@@ -1,0 +1,131 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build directories
+/bin/
+/dist/
+/build/
+/tmp/
+
+# IDE specific files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+/logs/
+
+# Generated files
+/graph/generated/
+*.generated.go
+*_gen.go
+
+# Coverage reports
+coverage.txt
+coverage.html
+*.cover
+.coverage/
+
+# Debug files
+debug
+__debug_bin
+
+# Air (live reload) temp files
+tmp/
+
+# Config files with sensitive data
+configs/local.yml
+configs/production.yml
+configs/*.local.yml
+
+# Uploaded files
+/uploads/
+/storage/
+
+# Cache
+/cache/
+*.cache
+
+# Profiling
+*.prof
+*.pprof
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*
+
+# Project specific
+/kainuguru-api
+/cmd/api/api
+/cmd/scraper/scraper
+/cmd/migrator/migrator
+
+# Terraform (if used for infrastructure)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.cert
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Session files
+sessions/
+
+# Temporary files
+*.tmp
+*.temp
