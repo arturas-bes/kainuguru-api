@@ -42,7 +42,7 @@ type ProductMaster struct {
 	AvgPrice          *float64   `bun:"avg_price" json:"avg_price"`
 	MinPrice          *float64   `bun:"min_price" json:"min_price"`
 	MaxPrice          *float64   `bun:"max_price" json:"max_price"`
-	PriceTrend        string     `bun:"price_trend,default:'stable'" json:"price_trend"`
+	PriceTrend        ProductPriceTrend `bun:"price_trend,default:'stable'" json:"price_trend"`
 	LastPriceUpdate   *time.Time `bun:"last_price_update" json:"last_price_update"`
 
 	// Availability and popularity
@@ -84,13 +84,13 @@ const (
 	ProductMasterStatusDeleted  ProductMasterStatus = "deleted"
 )
 
-// PriceTrend represents price trend directions
-type PriceTrend string
+// ProductPriceTrend represents price trend directions for product masters
+type ProductPriceTrend string
 
 const (
-	PriceTrendIncreasing PriceTrend = "increasing"
-	PriceTrendDecreasing PriceTrend = "decreasing"
-	PriceTrendStable     PriceTrend = "stable"
+	ProductPriceTrendIncreasing ProductPriceTrend = "increasing"
+	ProductPriceTrendDecreasing ProductPriceTrend = "decreasing"
+	ProductPriceTrendStable     ProductPriceTrend = "stable"
 )
 
 // MatchingKeywords represents keywords used for product matching

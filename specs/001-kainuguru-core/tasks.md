@@ -264,49 +264,49 @@
 
 ### BDD Tests for User Story 3
 
-- [ ] T106 [P] [US3] BDD test for shopping list CRUD in tests/bdd/features/shopping_lists.feature
-- [ ] T107 [P] [US3] BDD test for list item management in tests/bdd/features/list_items.feature
-- [ ] T108 [P] [US3] BDD test for list persistence in tests/bdd/features/list_persistence.feature
+- [X] T106 [P] [US3] BDD test for shopping list CRUD in tests/bdd/features/shopping_lists.feature
+- [X] T107 [P] [US3] BDD test for list item management in tests/bdd/features/list_items.feature
+- [X] T108 [P] [US3] BDD test for list persistence in tests/bdd/features/list_persistence.feature
 
 ### Database Schema for User Story 3
 
-- [ ] T109 [US3] Create shopping_lists table migration in migrations/013_create_shopping_lists.sql
-- [ ] T110 [US3] Create shopping_list_items table migration in migrations/014_create_list_items.sql
-- [ ] T111 [US3] Create product_masters table migration in migrations/015_create_product_masters.sql
-- [ ] T112 [US3] Create product_tags table migration in migrations/016_create_tags.sql
+- [X] T109 [US3] Create shopping_lists table migration in migrations/013_create_shopping_lists.sql
+- [X] T110 [US3] Create shopping_list_items table migration in migrations/014_create_list_items.sql
+- [X] T111 [US3] Create product_masters table migration in migrations/015_create_product_masters.sql
+- [X] T112 [US3] Create product_tags table migration in migrations/016_create_tags.sql
 
 ### Models for User Story 3
 
-- [ ] T113 [P] [US3] Create ShoppingList model in internal/models/shopping_list.go
-- [ ] T114 [P] [US3] Create ShoppingListItem model in internal/models/shopping_list_item.go
-- [ ] T115 [P] [US3] Create ProductMaster model in internal/models/product_master.go
-- [ ] T116 [P] [US3] Create ProductTag model in internal/models/product_tag.go
+- [X] T113 [P] [US3] Create ShoppingList model in internal/models/shopping_list.go
+- [X] T114 [P] [US3] Create ShoppingListItem model in internal/models/shopping_list_item.go
+- [X] T115 [P] [US3] Create ProductMaster model in internal/models/product_master.go
+- [X] T116 [P] [US3] Create ProductTag model in internal/models/product_tag.go
 
 ### Shopping List Service for User Story 3
 
-- [ ] T117 [US3] Create shopping list service in internal/services/shopping/shopping_list.go
-- [ ] T118 [US3] Implement 3-tier item matching in internal/services/shopping/item_matcher.go
-- [ ] T119 [US3] Add item availability tracker in internal/services/shopping/availability.go
-- [ ] T120 [US3] Create alternative suggester in internal/services/shopping/suggester.go
-- [ ] T121 [US3] Implement list sharing functionality in internal/services/shopping/sharing.go
+- [X] T117 [US3] Create shopping list service in internal/services/shopping/shopping_list.go
+- [X] T118 [US3] Implement 3-tier item matching in internal/services/shopping/item_matcher.go
+- [X] T119 [US3] Add item availability tracker in internal/services/shopping/availability.go
+- [X] T120 [US3] Create alternative suggester in internal/services/shopping/suggester.go
+- [X] T121 [US3] Implement list sharing functionality in internal/services/shopping/sharing.go
 
 ### Product Matching for User Story 3
 
-- [ ] T122 [US3] Create product master service in internal/services/product/master.go
-- [ ] T123 [US3] Implement tag-based matching in internal/services/product/tag_matcher.go
-- [ ] T124 [US3] Add confidence scoring in internal/services/product/confidence.go
+- [X] T122 [US3] Create product master service in internal/services/product/master.go
+- [X] T123 [US3] Implement tag-based matching in internal/services/product/tag_matcher.go
+- [X] T124 [US3] Add confidence scoring in internal/services/product/confidence.go
 
 ### Repositories for User Story 3
 
-- [ ] T125 [US3] Implement ShoppingListRepository in internal/repository/shopping_list_repository.go
-- [ ] T126 [US3] Create ProductMasterRepository in internal/repository/product_master_repository.go
+- [X] T125 [US3] Implement ShoppingListRepository in internal/repository/shopping_list_repository.go
+- [X] T126 [US3] Create ProductMasterRepository in internal/repository/product_master_repository.go
 
 ### GraphQL API for User Story 3
 
-- [ ] T127 [US3] Add shopping list schema to GraphQL in graph/schema.graphqls
-- [ ] T128 [US3] Implement shopping list mutations in internal/handlers/shopping_list_resolver.go
-- [ ] T129 [US3] Add list item mutations in internal/handlers/list_item_resolver.go
-- [ ] T130 [US3] Create list sharing resolvers in internal/handlers/sharing_resolver.go
+- [X] T127 [US3] Add shopping list schema to GraphQL in graph/schema.graphqls
+- [X] T128 [US3] Implement shopping list mutations in internal/handlers/shopping_list_resolver.go
+- [X] T129 [US3] Add list item mutations in internal/handlers/list_item_resolver.go
+- [X] T130 [US3] Create list sharing resolvers in internal/handlers/sharing_resolver.go
 
 **Checkpoint**: User Story 3 complete - users can manage persistent shopping lists
 
@@ -320,24 +320,24 @@
 
 ### BDD Tests for User Story 4
 
-- [ ] T131 [P] [US4] BDD test for price history viewing in tests/bdd/features/price_history.feature
-- [ ] T132 [P] [US4] BDD test for price trend analysis in tests/bdd/features/price_trends.feature
+- [X] T131 [P] [US4] BDD test for price history viewing in tests/bdd/features/price_history.feature
+- [X] T132 [P] [US4] BDD test for price trend analysis in tests/bdd/features/price_trends.feature
 
 ### Price History Service for User Story 4
 
-- [ ] T133 [US4] Create price history service in internal/services/price/history.go
-- [ ] T134 [US4] Implement price aggregation in internal/services/price/aggregator.go
-- [ ] T135 [US4] Add trend calculator in internal/services/price/trends.go
+- [X] T133 [US4] Create price history service in internal/services/price/history.go
+- [X] T134 [US4] Implement price aggregation in internal/services/price/aggregator.go
+- [X] T135 [US4] Add trend calculator in internal/services/price/trends.go
 
 ### Data Archival for User Story 4
 
-- [ ] T136 [US4] Create archival service in internal/services/archive/archiver.go
-- [ ] T137 [US4] Implement image removal for archives in internal/services/archive/cleaner.go
+- [X] T136 [US4] Create archival service in internal/services/archive/archiver.go
+- [X] T137 [US4] Implement image removal for archives in internal/services/archive/cleaner.go
 
 ### GraphQL API for User Story 4
 
-- [ ] T138 [US4] Add price history schema to GraphQL in graph/schema.graphqls
-- [ ] T139 [US4] Implement price history resolver in internal/handlers/price_history_resolver.go
+- [X] T138 [US4] Add price history schema to GraphQL in internal/graphql/schema/schema.graphql
+- [X] T139 [US4] Implement price history resolver in internal/handlers/price_history_resolver.go
 
 **Checkpoint**: User Story 4 complete - users can track price history
 
@@ -483,16 +483,39 @@ With 3 developers:
   - ✅ Authentication middleware and GraphQL integration
   - ✅ Complete user and session repositories
 
+### ✅ COMPLETED PHASES (CONTINUED)
+- **Phase 6: User Story 3** - 100% complete (25/25 tasks)
+  - ✅ Shopping list models and repositories
+  - ✅ 3-tier item matching system
+  - ✅ Item availability tracking
+  - ✅ Alternative product suggestions
+  - ✅ List sharing functionality
+  - ✅ Product master management
+  - ✅ GraphQL API integration
+  - ✅ BDD test scenarios
+
+### ✅ COMPLETED PHASES (CONTINUED)
+- **Phase 7: User Story 4** - 100% complete (9/9 tasks)
+  - ✅ Price history models and database schema
+  - ✅ Price trend analysis with statistical calculations
+  - ✅ Price aggregation by time periods and stores
+  - ✅ Price prediction using linear regression
+  - ✅ Buying recommendations based on trends
+  - ✅ Data archival and cleanup services
+  - ✅ GraphQL API with comprehensive price queries
+  - ✅ BDD test scenarios for price analysis
+
 ### 🚧 READY FOR NEXT PHASES
-- **Phase 6: User Story 3** - Shopping lists (ready to start)
-- **Phase 7: User Story 4** - Price history (can run in parallel)
+- **Phase 8: Polish & Cross-Cutting Concerns** - Final improvements (ready to start)
 
 ### 📊 SUMMARY
-- **Total MVP + Authentication Tasks**: 87 tasks (65 MVP + 22 Auth)
-- **Completed**: 87 tasks (100%)
+- **Total MVP + Authentication + Shopping Lists + Price History**: 121 tasks (65 MVP + 22 Auth + 25 Shopping Lists + 9 Price History)
+- **Completed**: 121 tasks (100%)
 - **Core MVP**: ✅ COMPLETE (65/65 tasks)
 - **Authentication System**: ✅ COMPLETE (22/22 tasks)
-- **Ready for**: Phase 6 (Shopping Lists) or Phase 7 (Price History)
+- **Shopping Lists**: ✅ COMPLETE (25/25 tasks)
+- **Price History**: ✅ COMPLETE (9/9 tasks)
+- **Ready for**: Phase 8 (Polish & Cross-Cutting Concerns)
 - **Additional Features**: Scraping, AI integration (deferred to post-MVP)
 
 ---
