@@ -293,6 +293,386 @@ enum ProductMasterStatus {
   DEPRECATED
 }
 
+# Shopping List Types
+type ShoppingList {
+  id: Int!
+  userID: UUID!
+  name: String!
+  description: String
+  isDefault: Boolean!
+  isArchived: Boolean!
+  isPublic: Boolean!
+  shareCode: String
+  itemCount: Int!
+  completedItemCount: Int!
+  estimatedTotalPrice: Float
+  createdAt: Time!
+  updatedAt: Time!
+  lastAccessedAt: Time!
+
+  # Computed fields
+  completionPercentage: Float!
+  isCompleted: Boolean!
+  canBeShared: Boolean!
+
+  # Relations
+  user: User!
+  items(
+    filters: ShoppingListItemFilters
+    first: Int
+    after: String
+  ): ShoppingListItemConnection!
+  categories: [ShoppingListCategory!]!
+}
+
+type ShoppingListItem {
+  id: Int!
+  shoppingListID: Int!
+  userID: UUID!
+  description: String!
+  normalizedDescription: String!
+  notes: String
+  quantity: Float!
+  unit: String
+  unitType: String
+  isChecked: Boolean!
+  checkedAt: Time
+  checkedByUserID: UUID
+  sortOrder: Int!
+  productMasterID: Int
+  linkedProductID: Int
+  storeID: Int
+  flyerID: Int
+  estimatedPrice: Float
+  actualPrice: Float
+  priceSource: String
+  category: String
+  tags: [String!]!
+  suggestionSource: String
+  matchingConfidence: Float
+  availabilityStatus: String!
+  availabilityCheckedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  totalEstimatedPrice: Float!
+  totalActualPrice: Float!
+  isLinked: Boolean!
+
+  # Relations
+  shoppingList: ShoppingList!
+  user: User!
+  checkedByUser: User
+  productMaster: ProductMaster
+  linkedProduct: Product
+  store: Store
+  flyer: Flyer
+}
+
+type ShoppingListCategory {
+  id: Int!
+  shoppingListID: Int!
+  userID: UUID!
+  name: String!
+  colorHex: String
+  iconName: String
+  sortOrder: Int!
+  itemCount: Int!
+  createdAt: Time!
+
+  # Relations
+  shoppingList: ShoppingList!
+  user: User!
+}
+
+type ProductCategory {
+  id: Int!
+  name: String!
+  normalizedName: String!
+  parentID: Int
+  displayNameLT: String!
+  displayNameEN: String
+  description: String
+  iconName: String
+  colorHex: String
+  level: Int!
+  sortOrder: Int!
+  keywords: [String!]!
+  excludedKeywords: [String!]!
+  productCount: Int!
+  usageCount: Int!
+  isActive: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Relations
+  parent: ProductCategory
+  children: [ProductCategory!]!
+}
+
+type ProductTag {
+  id: Int!
+  name: String!
+  normalizedName: String!
+  displayNameLT: String!
+  displayNameEN: String
+  description: String
+  colorHex: String
+  tagType: String!
+  isSystemTag: Boolean!
+  usageCount: Int!
+  isActive: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type UserTag {
+  id: Int!
+  userID: UUID!
+  tagName: String!
+  displayName: String
+  colorHex: String
+  usageCount: Int!
+  lastUsedAt: Time
+  createdAt: Time!
+
+  # Relations
+  user: User!
+}
+
+enum SuggestionSource {
+  MANUAL
+  FLYER
+  PREVIOUS_ITEMS
+  POPULAR
+  AUTO_COMPLETE
+}
+
+enum PriceSource {
+  FLYER
+  USER_ESTIMATE
+  HISTORICAL
+  ACTUAL
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  UNKNOWN
+  SEASONAL
+}
+
+enum UnitType {
+  VOLUME
+  WEIGHT
+  COUNT
+}
+
+enum TagType {
+  GENERAL
+  DIETARY
+  ALLERGEN
+  QUALITY
+  SEASONAL
+}
+
+# Shopping List Connection Types
+type ShoppingListConnection {
+  edges: [ShoppingListEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListEdge {
+  node: ShoppingList!
+  cursor: String!
+}
+
+type ShoppingListItemConnection {
+  edges: [ShoppingListItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListItemEdge {
+  node: ShoppingListItem!
+  cursor: String!
+}
+
+type ProductCategoryConnection {
+  edges: [ProductCategoryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductCategoryEdge {
+  node: ProductCategory!
+  cursor: String!
+}
+
+type ProductTagConnection {
+  edges: [ProductTagEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductTagEdge {
+  node: ProductTag!
+  cursor: String!
+}
+
+# Shopping List Input Types
+input CreateShoppingListInput {
+  name: String!
+  description: String
+  isDefault: Boolean = false
+}
+
+input UpdateShoppingListInput {
+  name: String
+  description: String
+  isDefault: Boolean
+}
+
+input ShoppingListFilters {
+  isDefault: Boolean
+  isArchived: Boolean
+  isPublic: Boolean
+  hasItems: Boolean
+  createdAfter: Time
+  createdBefore: Time
+  updatedAfter: Time
+  updatedBefore: Time
+}
+
+input CreateShoppingListItemInput {
+  shoppingListID: Int!
+  description: String!
+  notes: String
+  quantity: Float = 1
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!] = []
+  estimatedPrice: Float
+  productMasterID: Int
+  linkedProductID: Int
+  storeID: Int
+}
+
+input UpdateShoppingListItemInput {
+  description: String
+  notes: String
+  quantity: Float
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!]
+  estimatedPrice: Float
+  actualPrice: Float
+}
+
+input ShoppingListItemFilters {
+  isChecked: Boolean
+  categories: [String!]
+  tags: [String!]
+  hasPrice: Boolean
+  isLinked: Boolean
+  storeIDs: [Int!]
+  createdAfter: Time
+  createdBefore: Time
+}
+
+input BulkItemOperationInput {
+  itemIDs: [Int!]!
+}
+
+input ReorderItemsInput {
+  listID: Int!
+  itemOrders: [ItemOrderInput!]!
+}
+
+input ItemOrderInput {
+  itemID: Int!
+  sortOrder: Int!
+}
+
+input ProductMatchFilters {
+  storeIDs: [Int!]
+  categories: [String!]
+  brands: [String!]
+  minConfidence: Float
+  onlyAvailable: Boolean = false
+  onlyOnSale: Boolean = false
+  priceRange: PriceRangeInput
+}
+
+input PriceRangeInput {
+  min: Float
+  max: Float
+}
+
+input CategoryFilters {
+  parentID: Int
+  level: Int
+  isActive: Boolean
+}
+
+input TagFilters {
+  tagType: [TagType!]
+  isSystem: Boolean
+  isActive: Boolean
+}
+
+# Response Types
+type ShoppingListStats {
+  totalItems: Int!
+  completedItems: Int!
+  completionRate: Float!
+  estimatedTotal: Float
+  categoriesUsed: Int!
+  tagsUsed: Int!
+  lastUpdated: Time!
+  averageItemPrice: Float
+  linkedItemsCount: Int!
+  unlinkedItemsCount: Int!
+}
+
+type ItemSuggestion {
+  description: String!
+  source: String!
+  productMaster: ProductMaster
+  product: Product
+  estimatedPrice: Float
+  confidence: Float!
+}
+
+type ProductMatch {
+  product: Product!
+  productMaster: ProductMaster
+  confidence: Float!
+  priceMatch: Boolean!
+  brandMatch: Boolean!
+  sizeMatch: Boolean!
+}
+
+type AutoMatchResult {
+  itemID: Int!
+  item: ShoppingListItem!
+  match: ProductMatch
+  success: Boolean!
+  reason: String!
+}
+
+type SmartSuggestion {
+  type: String!
+  productMaster: ProductMaster!
+  reason: String!
+  confidence: Float!
+  estimatedPrice: Float
+}
+
 # Connection Types for Pagination
 type StoreConnection {
   edges: [StoreEdge!]!
@@ -516,6 +896,60 @@ type Query {
     first: Int
     after: String
   ): ProductMasterConnection!
+
+  # Shopping List Queries (require auth)
+  shoppingList(id: Int!): ShoppingList
+  shoppingLists(
+    filters: ShoppingListFilters
+    first: Int
+    after: String
+  ): ShoppingListConnection!
+
+  sharedShoppingList(shareCode: String!): ShoppingList
+  myDefaultShoppingList: ShoppingList
+  myShoppingListStats: ShoppingListStats!
+
+  # Shopping List Item Queries (require auth)
+  shoppingListItem(id: Int!): ShoppingListItem
+  shoppingListItems(
+    listID: Int!
+    filters: ShoppingListItemFilters
+    first: Int
+    after: String
+  ): ShoppingListItemConnection!
+
+  # Item suggestions and matching
+  suggestItems(
+    query: String!
+    limit: Int = 10
+  ): [ItemSuggestion!]!
+
+  findMatchingProducts(
+    description: String!
+    filters: ProductMatchFilters
+  ): [ProductMatch!]!
+
+  smartSuggestions(
+    listID: Int!
+    limit: Int = 10
+  ): [SmartSuggestion!]!
+
+  # Category and Tag Queries
+  productCategories(
+    filters: CategoryFilters
+    first: Int
+    after: String
+  ): ProductCategoryConnection!
+
+  productTags(
+    filters: TagFilters
+    first: Int
+    after: String
+  ): ProductTagConnection!
+
+  myUserTags: [UserTag!]!
+
+  myShoppingListCategories(listID: Int!): [ShoppingListCategory!]!
 }
 
 # Search Input Types
@@ -679,6 +1113,54 @@ type Mutation {
 
   # Search Management
   refreshSearchSuggestions: RefreshSearchSuggestionsResponse!
+
+  # Shopping List Mutations (require auth)
+  createShoppingList(input: CreateShoppingListInput!): ShoppingList!
+  updateShoppingList(id: Int!, input: UpdateShoppingListInput!): ShoppingList!
+  deleteShoppingList(id: Int!): Boolean!
+  archiveShoppingList(id: Int!): ShoppingList!
+  unarchiveShoppingList(id: Int!): ShoppingList!
+  setDefaultShoppingList(id: Int!): ShoppingList!
+  generateShareCode(id: Int!): ShoppingList!
+  disableSharing(id: Int!): ShoppingList!
+  duplicateShoppingList(id: Int!, newName: String!): ShoppingList!
+  clearCompletedItems(id: Int!): ShoppingList!
+
+  # Shopping List Item Mutations (require auth)
+  createShoppingListItem(input: CreateShoppingListItemInput!): ShoppingListItem!
+  updateShoppingListItem(id: Int!, input: UpdateShoppingListItemInput!): ShoppingListItem!
+  deleteShoppingListItem(id: Int!): Boolean!
+  checkShoppingListItem(id: Int!): ShoppingListItem!
+  uncheckShoppingListItem(id: Int!): ShoppingListItem!
+
+  # Bulk operations
+  bulkCheckItems(input: BulkItemOperationInput!): [ShoppingListItem!]!
+  bulkUncheckItems(input: BulkItemOperationInput!): [ShoppingListItem!]!
+  bulkDeleteItems(input: BulkItemOperationInput!): Boolean!
+  reorderItems(input: ReorderItemsInput!): [ShoppingListItem!]!
+
+  # Item matching and suggestions
+  matchItemToProduct(itemID: Int!, productID: Int!): ShoppingListItem!
+  matchItemToProductMaster(itemID: Int!, productMasterID: Int!): ShoppingListItem!
+  autoMatchItem(itemID: Int!): AutoMatchResult!
+  batchAutoMatchItems(listID: Int!): [AutoMatchResult!]!
+
+  # Category and tag management
+  createShoppingListCategory(
+    listID: Int!
+    name: String!
+    colorHex: String
+    iconName: String
+  ): ShoppingListCategory!
+
+  updateShoppingListCategory(
+    id: Int!
+    name: String
+    colorHex: String
+    iconName: String
+  ): ShoppingListCategory!
+
+  deleteShoppingListCategory(id: Int!): Boolean!
 
   # Placeholder mutations for future implementation
   _placeholder: Boolean

@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
@@ -444,34 +445,48 @@ func mapProductMasterToGraphQL(master *models.ProductMaster) *model.ProductMaste
 		return nil
 	}
 
-	matchingKeywords, _ := master.GetMatchingKeywords()
-	alternativeNames, _ := master.GetAlternativeNames()
-	exclusionKeywords, _ := master.GetExclusionKeywords()
+	// Handle pointer fields safely
+	var brand, category, subcategory, standardUnit, unitType string
+	if master.Brand != nil {
+		brand = *master.Brand
+	}
+	if master.Category != nil {
+		category = *master.Category
+	}
+	if master.Subcategory != nil {
+		subcategory = *master.Subcategory
+	}
+	if master.StandardUnit != nil {
+		standardUnit = *master.StandardUnit
+	}
+	if master.UnitType != nil {
+		unitType = *master.UnitType
+	}
 
 	return &model.ProductMaster{
-		ID:                   master.ID,
-		CanonicalName:        master.CanonicalName,
+		ID:                   int(master.ID),
+		CanonicalName:        master.Name, // Updated field name
 		NormalizedName:       master.NormalizedName,
-		Brand:                master.Brand,
-		Category:             master.Category,
-		Subcategory:          master.Subcategory,
-		StandardUnitSize:     master.StandardUnitSize,
-		StandardUnitType:     master.StandardUnitType,
-		StandardPackageSize:  master.StandardPackageSize,
-		StandardWeight:       master.StandardWeight,
-		StandardVolume:       master.StandardVolume,
-		MatchingKeywords:     matchingKeywords,
-		AlternativeNames:     alternativeNames,
-		ExclusionKeywords:    exclusionKeywords,
+		Brand:                brand,
+		Category:             category,
+		Subcategory:          &subcategory,
+		StandardUnitSize:     &standardUnit,
+		StandardUnitType:     &unitType,
+		StandardPackageSize:  nil, // Not in new schema
+		StandardWeight:       nil, // Not in new schema
+		StandardVolume:       nil, // Not in new schema
+		MatchingKeywords:     json.RawMessage{}, // Convert to JSON later
+		AlternativeNames:     json.RawMessage{}, // Convert to JSON later
+		ExclusionKeywords:    json.RawMessage{}, // Not in new schema
 		ConfidenceScore:      master.ConfidenceScore,
-		MatchedProducts:      master.MatchedProducts,
-		SuccessfulMatches:    master.SuccessfulMatches,
-		FailedMatches:        master.FailedMatches,
+		MatchedProducts:      master.MatchCount,
+		SuccessfulMatches:    master.MatchCount, // Assume all successful for now
+		FailedMatches:        0, // Not tracked in new schema
 		Status:               mapProductMasterStatusToGraphQL(master.Status),
-		IsVerified:           master.IsVerified,
-		LastMatchedAt:        master.LastMatchedAt,
-		VerifiedAt:           master.VerifiedAt,
-		VerifiedBy:           master.VerifiedBy,
+		IsVerified:           false, // Not in new schema
+		LastMatchedAt:        master.LastSeenDate,
+		VerifiedAt:           nil, // Not in new schema
+		VerifiedBy:           nil, // Not in new schema
 		CreatedAt:            master.CreatedAt,
 		UpdatedAt:            master.UpdatedAt,
 		MatchSuccessRate:     master.GetMatchSuccessRate(),
@@ -484,14 +499,12 @@ func mapProductMasterStatusToGraphQL(status string) model.ProductMasterStatus {
 		return model.ProductMasterStatusActive
 	case string(models.ProductMasterStatusInactive):
 		return model.ProductMasterStatusInactive
-	case string(models.ProductMasterStatusPending):
-		return model.ProductMasterStatusPending
-	case string(models.ProductMasterStatusDuplicate):
-		return model.ProductMasterStatusDuplicate
-	case string(models.ProductMasterStatusDeprecated):
-		return model.ProductMasterStatusDeprecated
+	case string(models.ProductMasterStatusMerged):
+		return model.ProductMasterStatusDuplicate // Map merged to duplicate for compatibility
+	case string(models.ProductMasterStatusDeleted):
+		return model.ProductMasterStatusDeprecated // Map deleted to deprecated for compatibility
 	default:
-		return model.ProductMasterStatusPending
+		return model.ProductMasterStatusActive
 	}
 }
 

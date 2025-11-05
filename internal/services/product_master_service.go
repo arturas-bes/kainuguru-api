@@ -20,11 +20,11 @@ func NewProductMasterService(db *bun.DB) ProductMasterService {
 }
 
 // Basic CRUD operations
-func (s *productMasterService) GetByID(ctx context.Context, id int) (*models.ProductMaster, error) {
+func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.ProductMaster, error) {
 	return nil, fmt.Errorf("productMasterService.GetByID not implemented")
 }
 
-func (s *productMasterService) GetByIDs(ctx context.Context, ids []int) ([]*models.ProductMaster, error) {
+func (s *productMasterService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ProductMaster, error) {
 	return nil, fmt.Errorf("productMasterService.GetByIDs not implemented")
 }
 
@@ -40,7 +40,7 @@ func (s *productMasterService) Update(ctx context.Context, master *models.Produc
 	return fmt.Errorf("productMasterService.Update not implemented")
 }
 
-func (s *productMasterService) Delete(ctx context.Context, id int) error {
+func (s *productMasterService) Delete(ctx context.Context, id int64) error {
 	return fmt.Errorf("productMasterService.Delete not implemented")
 }
 
@@ -66,7 +66,7 @@ func (s *productMasterService) FindMatchingMasters(ctx context.Context, productN
 	return nil, fmt.Errorf("productMasterService.FindMatchingMasters not implemented")
 }
 
-func (s *productMasterService) MatchProduct(ctx context.Context, productID int, masterID int) error {
+func (s *productMasterService) MatchProduct(ctx context.Context, productID int, masterID int64) error {
 	return fmt.Errorf("productMasterService.MatchProduct not implemented")
 }
 
@@ -75,20 +75,20 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 }
 
 // Verification operations
-func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID int, verifierID string) error {
+func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID int64, verifierID string) error {
 	return fmt.Errorf("productMasterService.VerifyProductMaster not implemented")
 }
 
-func (s *productMasterService) DeactivateProductMaster(ctx context.Context, masterID int) error {
+func (s *productMasterService) DeactivateProductMaster(ctx context.Context, masterID int64) error {
 	return fmt.Errorf("productMasterService.DeactivateProductMaster not implemented")
 }
 
-func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int, duplicateOfID int) error {
+func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int64, duplicateOfID int64) error {
 	return fmt.Errorf("productMasterService.MarkAsDuplicate not implemented")
 }
 
 // Statistics
-func (s *productMasterService) GetMatchingStatistics(ctx context.Context, masterID int) (*ProductMasterStats, error) {
+func (s *productMasterService) GetMatchingStatistics(ctx context.Context, masterID int64) (*ProductMasterStats, error) {
 	return nil, fmt.Errorf("productMasterService.GetMatchingStatistics not implemented")
 }
 
