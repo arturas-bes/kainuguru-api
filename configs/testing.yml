@@ -1,0 +1,81 @@
+server:
+  port: 8081
+  host: "localhost"
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 30s
+  graceful_shutdown_timeout: 5s
+
+database:
+  host: localhost
+  port: 5432
+  name: kainuguru_test
+  user: kainuguru_user
+  password: kainuguru_pass
+  ssl_mode: disable
+  max_open_conns: 10
+  max_idle_conns: 2
+  conn_max_lifetime: 30m
+  timezone: "Europe/Vilnius"
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 1  # Use different database for tests
+  max_retries: 1
+  pool_size: 5
+
+logging:
+  level: warn
+  format: json
+  output: stdout
+
+openai:
+  api_key: "test-key"
+  model: "gpt-4o"
+  max_tokens: 1000
+  temperature: 0.1
+  timeout: 10s
+  max_retries: 1
+
+scraper:
+  user_agent: "KainuguruBot/1.0 (Test)"
+  request_timeout: 10s
+  max_concurrent_requests: 2
+  rate_limit_per_minute: 10
+  retry_attempts: 1
+  retry_delay: 1s
+
+worker:
+  max_workers: 1
+  poll_interval: 1s
+  job_timeout: 30s
+  max_retries: 1
+
+cors:
+  allowed_origins:
+    - "http://localhost:3000"
+  allowed_methods:
+    - GET
+    - POST
+    - OPTIONS
+  allowed_headers:
+    - Content-Type
+    - Authorization
+  expose_headers:
+    - Content-Length
+  allow_credentials: true
+  max_age: 3600
+
+auth:
+  jwt_secret: "test-secret"
+  jwt_expires_in: 1h
+  bcrypt_cost: 4  # Lower cost for faster tests
+  session_timeout: 1h
+
+app:
+  name: "Kainuguru"
+  version: "1.0.0"
+  environment: "testing"
+  debug: false

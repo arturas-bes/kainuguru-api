@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kainuguru
+      POSTGRES_USER: kainuguru_user
+      POSTGRES_PASSWORD: kainuguru_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kainuguru_user -d kainuguru"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=development
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=kainuguru
+      - DB_USER=kainuguru_user
+      - DB_PASSWORD=kainuguru_pass
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/app
+      - go_modules:/go/pkg/mod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    working_dir: /app
+    command: ["go", "run", "cmd/api/main.go"]
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      - ENV=development
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=kainuguru
+      - DB_USER=kainuguru_user
+      - DB_PASSWORD=kainuguru_pass
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/app
+      - go_modules:/go/pkg/mod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    working_dir: /app
+    command: ["go", "run", "cmd/scraper/main.go"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  go_modules:

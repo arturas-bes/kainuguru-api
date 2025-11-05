@@ -1,0 +1,57 @@
+# Version control
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Build output
+build/
+dist/
+bin/
+
+# Dependencies
+vendor/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env*
+
+# Test files
+*_test.go
+tests/
+coverage/
+*.cover
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Configuration
+configs/*.local.yml
+configs/production.yml
+
+# Cache
+.cache
+tmp/
+
+# Terraform
+*.tf
+*.tfstate*
+.terraform/

@@ -1,11 +1,14 @@
 <!--
-Sync Impact Report (2025-11-04):
-- Version change: N/A → 1.0.0 (initial constitution)
-- Added principles: All core principles established
-- Added sections: Technical Values, Constraints, Quality Standards, Decision Framework, Success Metrics
-- Templates requiring updates: None (initial setup)
-- Follow-up TODOs:
-  - TODO(RATIFICATION_DATE): Set to project kickoff date once confirmed
+Sync Impact Report (2025-11-05):
+- Version change: 1.0.0 → 1.1.0 (minor bump - new governance procedures added)
+- Modified principles: V. Phase Quality Gates (new principle added)
+- Added sections: Phase Quality Gates governance, MCP Pull Request Requirements
+- Governance section: Enhanced with mandatory phase analysis and PR workflows
+- Templates requiring updates:
+  ✅ plan-template.md (Constitution Check section already supports new gates)
+  ✅ tasks-template.md (checkpoint structure aligns with phase requirements)
+  ✅ spec-template.md (no changes needed - requirements already support phased delivery)
+- Follow-up TODOs: None (all requirements integrated)
 -->
 
 # Kainuguru MVP Constitution
@@ -34,6 +37,13 @@ ChatGPT without cost controls initially. Monitor, then optimize.
 Choose the fastest path to working functionality. Use existing services
 (ChatGPT, PostgreSQL features) over custom implementations. Optimization
 comes after validation through real usage.
+
+### V. Phase Quality Gates
+After each implementation phase, ALL changes MUST be deeply analyzed and
+issues MUST be fixed before proceeding to the next phase. Every phase
+MUST conclude with a pull request created and merged via MCP GitHub
+integration. No phase progression without comprehensive validation and
+proper version control workflow.
 
 ## Technical Values
 
@@ -84,11 +94,46 @@ When in doubt, ask:
 
 ## Governance
 
+### Development Workflow
+
 - Reference KAINUGURU_MVP_FINAL.md for all decisions
 - Use TODO comments liberally for future work
 - Test critical paths, not edge cases
 - Constitution supersedes all other practices
+
+### Phase Quality Gates (MANDATORY)
+
+Every implementation phase MUST follow this workflow:
+
+1. **Deep Analysis**: Thoroughly analyze ALL changes made during the phase
+   - Review code quality and adherence to principles
+   - Identify and document any technical debt introduced
+   - Verify all TODOs are appropriately documented
+   - Check compliance with Lithuanian language requirements
+   - Validate performance against quality standards
+
+2. **Issue Resolution**: Fix ALL identified issues before phase completion
+   - Address code quality problems
+   - Resolve security vulnerabilities
+   - Fix functionality bugs
+   - Update documentation gaps
+   - No phase can be considered complete with known issues
+
+3. **Pull Request Workflow**: MANDATORY for every phase completion
+   - Create feature branch with descriptive name (###-feature-name format)
+   - Commit all phase changes with clear commit messages
+   - Create pull request via MCP GitHub integration
+   - Include comprehensive description of phase changes
+   - Merge pull request only after review and validation
+   - Delete feature branch after successful merge
+
+### Amendment Process
+
 - Amendments require documentation and migration plan
 - All PRs must verify compliance with core principles
+- Version increments follow semantic versioning:
+  - MAJOR: Backward incompatible governance/principle changes
+  - MINOR: New principles or expanded governance procedures
+  - PATCH: Clarifications, wording fixes, non-semantic refinements
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE) | **Last Amended**: 2025-11-04
+**Version**: 1.1.0 | **Ratified**: TODO(RATIFICATION_DATE) | **Last Amended**: 2025-11-05
