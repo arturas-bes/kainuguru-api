@@ -1,0 +1,72 @@
+server:
+  port: 8080
+  host: "localhost"
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  graceful_shutdown_timeout: "30s"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "kainuguru_dev"
+  user: "postgres"
+  password: "postgres"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  log_queries: true
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 10
+
+logging:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+
+openai:
+  api_key: ""
+  model: "gpt-4-vision-preview"
+  max_tokens: 4096
+  temperature: 0.1
+  timeout: "30s"
+
+scraper:
+  user_agent: "KainuguruBot/1.0 (Lithuanian grocery price aggregator)"
+  request_delay: "2s"
+  max_retries: 3
+  rate_limit_per_minute: 30
+  respect_robots_txt: true
+
+worker:
+  num_workers: 4
+  queue_check_interval: "10s"
+  job_timeout: "10m"
+  max_retry_attempts: 3
+
+cors:
+  allowed_origins: ["http://localhost:3000", "http://localhost:8080"]
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["Content-Type", "Authorization", "X-Requested-With"]
+  exposed_headers: ["X-Total-Count"]
+  allow_credentials: true
+  max_age: 86400
+
+auth:
+  jwt_secret: "dev-secret-key-change-in-production"
+  jwt_expires_in: "24h"
+  bcrypt_cost: 10
+  session_timeout: "30m"
+
+app:
+  name: "Kainuguru API"
+  version: "1.0.0"
+  environment: "development"
+  debug: true

@@ -126,7 +126,7 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 	app.All("/graphql", handlers.GraphQLPlaceholder())
 
 	// GraphQL playground (development only)
-	app.Get("/playground", handlers.PlaygroundPlaceholder())
+	app.Get("/playground", handlers.PlaygroundHandler())
 }
 
 func errorHandler(c *fiber.Ctx, err error) error {
