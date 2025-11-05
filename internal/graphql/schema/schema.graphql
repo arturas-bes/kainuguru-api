@@ -1,0 +1,435 @@
+# Kainuguru GraphQL Schema
+# Browse Weekly Grocery Flyers API
+
+scalar Time
+scalar JSON
+
+# Store Types
+type Store {
+  id: Int!
+  code: String!
+  name: String!
+  logoURL: String
+  websiteURL: String
+  flyerSourceURL: String
+  locations: [StoreLocation!]!
+  scraperConfig: JSON
+  scrapeSchedule: String!
+  lastScrapedAt: Time
+  isActive: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Relations
+  flyers(
+    filters: FlyerFilters
+    first: Int
+    after: String
+  ): FlyerConnection!
+}
+
+type StoreLocation {
+  city: String!
+  lat: Float!
+  lng: Float!
+  address: String!
+}
+
+# Flyer Types
+type Flyer {
+  id: Int!
+  storeID: Int!
+  title: String
+  validFrom: Time!
+  validTo: Time!
+  pageCount: Int
+  sourceURL: String
+  isArchived: Boolean!
+  archivedAt: Time
+  status: FlyerStatus!
+  extractionStartedAt: Time
+  extractionCompletedAt: Time
+  productsExtracted: Int!
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  isValid: Boolean!
+  isCurrent: Boolean!
+  daysRemaining: Int!
+  validityPeriod: String!
+  processingDuration: String
+
+  # Relations
+  store: Store!
+  flyerPages(
+    filters: FlyerPageFilters
+    first: Int
+    after: String
+  ): FlyerPageConnection!
+  products(
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+}
+
+enum FlyerStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+# Flyer Page Types
+type FlyerPage {
+  id: Int!
+  flyerID: Int!
+  pageNumber: Int!
+  imageURL: String
+  imageWidth: Int
+  imageHeight: Int
+  status: FlyerPageStatus!
+  extractionStartedAt: Time
+  extractionCompletedAt: Time
+  productsExtracted: Int!
+  extractionErrors: Int!
+  lastExtractionError: String
+  lastErrorAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  hasImage: Boolean!
+  imageDimensions: ImageDimensions
+  processingDuration: String
+  extractionEfficiency: Float!
+
+  # Relations
+  flyer: Flyer!
+  products(
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+}
+
+enum FlyerPageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type ImageDimensions {
+  width: Int!
+  height: Int!
+}
+
+# Product Types
+type Product {
+  id: Int!
+  flyerID: Int!
+  flyerPageID: Int
+  storeID: Int!
+  productMasterID: Int
+  name: String!
+  normalizedName: String!
+  brand: String
+  category: String
+  subcategory: String
+  description: String
+  currentPrice: Float!
+  originalPrice: Float
+  discountPercent: Float
+  currency: String!
+  unitSize: String
+  unitType: String
+  unitPrice: String
+  packageSize: String
+  weight: String
+  volume: String
+  imageURL: String
+  boundingBox: ProductBoundingBox
+  pagePosition: ProductPosition
+  isOnSale: Boolean!
+  saleStartDate: Time
+  saleEndDate: Time
+  isAvailable: Boolean!
+  stockLevel: String
+  extractionConfidence: Float!
+  extractionMethod: String!
+  requiresReview: Boolean!
+  validFrom: Time!
+  validTo: Time!
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  isCurrentlyOnSale: Boolean!
+  discountAmount: Float!
+  isValid: Boolean!
+  isExpired: Boolean!
+  validityPeriod: String!
+
+  # Relations
+  flyer: Flyer!
+  flyerPage: FlyerPage
+  store: Store!
+  productMaster: ProductMaster
+}
+
+type ProductBoundingBox {
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+}
+
+type ProductPosition {
+  row: Int!
+  column: Int!
+  zone: String!
+}
+
+# Product Master Types
+type ProductMaster {
+  id: Int!
+  canonicalName: String!
+  normalizedName: String!
+  brand: String!
+  category: String!
+  subcategory: String
+  standardUnitSize: String
+  standardUnitType: String
+  standardPackageSize: String
+  standardWeight: String
+  standardVolume: String
+  matchingKeywords: JSON!
+  alternativeNames: JSON!
+  exclusionKeywords: JSON!
+  confidenceScore: Float!
+  matchedProducts: Int!
+  successfulMatches: Int!
+  failedMatches: Int!
+  status: ProductMasterStatus!
+  isVerified: Boolean!
+  lastMatchedAt: Time
+  verifiedAt: Time
+  verifiedBy: String
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  matchSuccessRate: Float!
+
+  # Relations
+  products(
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+}
+
+enum ProductMasterStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  DUPLICATE
+  DEPRECATED
+}
+
+# Connection Types for Pagination
+type StoreConnection {
+  edges: [StoreEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type StoreEdge {
+  node: Store!
+  cursor: String!
+}
+
+type FlyerConnection {
+  edges: [FlyerEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FlyerEdge {
+  node: Flyer!
+  cursor: String!
+}
+
+type FlyerPageConnection {
+  edges: [FlyerPageEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FlyerPageEdge {
+  node: FlyerPage!
+  cursor: String!
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+type ProductMasterConnection {
+  edges: [ProductMasterEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductMasterEdge {
+  node: ProductMaster!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Filter Input Types
+input StoreFilters {
+  isActive: Boolean
+  hasFlyers: Boolean
+  codes: [String!]
+}
+
+input FlyerFilters {
+  storeIDs: [Int!]
+  storeCodes: [String!]
+  status: [FlyerStatus!]
+  isArchived: Boolean
+  validFrom: Time
+  validTo: Time
+  isCurrent: Boolean
+  isValid: Boolean
+}
+
+input FlyerPageFilters {
+  flyerIDs: [Int!]
+  status: [FlyerPageStatus!]
+  hasImage: Boolean
+  hasProducts: Boolean
+  pageNumbers: [Int!]
+}
+
+input ProductFilters {
+  storeIDs: [Int!]
+  flyerIDs: [Int!]
+  flyerPageIDs: [Int!]
+  productMasterIDs: [Int!]
+  categories: [String!]
+  brands: [String!]
+  isOnSale: Boolean
+  isAvailable: Boolean
+  requiresReview: Boolean
+  minPrice: Float
+  maxPrice: Float
+  currency: String
+  validFrom: Time
+  validTo: Time
+}
+
+input ProductMasterFilters {
+  status: [ProductMasterStatus!]
+  isVerified: Boolean
+  isActive: Boolean
+  categories: [String!]
+  brands: [String!]
+  minMatches: Int
+  minConfidence: Float
+}
+
+# Query Root
+type Query {
+  # Store Queries
+  store(id: Int!): Store
+  storeByCode(code: String!): Store
+  stores(
+    filters: StoreFilters
+    first: Int
+    after: String
+  ): StoreConnection!
+
+  # Flyer Queries
+  flyer(id: Int!): Flyer
+  flyers(
+    filters: FlyerFilters
+    first: Int
+    after: String
+  ): FlyerConnection!
+
+  # Current and Valid Flyers (Main Browse Feature)
+  currentFlyers(
+    storeIDs: [Int!]
+    first: Int
+    after: String
+  ): FlyerConnection!
+
+  validFlyers(
+    storeIDs: [Int!]
+    first: Int
+    after: String
+  ): FlyerConnection!
+
+  # Flyer Page Queries
+  flyerPage(id: Int!): FlyerPage
+  flyerPages(
+    filters: FlyerPageFilters
+    first: Int
+    after: String
+  ): FlyerPageConnection!
+
+  # Product Queries
+  product(id: Int!): Product
+  products(
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+
+  # Product Search
+  searchProducts(
+    query: String!
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+
+  # Products on Sale
+  productsOnSale(
+    storeIDs: [Int!]
+    filters: ProductFilters
+    first: Int
+    after: String
+  ): ProductConnection!
+
+  # Product Master Queries
+  productMaster(id: Int!): ProductMaster
+  productMasters(
+    filters: ProductMasterFilters
+    first: Int
+    after: String
+  ): ProductMasterConnection!
+}
+
+# Mutation Root (placeholder for future features)
+type Mutation {
+  # Placeholder mutations for future implementation
+  _placeholder: Boolean
+}

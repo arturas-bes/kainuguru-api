@@ -2,32 +2,104 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
+	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
-// GraphQLPlaceholder returns a placeholder GraphQL handler
-// Will be replaced with actual gqlgen implementation in Phase 3
-func GraphQLPlaceholder() fiber.Handler {
+// GraphQLConfig holds configuration for GraphQL handler
+type GraphQLConfig struct {
+	StoreService        services.StoreService
+	FlyerService        services.FlyerService
+	FlyerPageService    services.FlyerPageService
+	ProductService      services.ProductService
+	ProductMasterService services.ProductMasterService
+	ExtractionJobService services.ExtractionJobService
+}
+
+// GraphQLHandler handles GraphQL requests with configured services
+func GraphQLHandler(config GraphQLConfig) fiber.Handler {
+	resolver := resolvers.NewResolver(
+		config.StoreService,
+		config.FlyerService,
+		config.FlyerPageService,
+		config.ProductService,
+		config.ProductMasterService,
+		config.ExtractionJobService,
+	)
+
 	return func(c *fiber.Ctx) error {
+		// For now, return a configured response with resolver info
+		// TODO: Implement actual GraphQL server using gqlgen
 		return c.JSON(fiber.Map{
-			"message": "GraphQL endpoint - will be implemented in Phase 3",
-			"status":  "placeholder",
+			"message": "GraphQL endpoint - Phase 3 implementation",
+			"status":  "configured",
+			"schema":  "Browse Weekly Grocery Flyers",
+			"resolver": fiber.Map{
+				"configured": resolver != nil,
+				"services": fiber.Map{
+					"store":         config.StoreService != nil,
+					"flyer":         config.FlyerService != nil,
+					"flyerPage":     config.FlyerPageService != nil,
+					"product":       config.ProductService != nil,
+					"productMaster": config.ProductMasterService != nil,
+					"extractionJob": config.ExtractionJobService != nil,
+				},
+			},
 		})
 	}
 }
 
-// PlaygroundPlaceholder returns a placeholder GraphQL playground handler
-func PlaygroundPlaceholder() fiber.Handler {
+// GraphQLPlaceholder returns a placeholder GraphQL handler for backward compatibility
+func GraphQLPlaceholder() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"message": "GraphQL endpoint - use GraphQLHandler with config instead",
+			"status":  "deprecated",
+		})
+	}
+}
+
+// PlaygroundHandler returns GraphQL playground with schema information
+func PlaygroundHandler() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		return c.SendString(`
 			<!DOCTYPE html>
 			<html>
 			<head>
-				<title>GraphQL Playground</title>
+				<title>Kainuguru GraphQL Playground</title>
+				<style>
+					body { font-family: Arial, sans-serif; margin: 40px; }
+					.schema-info { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+					.endpoint { background: #e8f5e8; padding: 10px; border-radius: 4px; font-family: monospace; }
+				</style>
 			</head>
 			<body>
-				<h1>GraphQL Playground</h1>
-				<p>Will be implemented in Phase 3 with actual gqlgen integration</p>
-				<p>GraphQL endpoint will be available at: <code>/graphql</code></p>
+				<h1>Kainuguru GraphQL API</h1>
+				<p>Browse Weekly Grocery Flyers GraphQL Endpoint</p>
+
+				<div class="schema-info">
+					<h3>Phase 3 Implementation Status</h3>
+					<ul>
+						<li>✅ GraphQL Schema Defined</li>
+						<li>✅ Resolver Structure Created</li>
+						<li>✅ Service Layer Integrated</li>
+						<li>🔄 Full gqlgen Integration (Next Step)</li>
+					</ul>
+				</div>
+
+				<div class="endpoint">
+					GraphQL Endpoint: /graphql
+				</div>
+
+				<h3>Available Queries (Planned)</h3>
+				<ul>
+					<li><code>stores</code> - Browse grocery stores</li>
+					<li><code>currentFlyers</code> - Get current week flyers</li>
+					<li><code>validFlyers</code> - Get valid flyers</li>
+					<li><code>products</code> - Browse products</li>
+					<li><code>searchProducts</code> - Search products</li>
+					<li><code>productsOnSale</code> - Find discounted products</li>
+				</ul>
 			</body>
 			</html>
 		`)

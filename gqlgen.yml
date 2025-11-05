@@ -1,0 +1,36 @@
+# GraphQL schema location
+schema:
+  - internal/graphql/schema/*.graphql
+
+# Where the generated server code will go
+exec:
+  filename: internal/graphql/generated/generated.go
+  package: generated
+
+# Where the GraphQL models will be generated
+model:
+  filename: internal/graphql/model/models_gen.go
+  package: model
+
+# Where the GraphQL resolvers will be generated
+resolver:
+  filename: internal/graphql/resolvers/generated.go
+  package: resolvers
+  type: Resolver
+
+# Scalar configuration
+models:
+  Time:
+    model: time.Time
+  JSON:
+    model: interface{}
+
+# Skip generating these types since we have custom implementations
+skip_mod_tidy: true
+
+# Autobind types where possible
+autobind:
+  - github.com/kainuguru/kainuguru-api/internal/models
+
+# Custom scalar mappings
+struct_tag: bun

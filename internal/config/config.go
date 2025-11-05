@@ -156,7 +156,7 @@ func validateConfig(cfg *Config) error {
 	if cfg.Auth.JWTSecret == "" {
 		return fmt.Errorf("JWT secret is required")
 	}
-	if cfg.OpenAI.APIKey == "" && cfg.App.Environment != "testing" {
+	if cfg.OpenAI.APIKey == "" && cfg.App.Environment != "testing" && cfg.App.Environment != "development" {
 		return fmt.Errorf("OpenAI API key is required")
 	}
 
