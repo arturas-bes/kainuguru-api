@@ -36,27 +36,27 @@ type HistoryService interface {
 
 // PriceStatistics contains statistical information about a product's price history
 type PriceStatistics struct {
-	ProductID        int       `json:"product_id"`
-	MinPrice         float64   `json:"min_price"`
-	MaxPrice         float64   `json:"max_price"`
-	AveragePrice     float64   `json:"average_price"`
-	CurrentPrice     float64   `json:"current_price"`
-	PriceEntries     int       `json:"price_entries"`
-	FirstRecorded    time.Time `json:"first_recorded"`
-	LastRecorded     time.Time `json:"last_recorded"`
-	StoreCount       int       `json:"store_count"`
-	VolatilityScore  float64   `json:"volatility_score"`
+	ProductID       int       `json:"product_id"`
+	MinPrice        float64   `json:"min_price"`
+	MaxPrice        float64   `json:"max_price"`
+	AveragePrice    float64   `json:"average_price"`
+	CurrentPrice    float64   `json:"current_price"`
+	PriceEntries    int       `json:"price_entries"`
+	FirstRecorded   time.Time `json:"first_recorded"`
+	LastRecorded    time.Time `json:"last_recorded"`
+	StoreCount      int       `json:"store_count"`
+	VolatilityScore float64   `json:"volatility_score"`
 }
 
 // PriceComparisonResult contains comparison data between current and historical prices
 type PriceComparisonResult struct {
-	CurrentPrice        float64   `json:"current_price"`
-	PreviousPrice       float64   `json:"previous_price"`
-	PriceChange         float64   `json:"price_change"`
-	PriceChangePercent  float64   `json:"price_change_percent"`
-	IsLowerThanAverage  bool      `json:"is_lower_than_average"`
-	AveragePrice        float64   `json:"average_price"`
-	LastUpdated         time.Time `json:"last_updated"`
+	CurrentPrice       float64   `json:"current_price"`
+	PreviousPrice      float64   `json:"previous_price"`
+	PriceChange        float64   `json:"price_change"`
+	PriceChangePercent float64   `json:"price_change_percent"`
+	IsLowerThanAverage bool      `json:"is_lower_than_average"`
+	AveragePrice       float64   `json:"average_price"`
+	LastUpdated        time.Time `json:"last_updated"`
 }
 
 // DateRangeFilter represents date range filtering options

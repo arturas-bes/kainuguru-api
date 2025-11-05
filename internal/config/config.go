@@ -5,30 +5,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/kainuguru/kainuguru-api/internal/database"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
+	Server   ServerConfig    `mapstructure:"server"`
 	Database database.Config `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
-	OpenAI   OpenAIConfig   `mapstructure:"openai"`
-	Scraper  ScraperConfig  `mapstructure:"scraper"`
-	Worker   WorkerConfig   `mapstructure:"worker"`
-	CORS     CORSConfig     `mapstructure:"cors"`
-	Auth     AuthConfig     `mapstructure:"auth"`
-	App      AppConfig      `mapstructure:"app"`
+	Redis    RedisConfig     `mapstructure:"redis"`
+	Logging  LoggingConfig   `mapstructure:"logging"`
+	OpenAI   OpenAIConfig    `mapstructure:"openai"`
+	Scraper  ScraperConfig   `mapstructure:"scraper"`
+	Worker   WorkerConfig    `mapstructure:"worker"`
+	CORS     CORSConfig      `mapstructure:"cors"`
+	Auth     AuthConfig      `mapstructure:"auth"`
+	App      AppConfig       `mapstructure:"app"`
 }
 
 type ServerConfig struct {
-	Port                     int           `mapstructure:"port"`
-	Host                     string        `mapstructure:"host"`
-	ReadTimeout              time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout             time.Duration `mapstructure:"write_timeout"`
-	IdleTimeout              time.Duration `mapstructure:"idle_timeout"`
-	GracefulShutdownTimeout  time.Duration `mapstructure:"graceful_shutdown_timeout"`
+	Port                    int           `mapstructure:"port"`
+	Host                    string        `mapstructure:"host"`
+	ReadTimeout             time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout            time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout             time.Duration `mapstructure:"idle_timeout"`
+	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout"`
 }
 
 type RedisConfig struct {
@@ -56,19 +56,25 @@ type OpenAIConfig struct {
 }
 
 type ScraperConfig struct {
-	UserAgent               string        `mapstructure:"user_agent"`
-	RequestTimeout          time.Duration `mapstructure:"request_timeout"`
-	MaxConcurrentRequests   int           `mapstructure:"max_concurrent_requests"`
-	RateLimitPerMinute      int           `mapstructure:"rate_limit_per_minute"`
-	RetryAttempts           int           `mapstructure:"retry_attempts"`
-	RetryDelay              time.Duration `mapstructure:"retry_delay"`
+	UserAgent             string        `mapstructure:"user_agent"`
+	RequestTimeout        time.Duration `mapstructure:"request_timeout"`
+	RequestDelay          time.Duration `mapstructure:"request_delay"`
+	MaxConcurrentRequests int           `mapstructure:"max_concurrent_requests"`
+	RateLimitPerMinute    int           `mapstructure:"rate_limit_per_minute"`
+	MaxRetries            int           `mapstructure:"max_retries"`
+	RetryAttempts         int           `mapstructure:"retry_attempts"`
+	RetryDelay            time.Duration `mapstructure:"retry_delay"`
+	RespectRobotsTxt      bool          `mapstructure:"respect_robots_txt"`
 }
 
 type WorkerConfig struct {
-	MaxWorkers   int           `mapstructure:"max_workers"`
-	PollInterval time.Duration `mapstructure:"poll_interval"`
-	JobTimeout   time.Duration `mapstructure:"job_timeout"`
-	MaxRetries   int           `mapstructure:"max_retries"`
+	NumWorkers           int           `mapstructure:"num_workers"`
+	MaxWorkers           int           `mapstructure:"max_workers"`
+	QueueCheckInterval   time.Duration `mapstructure:"queue_check_interval"`
+	PollInterval         time.Duration `mapstructure:"poll_interval"`
+	JobTimeout           time.Duration `mapstructure:"job_timeout"`
+	MaxRetryAttempts     int           `mapstructure:"max_retry_attempts"`
+	MaxRetries           int           `mapstructure:"max_retries"`
 }
 
 type CORSConfig struct {
@@ -81,10 +87,10 @@ type CORSConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret       string        `mapstructure:"jwt_secret"`
-	JWTExpiresIn    time.Duration `mapstructure:"jwt_expires_in"`
-	BCryptCost      int           `mapstructure:"bcrypt_cost"`
-	SessionTimeout  time.Duration `mapstructure:"session_timeout"`
+	JWTSecret      string        `mapstructure:"jwt_secret"`
+	JWTExpiresIn   time.Duration `mapstructure:"jwt_expires_in"`
+	BCryptCost     int           `mapstructure:"bcrypt_cost"`
+	SessionTimeout time.Duration `mapstructure:"session_timeout"`
 }
 
 type AppConfig struct {
@@ -97,38 +103,39 @@ type AppConfig struct {
 func Load(env string) (*Config, error) {
 	v := viper.New()
 
-	// Load from .env file first if it exists
+	// First, load YAML config for application settings
+	v.SetConfigName(env)
+	v.SetConfigType("yaml")
+	v.AddConfigPath("./configs")
+	v.AddConfigPath("../configs")
+	v.AddConfigPath("../../configs")
+
+	// Read YAML config (application settings like timeouts, retry counts)
+	if err := v.ReadInConfig(); err != nil {
+		// YAML config is optional, continue without it
+		v.SetConfigType("env")
+	}
+
+	// Then, load .env file for infrastructure settings (this will override YAML where applicable)
 	v.SetConfigFile(".env")
 	v.SetConfigType("env")
 
-	// Try to read .env file, but don't fail if it doesn't exist
-	if err := v.ReadInConfig(); err != nil {
+	// Merge .env into existing config
+	if err := v.MergeInConfig(); err != nil {
 		// Try environment-specific .env file
 		envFile := fmt.Sprintf(".env.%s", env)
 		v.SetConfigFile(envFile)
-		if err := v.ReadInConfig(); err != nil {
-			// If no .env files, try YAML config files
-			v.SetConfigName(env)
-			v.SetConfigType("yaml")
-			v.AddConfigPath("./configs")
-			v.AddConfigPath("../configs")
-			v.AddConfigPath("../../configs")
-
-			if err := v.ReadInConfig(); err != nil {
-				// If no config files found, continue with environment variables only
-				v.SetConfigType("env")
-			}
-		}
+		v.MergeInConfig() // Ignore error - .env files are optional
 	}
 
-	// Environment variable support with automatic binding
+	// Environment variable support with automatic binding (highest priority)
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Bind all environment variables to config structure
 	bindEnvironmentVariables(v)
 
-	// Set defaults
+	// Set defaults (lowest priority)
 	setDefaults(v)
 
 	// Unmarshal config
@@ -251,6 +258,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("redis.pool_size", 10)
 
 	// CORS defaults
+	v.SetDefault("cors.allowed_origins", []string{"http://localhost:3000", "http://localhost:8080"})
 	v.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
 	v.SetDefault("cors.allowed_headers", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"})
 	v.SetDefault("cors.exposed_headers", []string{"X-Request-ID"})

@@ -2,7 +2,7 @@
 -- +goose StatementBegin
 CREATE TABLE shopping_lists (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
     -- List details
     name VARCHAR(100) NOT NULL,

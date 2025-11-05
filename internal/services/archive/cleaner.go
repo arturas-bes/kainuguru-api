@@ -38,15 +38,15 @@ type CleanerService interface {
 
 // CleanupResult contains results of a cleanup operation
 type CleanupResult struct {
-	OperationType   string                 `json:"operation_type"`
-	FilesProcessed  int                    `json:"files_processed"`
-	FilesDeleted    int                    `json:"files_deleted"`
-	BytesFreed      int64                  `json:"bytes_freed"`
-	Duration        time.Duration          `json:"duration"`
-	DryRun          bool                   `json:"dry_run"`
-	Errors          []string               `json:"errors"`
-	Details         map[string]interface{} `json:"details"`
-	CreatedAt       time.Time              `json:"created_at"`
+	OperationType  string                 `json:"operation_type"`
+	FilesProcessed int                    `json:"files_processed"`
+	FilesDeleted   int                    `json:"files_deleted"`
+	BytesFreed     int64                  `json:"bytes_freed"`
+	Duration       time.Duration          `json:"duration"`
+	DryRun         bool                   `json:"dry_run"`
+	Errors         []string               `json:"errors"`
+	Details        map[string]interface{} `json:"details"`
+	CreatedAt      time.Time              `json:"created_at"`
 }
 
 // ValidationResult contains results of image reference validation
@@ -81,65 +81,65 @@ type OrphanedFile struct {
 
 // OptimizationOptions contains options for storage optimization
 type OptimizationOptions struct {
-	CompressImages    bool    `json:"compress_images"`
-	ResizeImages      bool    `json:"resize_images"`
-	MaxImageWidth     int     `json:"max_image_width"`
-	MaxImageHeight    int     `json:"max_image_height"`
-	ImageQuality      int     `json:"image_quality"`
-	ConvertToWebP     bool    `json:"convert_to_webp"`
-	RemoveDuplicates  bool    `json:"remove_duplicates"`
-	DedupeThreshold   float64 `json:"dedupe_threshold"`
-	DryRun            bool    `json:"dry_run"`
+	CompressImages   bool    `json:"compress_images"`
+	ResizeImages     bool    `json:"resize_images"`
+	MaxImageWidth    int     `json:"max_image_width"`
+	MaxImageHeight   int     `json:"max_image_height"`
+	ImageQuality     int     `json:"image_quality"`
+	ConvertToWebP    bool    `json:"convert_to_webp"`
+	RemoveDuplicates bool    `json:"remove_duplicates"`
+	DedupeThreshold  float64 `json:"dedupe_threshold"`
+	DryRun           bool    `json:"dry_run"`
 }
 
 // OptimizationResult contains results of storage optimization
 type OptimizationResult struct {
-	ImagesProcessed    int                    `json:"images_processed"`
-	ImagesCompressed   int                    `json:"images_compressed"`
-	ImagesResized      int                    `json:"images_resized"`
-	DuplicatesRemoved  int                    `json:"duplicates_removed"`
-	SpaceSaved         int64                  `json:"space_saved_bytes"`
-	Duration           time.Duration          `json:"duration"`
-	Details            map[string]interface{} `json:"details"`
-	Errors             []string               `json:"errors"`
-	CreatedAt          time.Time              `json:"created_at"`
+	ImagesProcessed   int                    `json:"images_processed"`
+	ImagesCompressed  int                    `json:"images_compressed"`
+	ImagesResized     int                    `json:"images_resized"`
+	DuplicatesRemoved int                    `json:"duplicates_removed"`
+	SpaceSaved        int64                  `json:"space_saved_bytes"`
+	Duration          time.Duration          `json:"duration"`
+	Details           map[string]interface{} `json:"details"`
+	Errors            []string               `json:"errors"`
+	CreatedAt         time.Time              `json:"created_at"`
 }
 
 // CleanupStatistics contains statistics about cleanup operations
 type CleanupStatistics struct {
-	TotalCleanupOperations  int                      `json:"total_cleanup_operations"`
-	TotalFilesDeleted       int                      `json:"total_files_deleted"`
-	TotalBytesFreed         int64                    `json:"total_bytes_freed"`
-	CleanupsByType          map[string]int           `json:"cleanups_by_type"`
-	BytesFreedByType        map[string]int64         `json:"bytes_freed_by_type"`
-	AverageCleanupDuration  time.Duration            `json:"average_cleanup_duration"`
-	LastCleanupTime         *time.Time               `json:"last_cleanup_time"`
-	RecentOperations        []*CleanupResult         `json:"recent_operations"`
-	StorageUtilization      *StorageUtilization      `json:"storage_utilization"`
-	ScheduledCleanups       []*ScheduledCleanup      `json:"scheduled_cleanups"`
+	TotalCleanupOperations int                 `json:"total_cleanup_operations"`
+	TotalFilesDeleted      int                 `json:"total_files_deleted"`
+	TotalBytesFreed        int64               `json:"total_bytes_freed"`
+	CleanupsByType         map[string]int      `json:"cleanups_by_type"`
+	BytesFreedByType       map[string]int64    `json:"bytes_freed_by_type"`
+	AverageCleanupDuration time.Duration       `json:"average_cleanup_duration"`
+	LastCleanupTime        *time.Time          `json:"last_cleanup_time"`
+	RecentOperations       []*CleanupResult    `json:"recent_operations"`
+	StorageUtilization     *StorageUtilization `json:"storage_utilization"`
+	ScheduledCleanups      []*ScheduledCleanup `json:"scheduled_cleanups"`
 }
 
 // StorageUtilization contains storage utilization information
 type StorageUtilization struct {
-	TotalSpace      int64     `json:"total_space"`
-	UsedSpace       int64     `json:"used_space"`
-	FreeSpace       int64     `json:"free_space"`
-	UsagePercent    float64   `json:"usage_percent"`
-	ImageStorage    int64     `json:"image_storage"`
-	ArchiveStorage  int64     `json:"archive_storage"`
-	TempStorage     int64     `json:"temp_storage"`
-	LastUpdated     time.Time `json:"last_updated"`
+	TotalSpace     int64     `json:"total_space"`
+	UsedSpace      int64     `json:"used_space"`
+	FreeSpace      int64     `json:"free_space"`
+	UsagePercent   float64   `json:"usage_percent"`
+	ImageStorage   int64     `json:"image_storage"`
+	ArchiveStorage int64     `json:"archive_storage"`
+	TempStorage    int64     `json:"temp_storage"`
+	LastUpdated    time.Time `json:"last_updated"`
 }
 
 // ScheduledCleanup represents a scheduled cleanup operation
 type ScheduledCleanup struct {
-	ID          string        `json:"id"`
-	Type        string        `json:"type"`
-	Schedule    string        `json:"schedule"`
-	Enabled     bool          `json:"enabled"`
-	LastRun     *time.Time    `json:"last_run"`
-	NextRun     time.Time     `json:"next_run"`
-	Config      *CleanupConfig `json:"config"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Schedule string         `json:"schedule"`
+	Enabled  bool           `json:"enabled"`
+	LastRun  *time.Time     `json:"last_run"`
+	NextRun  time.Time      `json:"next_run"`
+	Config   *CleanupConfig `json:"config"`
 }
 
 // CleanupConfig contains configuration for cleanup operations
@@ -186,23 +186,23 @@ type ImageReference struct {
 
 // cleanerService implements CleanerService
 type cleanerService struct {
-	storage         FileStorage
-	imageRepo       ImageRepository
-	flyerRepo       FlyerRepository
-	productRepo     ProductRepository
-	config          *CleanerServiceConfig
+	storage     FileStorage
+	imageRepo   ImageRepository
+	flyerRepo   FlyerRepository
+	productRepo ProductRepository
+	config      *CleanerServiceConfig
 }
 
 // CleanerServiceConfig contains service configuration
 type CleanerServiceConfig struct {
-	ImageBasePath      string
-	TempBasePath       string
-	ArchiveBasePath    string
-	MaxFileAge         time.Duration
-	MaxTempFileAge     time.Duration
-	ChunkSize          int
-	ConcurrentWorkers  int
-	ValidationEnabled  bool
+	ImageBasePath     string
+	TempBasePath      string
+	ArchiveBasePath   string
+	MaxFileAge        time.Duration
+	MaxTempFileAge    time.Duration
+	ChunkSize         int
+	ConcurrentWorkers int
+	ValidationEnabled bool
 }
 
 // NewCleanerService creates a new cleaner service
@@ -445,10 +445,10 @@ func (s *cleanerService) ValidateImageReferences(ctx context.Context) (*Validati
 	}
 
 	result := &ValidationResult{
-		TotalReferences:  len(references),
-		BrokenFiles:      []BrokenFile{},
-		OrphanedFiles:    []OrphanedFile{},
-		ValidationTime:   time.Now(),
+		TotalReferences: len(references),
+		BrokenFiles:     []BrokenFile{},
+		OrphanedFiles:   []OrphanedFile{},
+		ValidationTime:  time.Now(),
 	}
 
 	validCount := 0

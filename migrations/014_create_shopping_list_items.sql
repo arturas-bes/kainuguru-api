@@ -3,7 +3,7 @@
 CREATE TABLE shopping_list_items (
     id BIGSERIAL PRIMARY KEY,
     shopping_list_id BIGINT NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- For attribution
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- For attribution
 
     -- Item details
     description VARCHAR(255) NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE shopping_list_items (
     -- State
     is_checked BOOLEAN DEFAULT FALSE,
     checked_at TIMESTAMP WITH TIME ZONE,
-    checked_by_user_id BIGINT REFERENCES users(id),
+    checked_by_user_id UUID REFERENCES users(id),
 
     -- Ordering
     sort_order INTEGER DEFAULT 0,

@@ -10,10 +10,10 @@ import (
 type PriceHistory struct {
 	bun.BaseModel `bun:"table:price_history,alias:ph"`
 
-	ID        int64     `bun:"id,pk,autoincrement" json:"id"`
-	ProductID int       `bun:"product_id,notnull" json:"product_id"`
-	StoreID   int       `bun:"store_id,notnull" json:"store_id"`
-	FlyerID   *int      `bun:"flyer_id" json:"flyer_id,omitempty"`
+	ID        int64 `bun:"id,pk,autoincrement" json:"id"`
+	ProductID int   `bun:"product_id,notnull" json:"product_id"`
+	StoreID   int   `bun:"store_id,notnull" json:"store_id"`
+	FlyerID   *int  `bun:"flyer_id" json:"flyer_id,omitempty"`
 
 	// Price information
 	Price         float64  `bun:"price,notnull" json:"price"`
@@ -38,8 +38,8 @@ type PriceHistory struct {
 	StockLevel  *string `bun:"stock_level" json:"stock_level,omitempty"`
 
 	// Metadata
-	Notes     *string `bun:"notes" json:"notes,omitempty"`
-	IsActive  bool    `bun:"is_active,default:true" json:"is_active"`
+	Notes     *string   `bun:"notes" json:"notes,omitempty"`
+	IsActive  bool      `bun:"is_active,default:true" json:"is_active"`
 	CreatedAt time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
 
 	// Relations
@@ -57,9 +57,9 @@ type PriceTrend struct {
 	StoreID   *int  `bun:"store_id" json:"store_id,omitempty"`
 
 	// Period information
-	Period      string    `bun:"period,notnull" json:"period"` // '7d', '30d', '90d', '1y'
-	StartDate   time.Time `bun:"start_date,notnull" json:"start_date"`
-	EndDate     time.Time `bun:"end_date,notnull" json:"end_date"`
+	Period       string    `bun:"period,notnull" json:"period"` // '7d', '30d', '90d', '1y'
+	StartDate    time.Time `bun:"start_date,notnull" json:"start_date"`
+	EndDate      time.Time `bun:"end_date,notnull" json:"end_date"`
 	CalculatedAt time.Time `bun:"calculated_at,notnull" json:"calculated_at"`
 
 	// Trend data
@@ -70,18 +70,18 @@ type PriceTrend struct {
 	VolatilityScore float64 `bun:"volatility_score,notnull" json:"volatility_score"`
 
 	// Price statistics
-	StartPrice       float64 `bun:"start_price,notnull" json:"start_price"`
-	EndPrice         float64 `bun:"end_price,notnull" json:"end_price"`
-	MinPrice         float64 `bun:"min_price,notnull" json:"min_price"`
-	MaxPrice         float64 `bun:"max_price,notnull" json:"max_price"`
-	AvgPrice         float64 `bun:"avg_price,notnull" json:"avg_price"`
-	MedianPrice      float64 `bun:"median_price,notnull" json:"median_price"`
+	StartPrice  float64 `bun:"start_price,notnull" json:"start_price"`
+	EndPrice    float64 `bun:"end_price,notnull" json:"end_price"`
+	MinPrice    float64 `bun:"min_price,notnull" json:"min_price"`
+	MaxPrice    float64 `bun:"max_price,notnull" json:"max_price"`
+	AvgPrice    float64 `bun:"avg_price,notnull" json:"avg_price"`
+	MedianPrice float64 `bun:"median_price,notnull" json:"median_price"`
 
 	// Regression analysis
-	Slope       float64 `bun:"slope" json:"slope"`
-	Intercept   float64 `bun:"intercept" json:"intercept"`
-	RSquared    float64 `bun:"r_squared" json:"r_squared"`
-	IsSignificant bool  `bun:"is_significant,default:false" json:"is_significant"`
+	Slope         float64 `bun:"slope" json:"slope"`
+	Intercept     float64 `bun:"intercept" json:"intercept"`
+	RSquared      float64 `bun:"r_squared" json:"r_squared"`
+	IsSignificant bool    `bun:"is_significant,default:false" json:"is_significant"`
 
 	// Moving averages
 	MA7  float64 `bun:"ma_7" json:"ma_7"`
@@ -108,12 +108,12 @@ type PriceAlert struct {
 	StoreID   *int  `bun:"store_id" json:"store_id,omitempty"`
 
 	// Alert configuration
-	AlertType     string  `bun:"alert_type,notnull" json:"alert_type"` // 'PRICE_DROP', 'TARGET_PRICE', 'PERCENTAGE_DROP'
-	TargetPrice   float64 `bun:"target_price,notnull" json:"target_price"`
-	DropPercent   *float64 `bun:"drop_percent" json:"drop_percent,omitempty"`
-	IsActive      bool    `bun:"is_active,default:true" json:"is_active"`
-	NotifyEmail   bool    `bun:"notify_email,default:true" json:"notify_email"`
-	NotifyPush    bool    `bun:"notify_push,default:false" json:"notify_push"`
+	AlertType   string   `bun:"alert_type,notnull" json:"alert_type"` // 'PRICE_DROP', 'TARGET_PRICE', 'PERCENTAGE_DROP'
+	TargetPrice float64  `bun:"target_price,notnull" json:"target_price"`
+	DropPercent *float64 `bun:"drop_percent" json:"drop_percent,omitempty"`
+	IsActive    bool     `bun:"is_active,default:true" json:"is_active"`
+	NotifyEmail bool     `bun:"notify_email,default:true" json:"notify_email"`
+	NotifyPush  bool     `bun:"notify_push,default:false" json:"notify_push"`
 
 	// Trigger information
 	LastTriggered *time.Time `bun:"last_triggered" json:"last_triggered,omitempty"`
@@ -121,9 +121,9 @@ type PriceAlert struct {
 	LastPrice     *float64   `bun:"last_price" json:"last_price,omitempty"`
 
 	// Metadata
-	Notes     *string   `bun:"notes" json:"notes,omitempty"`
-	CreatedAt time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
+	Notes     *string    `bun:"notes" json:"notes,omitempty"`
+	CreatedAt time.Time  `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt time.Time  `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
 	ExpiresAt *time.Time `bun:"expires_at" json:"expires_at,omitempty"`
 
 	// Relations
@@ -138,8 +138,8 @@ type PriceAlert struct {
 func (ph *PriceHistory) IsCurrentlyValid() bool {
 	now := time.Now()
 	return ph.ValidFrom.Before(now.Add(time.Hour)) && // Valid from now or earlier (with 1h grace)
-		   ph.ValidTo.After(now) && // Valid until after now
-		   ph.IsActive
+		ph.ValidTo.After(now) && // Valid until after now
+		ph.IsActive
 }
 
 // IsCurrentlySale checks if this price represents a current sale

@@ -1,0 +1,899 @@
+# Kainuguru GraphQL Schema
+# Lithuanian Grocery Price Comparison & Shopping Lists API
+# Following Hyena-style professional GraphQL patterns
+
+scalar DateTime
+scalar JSON
+scalar UUID
+
+# Core Product Types (following Hyena's nested structure pattern)
+type Product {
+  # Identity & Basic Info
+  id: Int!
+  sku: String!
+  slug: String!
+  name: String!
+  normalizedName: String!
+  brand: String
+
+  # Rich Content
+  description: String
+  category: String
+  subcategory: String
+
+  # Pricing (Complex structure like Hyena)
+  price: ProductPrice!
+  isOnSale: Boolean!
+
+  # Physical Properties
+  unitSize: String
+  unitType: String
+  unitPrice: String
+  packageSize: String
+  weight: String
+  volume: String
+
+  # Visual Assets
+  imageURL: String
+  boundingBox: ProductBoundingBox
+  pagePosition: ProductPosition
+
+  # Store Context
+  store: Store!
+  flyer: Flyer!
+  flyerPage: FlyerPage
+
+  # Business Logic
+  isAvailable: Boolean!
+  stockLevel: String
+  extractionConfidence: Float!
+  extractionMethod: String!
+  requiresReview: Boolean!
+
+  # Temporal Data
+  validFrom: DateTime!
+  validTo: DateTime!
+  saleStartDate: DateTime
+  saleEndDate: DateTime
+
+  # Computed Fields (Hyena pattern)
+  isCurrentlyOnSale: Boolean!
+  discountAmount: Float!
+  isValid: Boolean!
+  isExpired: Boolean!
+  validityPeriod: String!
+
+  # Relations
+  productMaster: ProductMaster
+  priceHistory: [PriceHistory!]!
+}
+
+type ProductPrice {
+  current: Float!
+  original: Float
+  currency: String!
+  discount: Float
+  discountPercent: Float
+
+  # Computed pricing fields
+  discountAmount: Float!
+  isDiscounted: Boolean!
+}
+
+type ProductBoundingBox {
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+}
+
+type ProductPosition {
+  row: Int!
+  column: Int!
+  zone: String!
+}
+
+# Store Management (following Hyena's category pattern)
+type Store {
+  id: Int!
+  code: String!
+  name: String!
+  logoURL: String
+  websiteURL: String
+  flyerSourceURL: String
+
+  # Configuration
+  scraperConfig: JSON
+  scrapeSchedule: String!
+  lastScrapedAt: DateTime
+  isActive: Boolean!
+
+  # Location Data
+  locations: [StoreLocation!]!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations with pagination (Hyena pattern)
+  flyers(filters: FlyerFilters, first: Int, after: String): FlyerConnection!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+type StoreLocation {
+  city: String!
+  lat: Float!
+  lng: Float!
+  address: String!
+}
+
+# Flyer System (Rich nested structure)
+type Flyer {
+  id: Int!
+  storeID: Int!
+  title: String
+  validFrom: DateTime!
+  validTo: DateTime!
+  pageCount: Int
+  sourceURL: String
+
+  # Processing Status
+  status: FlyerStatus!
+  isArchived: Boolean!
+  archivedAt: DateTime
+  extractionStartedAt: DateTime
+  extractionCompletedAt: DateTime
+  productsExtracted: Int!
+
+  # Computed fields (Hyena pattern)
+  isValid: Boolean!
+  isCurrent: Boolean!
+  daysRemaining: Int!
+  validityPeriod: String!
+  processingDuration: String
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  store: Store!
+  flyerPages(filters: FlyerPageFilters, first: Int, after: String): FlyerPageConnection!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+enum FlyerStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type FlyerPage {
+  id: Int!
+  flyerID: Int!
+  pageNumber: Int!
+  imageURL: String
+
+  # Processing Status
+  extractionStatus: FlyerPageStatus!
+  extractionAttempts: Int!
+  extractionError: String
+  needsManualReview: Boolean!
+
+  # Raw extraction data
+  rawExtractionData: JSON
+
+  # Computed fields
+  hasImage: Boolean!
+  processingDuration: String
+  extractionEfficiency: Float!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  flyer: Flyer!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+enum FlyerPageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type ImageDimensions {
+  width: Int!
+  height: Int!
+}
+
+# Authentication & User Management (Hyena pattern)
+type User {
+  id: UUID!
+  email: String!
+  emailVerified: Boolean!
+  fullName: String
+  preferredLanguage: String!
+  isActive: Boolean!
+  lastLoginAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  shoppingLists: [ShoppingList!]!
+  priceAlerts: [PriceAlert!]!
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  refreshToken: String!
+  expiresAt: DateTime!
+  tokenType: String!
+}
+
+# Shopping Lists (following Hyena's cart pattern)
+type ShoppingList {
+  id: Int!
+  userID: UUID!
+  name: String!
+  description: String
+  isDefault: Boolean!
+  isArchived: Boolean!
+  isPublic: Boolean!
+  shareCode: String
+
+  # Statistics
+  itemCount: Int!
+  completedItemCount: Int!
+  estimatedTotalPrice: Float
+
+  # Computed fields (Hyena pattern)
+  completionPercentage: Float!
+  isCompleted: Boolean!
+  canBeShared: Boolean!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lastAccessedAt: DateTime!
+
+  # Relations
+  user: User!
+  items(filters: ShoppingListItemFilters, first: Int, after: String): ShoppingListItemConnection!
+  categories: [ShoppingListCategory!]!
+}
+
+type ShoppingListItem {
+  id: Int!
+  shoppingListID: Int!
+  userID: UUID!
+  description: String!
+  normalizedDescription: String!
+  notes: String
+  quantity: Float!
+  unit: String
+  unitType: String
+
+  # State Management
+  isChecked: Boolean!
+  checkedAt: DateTime
+  checkedByUserID: UUID
+  sortOrder: Int!
+
+  # Product Linking
+  productMasterID: Int
+  linkedProductID: Int
+  storeID: Int
+  flyerID: Int
+
+  # Pricing
+  estimatedPrice: Float
+  actualPrice: Float
+  priceSource: String
+
+  # Organization
+  category: String
+  tags: [String!]!
+  suggestionSource: String
+  matchingConfidence: Float
+  availabilityStatus: String!
+  availabilityCheckedAt: DateTime
+
+  # Computed fields
+  totalEstimatedPrice: Float!
+  totalActualPrice: Float!
+  isLinked: Boolean!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  shoppingList: ShoppingList!
+  user: User!
+  checkedByUser: User
+  productMaster: ProductMaster
+  linkedProduct: Product
+  store: Store
+  flyer: Flyer
+}
+
+type ShoppingListCategory {
+  id: Int!
+  shoppingListID: Int!
+  userID: UUID!
+  name: String!
+  colorHex: String
+  iconName: String
+  sortOrder: Int!
+  itemCount: Int!
+  createdAt: DateTime!
+
+  # Relations
+  shoppingList: ShoppingList!
+  user: User!
+}
+
+# Product Master System (Hyena's designer pattern)
+type ProductMaster {
+  id: Int!
+  canonicalName: String!
+  normalizedName: String!
+  brand: String!
+  category: String!
+  subcategory: String
+
+  # Standardization
+  standardUnitSize: String
+  standardUnitType: String
+  standardPackageSize: String
+  standardWeight: String
+  standardVolume: String
+
+  # Matching Logic
+  matchingKeywords: JSON!
+  alternativeNames: JSON!
+  exclusionKeywords: JSON!
+  confidenceScore: Float!
+
+  # Statistics
+  matchedProducts: Int!
+  successfulMatches: Int!
+  failedMatches: Int!
+
+  # Status
+  status: ProductMasterStatus!
+  isVerified: Boolean!
+  lastMatchedAt: DateTime
+  verifiedAt: DateTime
+  verifiedBy: String
+
+  # Computed fields
+  matchSuccessRate: Float!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+enum ProductMasterStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  DUPLICATE
+  DEPRECATED
+}
+
+# Search System (Hyena's advanced search pattern)
+type SearchResult {
+  products: [ProductSearchResult!]!
+  totalCount: Int!
+  queryTime: String!
+  suggestions: [String!]
+  hasMore: Boolean!
+  facets: SearchFacets!
+  pagination: Pagination!
+}
+
+type ProductSearchResult {
+  product: Product!
+  searchScore: Float!
+  matchType: String!
+  similarity: Float
+  highlights: [String!]
+}
+
+type SearchFacets {
+  stores: StoreFacet!
+  categories: CategoryFacet!
+  brands: BrandFacet!
+  priceRanges: PriceRangeFacet!
+  availability: AvailabilityFacet!
+}
+
+type StoreFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type CategoryFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type BrandFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type PriceRangeFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type AvailabilityFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type FacetOption {
+  id: String
+  value: String!
+  count: Int!
+  name: String
+  slug: String
+}
+
+type Pagination {
+  totalItems: Int!
+  currentPage: Int!
+  totalPages: Int!
+  itemsPerPage: Int!
+}
+
+# Price History & Analytics (Rich data structure)
+type PriceHistory {
+  id: ID!
+  productID: Int!
+  storeID: Int!
+  flyerID: Int
+  price: Float!
+  originalPrice: Float
+  currency: String!
+  isOnSale: Boolean!
+  recordedAt: DateTime!
+  validFrom: DateTime!
+  validTo: DateTime!
+  saleStartDate: DateTime
+  saleEndDate: DateTime
+  source: String!
+  extractionMethod: String!
+  confidence: Float!
+  isAvailable: Boolean!
+  stockLevel: String
+  notes: String
+  isActive: Boolean!
+
+  # Computed fields
+  isCurrentlyValid: Boolean!
+  isCurrentlySale: Boolean!
+  discountAmount: Float!
+  discountPercent: Float!
+  isExpired: Boolean!
+  validityDuration: String!
+
+  # Temporal
+  createdAt: DateTime!
+
+  # Relations
+  product: Product!
+  store: Store!
+  flyer: Flyer
+}
+
+type PriceAlert {
+  id: ID!
+  userID: Int!
+  productID: Int!
+  storeID: Int
+  alertType: AlertType!
+  targetPrice: Float!
+  dropPercent: Float
+  isActive: Boolean!
+  notifyEmail: Boolean!
+  notifyPush: Boolean!
+  lastTriggered: DateTime
+  triggerCount: Int!
+  lastPrice: Float
+  notes: String
+  expiresAt: DateTime
+
+  # Computed fields
+  isActiveAlert: Boolean!
+
+  # Temporal
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relations
+  user: User!
+  product: Product!
+  store: Store
+}
+
+enum AlertType {
+  PRICE_DROP
+  TARGET_PRICE
+  PERCENTAGE_DROP
+}
+
+# Connection Types (Hyena pagination pattern)
+type StoreConnection {
+  edges: [StoreEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type StoreEdge {
+  node: Store!
+  cursor: String!
+}
+
+type FlyerConnection {
+  edges: [FlyerEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FlyerEdge {
+  node: Flyer!
+  cursor: String!
+}
+
+type FlyerPageConnection {
+  edges: [FlyerPageEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FlyerPageEdge {
+  node: FlyerPage!
+  cursor: String!
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+type ProductMasterConnection {
+  edges: [ProductMasterEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductMasterEdge {
+  node: ProductMaster!
+  cursor: String!
+}
+
+type ShoppingListConnection {
+  edges: [ShoppingListEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListEdge {
+  node: ShoppingList!
+  cursor: String!
+}
+
+type ShoppingListItemConnection {
+  edges: [ShoppingListItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListItemEdge {
+  node: ShoppingListItem!
+  cursor: String!
+}
+
+type PriceHistoryConnection {
+  edges: [PriceHistoryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceHistoryEdge {
+  node: PriceHistory!
+  cursor: String!
+}
+
+type PriceAlertConnection {
+  edges: [PriceAlertEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceAlertEdge {
+  node: PriceAlert!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Input Types (Hyena pattern)
+input RegisterInput {
+  email: String!
+  password: String!
+  fullName: String
+  preferredLanguage: String = "lt"
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input StoreFilters {
+  isActive: Boolean
+  hasFlyers: Boolean
+  codes: [String!]
+}
+
+input FlyerFilters {
+  storeIDs: [Int!]
+  storeCodes: [String!]
+  status: [FlyerStatus!]
+  isArchived: Boolean
+  validFrom: DateTime
+  validTo: DateTime
+  isCurrent: Boolean
+  isValid: Boolean
+}
+
+input FlyerPageFilters {
+  flyerIDs: [Int!]
+  status: [FlyerPageStatus!]
+  hasImage: Boolean
+  hasProducts: Boolean
+  pageNumbers: [Int!]
+}
+
+input ProductFilters {
+  storeIDs: [Int!]
+  flyerIDs: [Int!]
+  flyerPageIDs: [Int!]
+  productMasterIDs: [Int!]
+  categories: [String!]
+  brands: [String!]
+  isOnSale: Boolean
+  isAvailable: Boolean
+  requiresReview: Boolean
+  minPrice: Float
+  maxPrice: Float
+  currency: String
+  validFrom: DateTime
+  validTo: DateTime
+}
+
+input ProductMasterFilters {
+  status: [ProductMasterStatus!]
+  isVerified: Boolean
+  isActive: Boolean
+  categories: [String!]
+  brands: [String!]
+  minMatches: Int
+  minConfidence: Float
+}
+
+input ShoppingListFilters {
+  isDefault: Boolean
+  isArchived: Boolean
+  isPublic: Boolean
+  hasItems: Boolean
+  createdAfter: DateTime
+  createdBefore: DateTime
+  updatedAfter: DateTime
+  updatedBefore: DateTime
+}
+
+input ShoppingListItemFilters {
+  isChecked: Boolean
+  categories: [String!]
+  tags: [String!]
+  hasPrice: Boolean
+  isLinked: Boolean
+  storeIDs: [Int!]
+  createdAfter: DateTime
+  createdBefore: DateTime
+}
+
+input PriceHistoryFilters {
+  productID: Int
+  storeID: Int
+  startDate: DateTime
+  endDate: DateTime
+  isOnSale: Boolean
+  minPrice: Float
+  maxPrice: Float
+  source: String
+}
+
+input PriceAlertFilters {
+  productID: Int
+  storeID: Int
+  alertType: AlertType
+  isActive: Boolean
+}
+
+input SearchInput {
+  q: String!
+  storeIDs: [Int!]
+  minPrice: Float
+  maxPrice: Float
+  onSaleOnly: Boolean = false
+  category: String
+  first: Int = 50
+  after: String
+  preferFuzzy: Boolean = false
+}
+
+input CreateShoppingListInput {
+  name: String!
+  description: String
+  isDefault: Boolean = false
+}
+
+input CreateShoppingListItemInput {
+  shoppingListID: Int!
+  description: String!
+  notes: String
+  quantity: Float = 1
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!] = []
+  estimatedPrice: Float
+  productMasterID: Int
+  linkedProductID: Int
+  storeID: Int
+}
+
+input CreatePriceAlertInput {
+  productID: Int!
+  storeID: Int
+  alertType: AlertType!
+  targetPrice: Float!
+  dropPercent: Float
+  notifyEmail: Boolean = true
+  notifyPush: Boolean = false
+  notes: String
+  expiresAt: DateTime
+}
+
+# Query Root (following Hyena's organization)
+type Query {
+  # Store Queries
+  store(id: Int!): Store
+  storeByCode(code: String!): Store
+  stores(filters: StoreFilters, first: Int, after: String): StoreConnection!
+
+  # Flyer Queries
+  flyer(id: Int!): Flyer
+  flyers(filters: FlyerFilters, first: Int, after: String): FlyerConnection!
+  currentFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
+  validFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
+
+  # Product Queries
+  product(id: Int!): Product
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+  productsOnSale(storeIDs: [Int!], filters: ProductFilters, first: Int, after: String): ProductConnection!
+
+  # Search (Hyena pattern)
+  searchProducts(input: SearchInput!): SearchResult!
+
+  # Product Master Queries
+  productMaster(id: Int!): ProductMaster
+  productMasters(filters: ProductMasterFilters, first: Int, after: String): ProductMasterConnection!
+
+  # User Queries (require auth)
+  me: User
+
+  # Shopping List Queries (require auth)
+  shoppingList(id: Int!): ShoppingList
+  shoppingLists(filters: ShoppingListFilters, first: Int, after: String): ShoppingListConnection!
+  myDefaultShoppingList: ShoppingList
+  sharedShoppingList(shareCode: String!): ShoppingList
+
+  # Price Queries
+  priceHistory(productID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
+  currentPrice(productID: Int!, storeID: Int): PriceHistory
+
+  # Price Alert Queries (require auth)
+  priceAlert(id: ID!): PriceAlert
+  priceAlerts(filters: PriceAlertFilters, first: Int, after: String): PriceAlertConnection!
+  myPriceAlerts: [PriceAlert!]!
+}
+
+# Mutation Root (following Hyena's action-based naming)
+type Mutation {
+  # Authentication (Hyena pattern)
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  logout: Boolean!
+  refreshToken: AuthPayload!
+
+  # Shopping List Management
+  createShoppingList(input: CreateShoppingListInput!): ShoppingList!
+  updateShoppingList(id: Int!, input: UpdateShoppingListInput!): ShoppingList!
+  deleteShoppingList(id: Int!): Boolean!
+  setDefaultShoppingList(id: Int!): ShoppingList!
+
+  # Shopping List Item Management
+  createShoppingListItem(input: CreateShoppingListItemInput!): ShoppingListItem!
+  updateShoppingListItem(id: Int!, input: UpdateShoppingListItemInput!): ShoppingListItem!
+  deleteShoppingListItem(id: Int!): Boolean!
+  checkShoppingListItem(id: Int!): ShoppingListItem!
+  uncheckShoppingListItem(id: Int!): ShoppingListItem!
+
+  # Price Alert Management
+  createPriceAlert(input: CreatePriceAlertInput!): PriceAlert!
+  updatePriceAlert(id: ID!, input: UpdatePriceAlertInput!): PriceAlert!
+  deletePriceAlert(id: ID!): Boolean!
+  activatePriceAlert(id: ID!): PriceAlert!
+  deactivatePriceAlert(id: ID!): PriceAlert!
+}
+
+# Additional Input Types for Updates
+input UpdateShoppingListInput {
+  name: String
+  description: String
+  isDefault: Boolean
+}
+
+input UpdateShoppingListItemInput {
+  description: String
+  notes: String
+  quantity: Float
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!]
+  estimatedPrice: Float
+  actualPrice: Float
+}
+
+input UpdatePriceAlertInput {
+  targetPrice: Float
+  dropPercent: Float
+  isActive: Boolean
+  notifyEmail: Boolean
+  notifyPush: Boolean
+  notes: String
+  expiresAt: DateTime
+}

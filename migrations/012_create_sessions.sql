@@ -35,9 +35,9 @@ CREATE INDEX idx_sessions_expires ON user_sessions(expires_at);
 CREATE INDEX idx_sessions_active ON user_sessions(user_id, is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_sessions_cleanup ON user_sessions(expires_at, is_active) WHERE is_active = TRUE;
 
--- Partial index for active sessions
+-- Partial index for active sessions (removed NOW() predicate due to immutability requirement)
 CREATE INDEX idx_sessions_active_user ON user_sessions(user_id, last_used_at)
-    WHERE is_active = TRUE AND expires_at > NOW();
+    WHERE is_active = TRUE;
 
 -- +goose Down
 DROP TABLE IF EXISTS user_sessions;

@@ -10,9 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/rs/zerolog/log"
 
+	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"
-	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/handlers"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/services"
@@ -150,7 +150,7 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 
 func errorHandler(c *fiber.Ctx, err error) error {
 	log.Error().Err(err).Str("path", c.Path()).Msg("Request error")
-	
+
 	code := fiber.StatusInternalServerError
 	if e, ok := err.(*fiber.Error); ok {
 		code = e.Code

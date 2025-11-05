@@ -129,3 +129,4 @@ sessions/
 # Temporary files
 *.tmp
 *.temp
+test_output/*

@@ -464,15 +464,15 @@ func (r *userRepository) GetVerifiedUserCount(ctx context.Context) (int, error) 
 
 // UserFilters represents filters for user queries
 type UserFilters struct {
-	IsActive           *bool      `json:"isActive"`
-	IsVerified         *bool      `json:"isVerified"`
-	PreferredLanguage  string     `json:"preferredLanguage"`
-	HasOAuth           *bool      `json:"hasOAuth"`
-	CreatedAfter       *time.Time `json:"createdAfter"`
-	CreatedBefore      *time.Time `json:"createdBefore"`
-	LastLoginAfter     *time.Time `json:"lastLoginAfter"`
-	Limit              int        `json:"limit"`
-	Offset             int        `json:"offset"`
-	OrderBy            string     `json:"orderBy"`
-	OrderDir           string     `json:"orderDir"`
+	IsActive          *bool      `json:"isActive"`
+	IsVerified        *bool      `json:"isVerified"`
+	PreferredLanguage string     `json:"preferredLanguage"`
+	HasOAuth          *bool      `json:"hasOAuth"`
+	CreatedAfter      *time.Time `json:"createdAfter"`
+	CreatedBefore     *time.Time `json:"createdBefore"`
+	LastLoginAfter    *time.Time `json:"lastLoginAfter"`
+	Limit             int        `json:"limit"`
+	Offset            int        `json:"offset"`
+	OrderBy           string     `json:"orderBy"`
+	OrderDir          string     `json:"orderDir"`
 }

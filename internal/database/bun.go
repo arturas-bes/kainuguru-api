@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
-	"github.com/rs/zerolog/log"
 )
 
 type BunDB struct {
@@ -20,14 +20,13 @@ type BunDB struct {
 func NewBun(cfg Config) (*BunDB, error) {
 	// Build connection string
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=%s",
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		cfg.User,
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
 		cfg.Name,
 		cfg.SSLMode,
-		cfg.Timezone,
 	)
 
 	// Create SQL DB connection

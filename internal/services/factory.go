@@ -3,8 +3,8 @@ package services
 import (
 	"log/slog"
 
-	"github.com/uptrace/bun"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
+	"github.com/uptrace/bun"
 )
 
 // ServiceFactory creates and manages all service instances

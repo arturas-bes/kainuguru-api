@@ -35,8 +35,8 @@ type ShoppingList struct {
 	LastAccessedAt time.Time `bun:"last_accessed_at,default:now()" json:"last_accessed_at"`
 
 	// Relations
-	User  *User                `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
-	Items []*ShoppingListItem  `bun:"rel:has-many,join:id=shopping_list_id" json:"items,omitempty"`
+	User       *User                   `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
+	Items      []*ShoppingListItem     `bun:"rel:has-many,join:id=shopping_list_id" json:"items,omitempty"`
 	Categories []*ShoppingListCategory `bun:"rel:has-many,join:id=shopping_list_id" json:"categories,omitempty"`
 }
 

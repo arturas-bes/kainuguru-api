@@ -276,9 +276,9 @@ type RegressionData struct {
 }
 
 type MovingAverages struct {
-	MA7         float64
-	MA14        float64
-	MA30        float64
+	MA7          float64
+	MA14         float64
+	MA30         float64
 	MA7AboveMA30 bool
 }
 

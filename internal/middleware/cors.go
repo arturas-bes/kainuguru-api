@@ -49,7 +49,7 @@ func Logger() fiber.Handler {
 func CORS(allowedOrigins, allowedMethods, allowedHeaders, exposedHeaders []string, allowCredentials bool, maxAge int) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		origin := c.Get("Origin")
-		
+
 		// Check if origin is allowed
 		if len(allowedOrigins) > 0 && !contains(allowedOrigins, origin) && !contains(allowedOrigins, "*") {
 			return c.Next()
@@ -57,23 +57,23 @@ func CORS(allowedOrigins, allowedMethods, allowedHeaders, exposedHeaders []strin
 
 		// Set CORS headers
 		c.Set("Access-Control-Allow-Origin", getOriginToAllow(allowedOrigins, origin))
-		
+
 		if len(allowedMethods) > 0 {
 			c.Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
 		}
-		
+
 		if len(allowedHeaders) > 0 {
 			c.Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))
 		}
-		
+
 		if len(exposedHeaders) > 0 {
 			c.Set("Access-Control-Expose-Headers", strings.Join(exposedHeaders, ", "))
 		}
-		
+
 		if allowCredentials {
 			c.Set("Access-Control-Allow-Credentials", "true")
 		}
-		
+
 		if maxAge > 0 {
 			c.Set("Access-Control-Max-Age", string(rune(maxAge)))
 		}

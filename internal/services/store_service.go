@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uptrace/bun"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/uptrace/bun"
 )
 
 type storeService struct {
@@ -177,8 +177,8 @@ func (s *storeService) GetScrapingEnabledStores(ctx context.Context) ([]*models.
 	err := s.db.NewSelect().
 		Model(&stores).
 		Where("s.is_active = ?", true).
-		Where("(s.scraper_config->>'flyer_selector' IS NOT NULL AND s.scraper_config->>'flyer_selector' != '') OR "+
-			  "(s.scraper_config->>'api_endpoint' IS NOT NULL AND s.scraper_config->>'api_endpoint' != '')").
+		Where("(s.scraper_config->>'flyer_selector' IS NOT NULL AND s.scraper_config->>'flyer_selector' != '') OR " +
+			"(s.scraper_config->>'api_endpoint' IS NOT NULL AND s.scraper_config->>'api_endpoint' != '')").
 		Order("(s.scraper_config->>'priority')::int ASC").
 		Scan(ctx)
 

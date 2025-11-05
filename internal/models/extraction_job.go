@@ -20,9 +20,9 @@ type ExtractionJob struct {
 	Payload json.RawMessage `bun:"payload,type:jsonb,notnull" json:"payload"`
 
 	// Processing metadata
-	Attempts    int     `bun:"attempts,default:0" json:"attempts"`
-	MaxAttempts int     `bun:"max_attempts,default:3" json:"max_attempts"`
-	WorkerID    *string `bun:"worker_id" json:"worker_id,omitempty"`
+	Attempts    int        `bun:"attempts,default:0" json:"attempts"`
+	MaxAttempts int        `bun:"max_attempts,default:3" json:"max_attempts"`
+	WorkerID    *string    `bun:"worker_id" json:"worker_id,omitempty"`
 	StartedAt   *time.Time `bun:"started_at" json:"started_at,omitempty"`
 	CompletedAt *time.Time `bun:"completed_at" json:"completed_at,omitempty"`
 
@@ -64,10 +64,10 @@ const (
 
 // ScrapeFlyerPayload represents payload for scrape_flyer jobs
 type ScrapeFlyerPayload struct {
-	StoreID   int    `json:"store_id"`
-	StoreCode string `json:"store_code"`
-	SourceURL string `json:"source_url"`
-	ForceRescrape bool `json:"force_rescrape,omitempty"`
+	StoreID       int    `json:"store_id"`
+	StoreCode     string `json:"store_code"`
+	SourceURL     string `json:"source_url"`
+	ForceRescrape bool   `json:"force_rescrape,omitempty"`
 }
 
 // ExtractPagePayload represents payload for extract_page jobs
@@ -80,17 +80,17 @@ type ExtractPagePayload struct {
 
 // MatchProductsPayload represents payload for match_products jobs
 type MatchProductsPayload struct {
-	FlyerID    int   `json:"flyer_id"`
-	ProductIDs []int `json:"product_ids,omitempty"`
-	ForceRematch bool `json:"force_rematch,omitempty"`
+	FlyerID      int   `json:"flyer_id"`
+	ProductIDs   []int `json:"product_ids,omitempty"`
+	ForceRematch bool  `json:"force_rematch,omitempty"`
 }
 
 // ProcessImagePayload represents payload for process_image jobs
 type ProcessImagePayload struct {
-	ImageURL        string  `json:"image_url"`
-	FlyerPageID     int     `json:"flyer_page_id"`
-	ProcessingType  string  `json:"processing_type"` // "ocr", "vision_ai", "layout_analysis"
-	Confidence      float64 `json:"confidence,omitempty"`
+	ImageURL       string  `json:"image_url"`
+	FlyerPageID    int     `json:"flyer_page_id"`
+	ProcessingType string  `json:"processing_type"` // "ocr", "vision_ai", "layout_analysis"
+	Confidence     float64 `json:"confidence,omitempty"`
 }
 
 // ValidateDataPayload represents payload for validate_data jobs
@@ -176,22 +176,22 @@ func (ej *ExtractionJob) IsFailed() bool {
 // IsExpired checks if the job has expired
 func (ej *ExtractionJob) IsExpired() bool {
 	return ej.Status == string(JobStatusExpired) ||
-		   (ej.ExpiresAt != nil && ej.ExpiresAt.Before(time.Now()))
+		(ej.ExpiresAt != nil && ej.ExpiresAt.Before(time.Now()))
 }
 
 // CanBeProcessed checks if the job can be picked up for processing
 func (ej *ExtractionJob) CanBeProcessed() bool {
 	return ej.IsPending() &&
-		   ej.Attempts < ej.MaxAttempts &&
-		   ej.ScheduledFor.Before(time.Now().Add(time.Minute)) &&
-		   !ej.IsExpired()
+		ej.Attempts < ej.MaxAttempts &&
+		ej.ScheduledFor.Before(time.Now().Add(time.Minute)) &&
+		!ej.IsExpired()
 }
 
 // CanBeRetried checks if the job can be retried
 func (ej *ExtractionJob) CanBeRetried() bool {
 	return (ej.IsFailed() || ej.Status == string(JobStatusProcessing)) &&
-		   ej.Attempts < ej.MaxAttempts &&
-		   !ej.IsExpired()
+		ej.Attempts < ej.MaxAttempts &&
+		!ej.IsExpired()
 }
 
 // GetProcessingDuration returns how long the job has been/was processing

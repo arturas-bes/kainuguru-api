@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/lib/pq"
 	"github.com/uptrace/bun"
-	"github.com/kainuguru/kainuguru-api/internal/models"
 )
 
 type searchService struct {
@@ -55,7 +55,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 
 	rows, err := s.db.QueryContext(ctx, query,
 		req.Query,
-		0.3,                // similarity_threshold
+		0.3, // similarity_threshold
 		req.Limit,
 		req.Offset,
 		pq.Array(req.StoreIDs),
@@ -72,9 +72,9 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	var results []ProductSearchResult
 	for rows.Next() {
 		var (
-			productID, storeID, flyerID                      int
-			name, brand, category                            string
-			currentPrice, nameSim, brandSim, combinedSim     float64
+			productID, storeID, flyerID                  int
+			name, brand, category                        string
+			currentPrice, nameSim, brandSim, combinedSim float64
 		)
 
 		err := rows.Scan(&productID, &name, &brand, &category, &currentPrice,
@@ -178,9 +178,9 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	var results []ProductSearchResult
 	for rows.Next() {
 		var (
-			productID, storeID, flyerID         int
-			name, brand, matchType              string
-			currentPrice, searchScore           float64
+			productID, storeID, flyerID int
+			name, brand, matchType      string
+			currentPrice, searchScore   float64
 		)
 
 		err := rows.Scan(&productID, &name, &brand, &currentPrice,
@@ -302,9 +302,9 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 	var products []SimilarProduct
 	for rows.Next() {
 		var (
-			productID, storeID               int
-			name, brand                      string
-			currentPrice, similarityScore    float64
+			productID, storeID            int
+			name, brand                   string
+			currentPrice, similarityScore float64
 		)
 
 		err := rows.Scan(&productID, &name, &brand, &currentPrice, &storeID, &similarityScore)

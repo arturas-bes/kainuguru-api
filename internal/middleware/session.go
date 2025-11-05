@@ -196,15 +196,15 @@ func SessionMetricsMiddleware() fiber.Handler {
 
 		// In production, these metrics would be sent to a monitoring system
 		metrics := &SessionMetrics{
-			Path:         c.Path(),
-			Method:       c.Method(),
-			StatusCode:   c.Response().StatusCode(),
-			Duration:     duration,
-			Timestamp:    start,
-			UserID:       getUserIDFromContext(c.Context()),
-			SessionID:    getSessionIDFromContext(c.Context()),
-			IPAddress:    c.IP(),
-			UserAgent:    c.Get("User-Agent"),
+			Path:       c.Path(),
+			Method:     c.Method(),
+			StatusCode: c.Response().StatusCode(),
+			Duration:   duration,
+			Timestamp:  start,
+			UserID:     getUserIDFromContext(c.Context()),
+			SessionID:  getSessionIDFromContext(c.Context()),
+			IPAddress:  c.IP(),
+			UserAgent:  c.Get("User-Agent"),
 		}
 
 		// Send metrics to monitoring system

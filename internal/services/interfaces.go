@@ -191,40 +191,40 @@ type ExtractionJobService interface {
 
 // Filter structures for service operations
 type StoreFilters struct {
-	IsActive     *bool
-	HasFlyers    *bool
-	Codes        []string
-	Limit        int
-	Offset       int
-	OrderBy      string
-	OrderDir     string
+	IsActive  *bool
+	HasFlyers *bool
+	Codes     []string
+	Limit     int
+	Offset    int
+	OrderBy   string
+	OrderDir  string
 }
 
 type FlyerFilters struct {
-	StoreIDs     []int
-	StoreCodes   []string
-	Status       []string
-	IsArchived   *bool
-	ValidFrom    *time.Time
-	ValidTo      *time.Time
-	IsCurrent    *bool
-	IsValid      *bool
-	Limit        int
-	Offset       int
-	OrderBy      string
-	OrderDir     string
+	StoreIDs   []int
+	StoreCodes []string
+	Status     []string
+	IsArchived *bool
+	ValidFrom  *time.Time
+	ValidTo    *time.Time
+	IsCurrent  *bool
+	IsValid    *bool
+	Limit      int
+	Offset     int
+	OrderBy    string
+	OrderDir   string
 }
 
 type FlyerPageFilters struct {
-	FlyerIDs     []int
-	Status       []string
-	HasImage     *bool
-	HasProducts  *bool
-	PageNumbers  []int
-	Limit        int
-	Offset       int
-	OrderBy      string
-	OrderDir     string
+	FlyerIDs    []int
+	Status      []string
+	HasImage    *bool
+	HasProducts *bool
+	PageNumbers []int
+	Limit       int
+	Offset      int
+	OrderBy     string
+	OrderDir    string
 }
 
 type ProductFilters struct {
@@ -249,52 +249,52 @@ type ProductFilters struct {
 }
 
 type ProductMasterFilters struct {
-	Status       []string
-	IsVerified   *bool
-	IsActive     *bool
-	Categories   []string
-	Brands       []string
-	MinMatches   *int
+	Status        []string
+	IsVerified    *bool
+	IsActive      *bool
+	Categories    []string
+	Brands        []string
+	MinMatches    *int
 	MinConfidence *float64
-	Limit        int
-	Offset       int
-	OrderBy      string
-	OrderDir     string
+	Limit         int
+	Offset        int
+	OrderBy       string
+	OrderDir      string
 }
 
 type ExtractionJobFilters struct {
-	JobTypes     []string
-	Status       []string
-	WorkerIDs    []string
-	Priority     *int
+	JobTypes        []string
+	Status          []string
+	WorkerIDs       []string
+	Priority        *int
 	ScheduledBefore *time.Time
 	ScheduledAfter  *time.Time
 	CreatedBefore   *time.Time
 	CreatedAfter    *time.Time
-	Limit        int
-	Offset       int
-	OrderBy      string
-	OrderDir     string
+	Limit           int
+	Offset          int
+	OrderBy         string
+	OrderDir        string
 }
 
 // Statistics structures
 type ProductMasterStats struct {
-	TotalMatches      int     `json:"total_matches"`
-	SuccessfulMatches int     `json:"successful_matches"`
-	FailedMatches     int     `json:"failed_matches"`
-	SuccessRate       float64 `json:"success_rate"`
-	ConfidenceScore   float64 `json:"confidence_score"`
+	TotalMatches      int        `json:"total_matches"`
+	SuccessfulMatches int        `json:"successful_matches"`
+	FailedMatches     int        `json:"failed_matches"`
+	SuccessRate       float64    `json:"success_rate"`
+	ConfidenceScore   float64    `json:"confidence_score"`
 	LastMatchedAt     *time.Time `json:"last_matched_at"`
 }
 
 type OverallMatchingStats struct {
-	TotalProducts        int     `json:"total_products"`
-	MatchedProducts      int     `json:"matched_products"`
-	UnmatchedProducts    int     `json:"unmatched_products"`
-	ProductMasters       int     `json:"product_masters"`
-	VerifiedMasters      int     `json:"verified_masters"`
-	OverallMatchRate     float64 `json:"overall_match_rate"`
-	AverageConfidence    float64 `json:"average_confidence"`
+	TotalProducts     int     `json:"total_products"`
+	MatchedProducts   int     `json:"matched_products"`
+	UnmatchedProducts int     `json:"unmatched_products"`
+	ProductMasters    int     `json:"product_masters"`
+	VerifiedMasters   int     `json:"verified_masters"`
+	OverallMatchRate  float64 `json:"overall_match_rate"`
+	AverageConfidence float64 `json:"average_confidence"`
 }
 
 // ShoppingListService defines the interface for shopping list operations
@@ -432,18 +432,18 @@ type CategoryService interface {
 
 // Filter structures for shopping list operations
 type ShoppingListFilters struct {
-	IsDefault   *bool
-	IsArchived  *bool
-	IsPublic    *bool
-	HasItems    *bool
+	IsDefault     *bool
+	IsArchived    *bool
+	IsPublic      *bool
+	HasItems      *bool
 	CreatedAfter  *time.Time
 	CreatedBefore *time.Time
 	UpdatedAfter  *time.Time
 	UpdatedBefore *time.Time
-	Limit       int
-	Offset      int
-	OrderBy     string
-	OrderDir    string
+	Limit         int
+	Offset        int
+	OrderBy       string
+	OrderDir      string
 }
 
 type ShoppingListItemFilters struct {
@@ -462,14 +462,14 @@ type ShoppingListItemFilters struct {
 }
 
 type ProductMatchFilters struct {
-	StoreIDs        []int
-	Categories      []string
-	Brands          []string
-	MinConfidence   *float64
-	OnlyAvailable   bool
-	OnlyOnSale      bool
-	PriceRange      *PriceRange
-	Limit           int
+	StoreIDs      []int
+	Categories    []string
+	Brands        []string
+	MinConfidence *float64
+	OnlyAvailable bool
+	OnlyOnSale    bool
+	PriceRange    *PriceRange
+	Limit         int
 }
 
 type ProductMasterMatchFilters struct {
@@ -482,23 +482,23 @@ type ProductMasterMatchFilters struct {
 }
 
 type CategoryFilters struct {
-	ParentID  *int
-	Level     *int
-	IsActive  *bool
-	Limit     int
-	Offset    int
-	OrderBy   string
-	OrderDir  string
+	ParentID *int
+	Level    *int
+	IsActive *bool
+	Limit    int
+	Offset   int
+	OrderBy  string
+	OrderDir string
 }
 
 type TagFilters struct {
-	TagType   []string
-	IsSystem  *bool
-	IsActive  *bool
-	Limit     int
-	Offset    int
-	OrderBy   string
-	OrderDir  string
+	TagType  []string
+	IsSystem *bool
+	IsActive *bool
+	Limit    int
+	Offset   int
+	OrderBy  string
+	OrderDir string
 }
 
 // Helper structures
@@ -508,76 +508,76 @@ type ItemOrder struct {
 }
 
 type ItemSuggestion struct {
-	Description      string                 `json:"description"`
-	Source          string                 `json:"source"`
-	ProductMaster   *models.ProductMaster  `json:"product_master,omitempty"`
-	Product         *models.Product        `json:"product,omitempty"`
-	EstimatedPrice  *float64               `json:"estimated_price,omitempty"`
-	Confidence      float64                `json:"confidence"`
+	Description    string                `json:"description"`
+	Source         string                `json:"source"`
+	ProductMaster  *models.ProductMaster `json:"product_master,omitempty"`
+	Product        *models.Product       `json:"product,omitempty"`
+	EstimatedPrice *float64              `json:"estimated_price,omitempty"`
+	Confidence     float64               `json:"confidence"`
 }
 
 type ProductMatch struct {
-	Product         *models.Product       `json:"product"`
-	ProductMaster   *models.ProductMaster `json:"product_master,omitempty"`
-	Confidence      float64               `json:"confidence"`
-	PriceMatch      bool                  `json:"price_match"`
-	BrandMatch      bool                  `json:"brand_match"`
-	SizeMatch       bool                  `json:"size_match"`
+	Product       *models.Product       `json:"product"`
+	ProductMaster *models.ProductMaster `json:"product_master,omitempty"`
+	Confidence    float64               `json:"confidence"`
+	PriceMatch    bool                  `json:"price_match"`
+	BrandMatch    bool                  `json:"brand_match"`
+	SizeMatch     bool                  `json:"size_match"`
 }
 
 type ProductMasterMatch struct {
-	ProductMaster   *models.ProductMaster `json:"product_master"`
-	Confidence      float64               `json:"confidence"`
-	ReasonCodes     []string              `json:"reason_codes"`
-	AvgPrice        *float64              `json:"avg_price,omitempty"`
-	Availability    float64               `json:"availability"`
+	ProductMaster *models.ProductMaster `json:"product_master"`
+	Confidence    float64               `json:"confidence"`
+	ReasonCodes   []string              `json:"reason_codes"`
+	AvgPrice      *float64              `json:"avg_price,omitempty"`
+	Availability  float64               `json:"availability"`
 }
 
 type ProductSuggestion struct {
-	Product         *models.Product       `json:"product"`
-	Store           *models.Store         `json:"store"`
-	Price           *float64              `json:"price"`
-	IsOnSale        bool                  `json:"is_on_sale"`
-	Confidence      float64               `json:"confidence"`
+	Product    *models.Product `json:"product"`
+	Store      *models.Store   `json:"store"`
+	Price      *float64        `json:"price"`
+	IsOnSale   bool            `json:"is_on_sale"`
+	Confidence float64         `json:"confidence"`
 }
 
 type AutoMatchResult struct {
-	ItemID          int64                 `json:"item_id"`
-	Item            *models.ShoppingListItem `json:"item"`
-	Match           *ProductMatch         `json:"match,omitempty"`
-	Success         bool                  `json:"success"`
-	Reason          string                `json:"reason"`
+	ItemID  int64                    `json:"item_id"`
+	Item    *models.ShoppingListItem `json:"item"`
+	Match   *ProductMatch            `json:"match,omitempty"`
+	Success bool                     `json:"success"`
+	Reason  string                   `json:"reason"`
 }
 
 type AvailabilityInfo struct {
-	IsAvailable     bool                  `json:"is_available"`
-	Stores          []*models.Store       `json:"stores"`
-	LastChecked     time.Time             `json:"last_checked"`
-	Alternatives    []*models.Product     `json:"alternatives,omitempty"`
+	IsAvailable  bool              `json:"is_available"`
+	Stores       []*models.Store   `json:"stores"`
+	LastChecked  time.Time         `json:"last_checked"`
+	Alternatives []*models.Product `json:"alternatives,omitempty"`
 }
 
 type PriceOption struct {
-	Product         *models.Product       `json:"product"`
-	Store           *models.Store         `json:"store"`
-	Price           float64               `json:"price"`
-	IsOnSale        bool                  `json:"is_on_sale"`
-	Distance        *float64              `json:"distance,omitempty"`
-	ValidUntil      *time.Time            `json:"valid_until,omitempty"`
+	Product    *models.Product `json:"product"`
+	Store      *models.Store   `json:"store"`
+	Price      float64         `json:"price"`
+	IsOnSale   bool            `json:"is_on_sale"`
+	Distance   *float64        `json:"distance,omitempty"`
+	ValidUntil *time.Time      `json:"valid_until,omitempty"`
 }
 
 type SmartSuggestion struct {
-	Type            string                `json:"type"` // "frequent", "seasonal", "trending", "complementary"
-	ProductMaster   *models.ProductMaster `json:"product_master"`
-	Reason          string                `json:"reason"`
-	Confidence      float64               `json:"confidence"`
-	EstimatedPrice  *float64              `json:"estimated_price,omitempty"`
+	Type           string                `json:"type"` // "frequent", "seasonal", "trending", "complementary"
+	ProductMaster  *models.ProductMaster `json:"product_master"`
+	Reason         string                `json:"reason"`
+	Confidence     float64               `json:"confidence"`
+	EstimatedPrice *float64              `json:"estimated_price,omitempty"`
 }
 
 type ItemPriceHistory struct {
-	Date            time.Time             `json:"date"`
-	Price           float64               `json:"price"`
-	Store           *models.Store         `json:"store"`
-	Source          string                `json:"source"`
+	Date   time.Time     `json:"date"`
+	Price  float64       `json:"price"`
+	Store  *models.Store `json:"store"`
+	Source string        `json:"source"`
 }
 
 type PriceRange struct {
@@ -586,14 +586,14 @@ type PriceRange struct {
 }
 
 type ShoppingListStats struct {
-	TotalItems          int       `json:"total_items"`
-	CompletedItems      int       `json:"completed_items"`
-	CompletionRate      float64   `json:"completion_rate"`
-	EstimatedTotal      *float64  `json:"estimated_total"`
-	CategoriesUsed      int       `json:"categories_used"`
-	TagsUsed            int       `json:"tags_used"`
-	LastUpdated         time.Time `json:"last_updated"`
-	AverageItemPrice    *float64  `json:"average_item_price"`
-	LinkedItemsCount    int       `json:"linked_items_count"`
-	UnlinkedItemsCount  int       `json:"unlinked_items_count"`
+	TotalItems         int       `json:"total_items"`
+	CompletedItems     int       `json:"completed_items"`
+	CompletionRate     float64   `json:"completion_rate"`
+	EstimatedTotal     *float64  `json:"estimated_total"`
+	CategoriesUsed     int       `json:"categories_used"`
+	TagsUsed           int       `json:"tags_used"`
+	LastUpdated        time.Time `json:"last_updated"`
+	AverageItemPrice   *float64  `json:"average_item_price"`
+	LinkedItemsCount   int       `json:"linked_items_count"`
+	UnlinkedItemsCount int       `json:"unlinked_items_count"`
 }

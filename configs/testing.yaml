@@ -1,0 +1,49 @@
+server:
+  read_timeout: "10s"
+  write_timeout: "10s"
+  idle_timeout: "30s"
+  graceful_shutdown_timeout: "5s"
+
+database:
+  max_open_conns: 5
+  max_idle_conns: 2
+  conn_max_lifetime: "30m"
+  log_queries: false
+
+redis:
+  max_retries: 1
+  pool_size: 5
+
+logging:
+  level: "warn"
+  format: "json"
+  output: "stdout"
+
+openai:
+  model: "gpt-4-vision-preview"
+  max_tokens: 1000
+  temperature: 0.1
+  timeout: "10s"
+
+scraper:
+  request_delay: "1s"
+  max_retries: 1
+  rate_limit_per_minute: 10
+  respect_robots_txt: false
+
+worker:
+  num_workers: 1
+  queue_check_interval: "5s"
+  job_timeout: "1m"
+  max_retry_attempts: 1
+
+auth:
+  jwt_expires_in: "1h"
+  bcrypt_cost: 4
+  session_timeout: "1h"
+
+app:
+  name: "Kainuguru API"
+  version: "1.0.0"
+  environment: "testing"
+  debug: false

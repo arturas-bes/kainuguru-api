@@ -13,19 +13,19 @@ import (
 type Product struct {
 	bun.BaseModel `bun:"table:products,alias:p"`
 
-	ID              int    `bun:"id,pk,autoincrement" json:"id"`
-	FlyerID         int    `bun:"flyer_id,notnull" json:"flyer_id"`
-	FlyerPageID     *int   `bun:"flyer_page_id" json:"flyer_page_id,omitempty"`
-	StoreID         int    `bun:"store_id,notnull" json:"store_id"`
-	ProductMasterID *int   `bun:"product_master_id" json:"product_master_id,omitempty"`
+	ID              int  `bun:"id,pk,autoincrement" json:"id"`
+	FlyerID         int  `bun:"flyer_id,notnull" json:"flyer_id"`
+	FlyerPageID     *int `bun:"flyer_page_id" json:"flyer_page_id,omitempty"`
+	StoreID         int  `bun:"store_id,notnull" json:"store_id"`
+	ProductMasterID *int `bun:"product_master_id" json:"product_master_id,omitempty"`
 
 	// Basic product information
-	Name            string  `bun:"name,notnull" json:"name"`
-	NormalizedName  string  `bun:"normalized_name,notnull" json:"normalized_name"`
-	Brand           *string `bun:"brand" json:"brand,omitempty"`
-	Category        *string `bun:"category" json:"category,omitempty"`
-	Subcategory     *string `bun:"subcategory" json:"subcategory,omitempty"`
-	Description     *string `bun:"description" json:"description,omitempty"`
+	Name           string  `bun:"name,notnull" json:"name"`
+	NormalizedName string  `bun:"normalized_name,notnull" json:"normalized_name"`
+	Brand          *string `bun:"brand" json:"brand,omitempty"`
+	Category       *string `bun:"category" json:"category,omitempty"`
+	Subcategory    *string `bun:"subcategory" json:"subcategory,omitempty"`
+	Description    *string `bun:"description" json:"description,omitempty"`
 
 	// Pricing information
 	CurrentPrice    float64  `bun:"current_price,notnull" json:"current_price"`
@@ -34,17 +34,17 @@ type Product struct {
 	Currency        string   `bun:"currency,default:'EUR'" json:"currency"`
 
 	// Product specifications
-	UnitSize     *string `bun:"unit_size" json:"unit_size,omitempty"`
-	UnitType     *string `bun:"unit_type" json:"unit_type,omitempty"`
-	UnitPrice    *string `bun:"unit_price" json:"unit_price,omitempty"`
-	PackageSize  *string `bun:"package_size" json:"package_size,omitempty"`
-	Weight       *string `bun:"weight" json:"weight,omitempty"`
-	Volume       *string `bun:"volume" json:"volume,omitempty"`
+	UnitSize    *string `bun:"unit_size" json:"unit_size,omitempty"`
+	UnitType    *string `bun:"unit_type" json:"unit_type,omitempty"`
+	UnitPrice   *string `bun:"unit_price" json:"unit_price,omitempty"`
+	PackageSize *string `bun:"package_size" json:"package_size,omitempty"`
+	Weight      *string `bun:"weight" json:"weight,omitempty"`
+	Volume      *string `bun:"volume" json:"volume,omitempty"`
 
 	// Image and location data
-	ImageURL      *string           `bun:"image_url" json:"image_url,omitempty"`
-	BoundingBox   *ProductBoundingBox `bun:"bounding_box,type:jsonb" json:"bounding_box,omitempty"`
-	PagePosition  *ProductPosition  `bun:"page_position,type:jsonb" json:"page_position,omitempty"`
+	ImageURL     *string             `bun:"image_url" json:"image_url,omitempty"`
+	BoundingBox  *ProductBoundingBox `bun:"bounding_box,type:jsonb" json:"bounding_box,omitempty"`
+	PagePosition *ProductPosition    `bun:"page_position,type:jsonb" json:"page_position,omitempty"`
 
 	// Availability and promotion
 	IsOnSale      bool       `bun:"is_on_sale,default:false" json:"is_on_sale"`
@@ -70,10 +70,10 @@ type Product struct {
 	UpdatedAt time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
 
 	// Relations
-	Flyer           *Flyer          `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
-	FlyerPage       *FlyerPage      `bun:"rel:belongs-to,join:flyer_page_id=id" json:"flyer_page,omitempty"`
-	Store           *Store          `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
-	ProductMaster   *ProductMaster  `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
+	Flyer         *Flyer         `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
+	FlyerPage     *FlyerPage     `bun:"rel:belongs-to,join:flyer_page_id=id" json:"flyer_page,omitempty"`
+	Store         *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	ProductMaster *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
 }
 
 // ProductBoundingBox represents the position of a product on a flyer page
@@ -86,8 +86,8 @@ type ProductBoundingBox struct {
 
 // ProductPosition represents additional positioning metadata
 type ProductPosition struct {
-	Row    int `json:"row"`
-	Column int `json:"column"`
+	Row    int    `json:"row"`
+	Column int    `json:"column"`
 	Zone   string `json:"zone"` // e.g., "header", "main", "footer", "sidebar"
 }
 
@@ -205,7 +205,7 @@ func (p *Product) NormalizeName() {
 func (p *Product) IsValid() bool {
 	now := time.Now()
 	return p.ValidFrom.Before(now.Add(24*time.Hour)) && // Valid from today or earlier
-		   p.ValidTo.After(now) // Valid until after now
+		p.ValidTo.After(now) // Valid until after now
 }
 
 // IsExpired checks if the product has expired
@@ -241,9 +241,9 @@ func (p *Product) SetPagePosition(row, column int, zone string) {
 // RequiresManualReview checks if the product needs manual review
 func (p *Product) RequiresManualReview() bool {
 	return p.RequiresReview ||
-		   p.ExtractionConfidence < 0.8 ||
-		   p.CurrentPrice <= 0 ||
-		   strings.TrimSpace(p.Name) == ""
+		p.ExtractionConfidence < 0.8 ||
+		p.CurrentPrice <= 0 ||
+		strings.TrimSpace(p.Name) == ""
 }
 
 // GetPricePerUnit calculates price per unit if unit information is available

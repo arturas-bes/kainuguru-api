@@ -1,139 +1,84 @@
-.PHONY: help build run test clean migrate-up migrate-down migrate-create docker-up docker-down format lint
+.PHONY: help install format run test scrape clean
 
 # Default target
 help:
-	@echo "Available commands:"
-	@echo "  build        - Build all binaries"
-	@echo "  run-api      - Run API server"
-	@echo "  run-scraper  - Run scraper worker"
+	@echo "🍎 Kainuguru API - Available Commands:"
+	@echo "=================================="
+	@echo "  install      - Spin up Docker development environment"
+	@echo "  format       - Clean up and format code"
+	@echo "  run          - Run API server locally"
 	@echo "  test         - Run all tests"
-	@echo "  test-bdd     - Run BDD tests only"
-	@echo "  test-unit    - Run unit tests only"
-	@echo "  format       - Format code with gofmt"
-	@echo "  lint         - Run linters"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  migrate-up   - Run database migrations up"
-	@echo "  migrate-down - Run database migrations down"
-	@echo "  migrate-create NAME=<name> - Create new migration"
-	@echo "  docker-up    - Start development environment"
-	@echo "  docker-down  - Stop development environment"
-	@echo "  deps         - Install dependencies"
+	@echo "  scrape       - Run scraper tests and integrations"
+	@echo "  clean        - Stop containers and clean up"
+	@echo ""
+	@echo "Quick start: make install && make run"
 
-# Build targets
-build: build-api build-scraper build-migrator
+# 🚀 MAIN COMMANDS
+# These are the primary commands the user requested
 
-build-api:
-	@echo "Building API server..."
-	@go build -o bin/api cmd/api/main.go
+install:
+	@echo "🐳 Spinning up Docker development environment..."
+	@docker-compose down --remove-orphans 2>/dev/null || true
+	@docker-compose up -d
+	@echo "✅ Development environment ready!"
+	@echo "   Database: postgres://kainuguru_user:kainuguru_pass@localhost:5432/kainuguru"
+	@echo "   Redis: redis://localhost:6379"
+	@echo "   API will start once containers are healthy"
 
-build-scraper:
-	@echo "Building scraper worker..."
-	@go build -o bin/scraper cmd/scraper/main.go
+format:
+	@echo "🧹 Cleaning up and formatting code..."
+	@go fmt ./...
+	@go mod tidy
+	@echo "✅ Code formatted and dependencies cleaned!"
 
-build-migrator:
-	@echo "Building migrator..."
-	@go build -o bin/migrator cmd/migrator/main.go
-
-# Run targets
-run: run-api
-
-run-api:
-	@echo "Starting API server..."
+run:
+	@echo "🚀 Running API server locally..."
 	@go run cmd/api/main.go
 
-run-scraper:
-	@echo "Starting scraper worker..."
-	@go run cmd/scraper/main.go
+test:
+	@echo "🧪 Running all tests..."
+	@go test -v ./... -race
+	@echo "✅ All tests completed!"
 
-# Test targets
-test: test-unit test-bdd
+scrape:
+	@echo "🤖 Running scraper tests and integrations..."
+	@echo ""
+	@echo "1. Testing IKI Scraper (Local)..."
+	@go run cmd/test-scraper/main.go
+	@echo ""
+	@echo "2. Testing Full Pipeline (Docker - includes PDF processing)..."
+	@docker run --rm -v $(PWD):/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache poppler-utils imagemagick && go run cmd/test-full-pipeline/main.go'
+	@echo ""
+	@echo "✅ Scraper integration tests completed!"
 
-test-unit:
-	@echo "Running unit tests..."
-	@go test -v ./... -tags=unit
-
-test-bdd:
-	@echo "Running BDD tests..."
-	@go test -v ./tests/bdd/... -tags=bdd
-
-test-coverage:
-	@echo "Running tests with coverage..."
-	@go test -v -coverprofile=coverage.out ./...
-	@go tool cover -html=coverage.out -o coverage.html
-
-# Code quality
-format:
-	@echo "Formatting code..."
-	@go fmt ./...
-
-lint:
-	@echo "Running linters..."
-	@golangci-lint run
-
-# Dependencies
-install: deps
-
-deps:
-	@echo "Installing dependencies..."
-	@go mod download
-	@go mod tidy
-
-# Clean
 clean:
-	@echo "Cleaning build artifacts..."
-	@rm -rf bin/
-	@rm -f coverage.out coverage.html
+	@echo "🧹 Stopping containers and cleaning up..."
+	@docker-compose down --remove-orphans --volumes
+	@docker system prune -f 2>/dev/null || true
+	@rm -rf test_output/ coverage.out coverage.html bin/
+	@echo "✅ Environment cleaned!"
 
-# Database migrations
-migrate-up:
-	@echo "Running migrations up..."
-	@go run cmd/migrator/main.go up
+# 🔧 HELPER COMMANDS (internal use)
 
-migrate-down:
-	@echo "Running migrations down..."
-	@go run cmd/migrator/main.go down
+_test-unit:
+	@echo "Running unit tests..."
+	@go test -v ./... -tags=unit -short
 
-migrate-create:
-	@echo "Creating migration: $(NAME)"
-	@go run cmd/migrator/main.go create $(NAME)
+_test-integration:
+	@echo "Running integration tests..."
+	@go test -v ./tests/... -tags=integration
 
-# Docker commands
-docker-up:
-	@echo "Starting development environment..."
-	@docker-compose up -d
+_build:
+	@echo "Building binaries..."
+	@mkdir -p bin/
+	@go build -o bin/api cmd/api/main.go
+	@go build -o bin/scraper cmd/scraper/main.go
+	@go build -o bin/migrator cmd/migrator/main.go
 
-docker-down:
-	@echo "Stopping development environment..."
-	@docker-compose down
-
-docker-build:
-	@echo "Building Docker images..."
-	@docker-compose build
-
-docker-logs:
+_docker-logs:
 	@echo "Showing Docker logs..."
 	@docker-compose logs -f
 
-# GraphQL
-generate-graphql:
-	@echo "Generating GraphQL code..."
-	@go run github.com/99designs/gqlgen generate
-
-# Development shortcuts
-dev-api: docker-up run-api
-
-dev-scraper: docker-up run-scraper
-
-# Production builds
-build-prod:
-	@echo "Building production binaries..."
-	@CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/api-prod cmd/api/main.go
-	@CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/scraper-prod cmd/scraper/main.go
-	@CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/migrator-prod cmd/migrator/main.go
-
-# Install tools
-install-tools:
-	@echo "Installing development tools..."
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@go install github.com/99designs/gqlgen@latest
-	@go install github.com/pressly/goose/v3/cmd/goose@latest
+_status:
+	@echo "Docker container status:"
+	@docker-compose ps

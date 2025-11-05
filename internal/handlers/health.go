@@ -5,17 +5,17 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/kainuguru/kainuguru-api/internal/database"
 	"github.com/kainuguru/kainuguru-api/internal/cache"
+	"github.com/kainuguru/kainuguru-api/internal/database"
 	"github.com/rs/zerolog/log"
 )
 
 // HealthResponse represents the health check response
 type HealthResponse struct {
-	Status     string            `json:"status"`
-	Timestamp  time.Time         `json:"timestamp"`
-	Services   map[string]string `json:"services"`
-	Version    string            `json:"version"`
+	Status    string            `json:"status"`
+	Timestamp time.Time         `json:"timestamp"`
+	Services  map[string]string `json:"services"`
+	Version   string            `json:"version"`
 }
 
 // Health returns a health check handler

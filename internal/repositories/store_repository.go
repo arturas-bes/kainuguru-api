@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uptrace/bun"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/uptrace/bun"
 )
 
 type storeRepository struct {
@@ -193,9 +193,9 @@ func (r *storeRepository) GetScrapingEnabledStores(ctx context.Context) ([]*mode
 	err := r.db.NewSelect().
 		Model(&stores).
 		Where("s.is_active = ?", true).
-		Where("("+
-			"(s.scraper_config->>'flyer_selector' IS NOT NULL AND s.scraper_config->>'flyer_selector' != '') OR "+
-			"(s.scraper_config->>'api_endpoint' IS NOT NULL AND s.scraper_config->>'api_endpoint' != '')"+
+		Where("(" +
+			"(s.scraper_config->>'flyer_selector' IS NOT NULL AND s.scraper_config->>'flyer_selector' != '') OR " +
+			"(s.scraper_config->>'api_endpoint' IS NOT NULL AND s.scraper_config->>'api_endpoint' != '')" +
 			")").
 		Order("COALESCE((s.scraper_config->>'priority')::int, 999) ASC").
 		Order("s.name ASC").

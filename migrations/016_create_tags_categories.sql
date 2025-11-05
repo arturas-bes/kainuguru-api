@@ -70,7 +70,7 @@ CREATE TABLE product_tags (
 CREATE TABLE shopping_list_categories (
     id BIGSERIAL PRIMARY KEY,
     shopping_list_id BIGINT NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
     -- Category details
     name VARCHAR(100) NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE shopping_list_categories (
 -- Junction table for user's personal tags
 CREATE TABLE user_tags (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     tag_name VARCHAR(50) NOT NULL,
 
     -- Custom display properties
@@ -244,7 +244,7 @@ CREATE OR REPLACE FUNCTION update_user_tag_usage()
 RETURNS trigger AS $$
 DECLARE
     tag_name TEXT;
-    item_user_id BIGINT;
+    item_user_id UUID;
 BEGIN
     item_user_id := COALESCE(NEW.user_id, OLD.user_id);
 

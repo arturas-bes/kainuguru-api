@@ -12,12 +12,12 @@ import (
 type ShoppingListItem struct {
 	bun.BaseModel `bun:"table:shopping_list_items,alias:sli"`
 
-	ID                   int64     `bun:"id,pk,autoincrement" json:"id"`
-	ShoppingListID       int64     `bun:"shopping_list_id,notnull" json:"shopping_list_id"`
-	UserID               uuid.UUID `bun:"user_id,notnull" json:"user_id"` // For attribution
-	Description          string    `bun:"description,notnull" json:"description"`
-	NormalizedDescription string   `bun:"normalized_description,notnull" json:"normalized_description"`
-	Notes                *string   `bun:"notes" json:"notes"`
+	ID                    int64     `bun:"id,pk,autoincrement" json:"id"`
+	ShoppingListID        int64     `bun:"shopping_list_id,notnull" json:"shopping_list_id"`
+	UserID                uuid.UUID `bun:"user_id,notnull" json:"user_id"` // For attribution
+	Description           string    `bun:"description,notnull" json:"description"`
+	NormalizedDescription string    `bun:"normalized_description,notnull" json:"normalized_description"`
+	Notes                 *string   `bun:"notes" json:"notes"`
 
 	// Quantity and units
 	Quantity float64 `bun:"quantity,default:1" json:"quantity"`
@@ -25,18 +25,18 @@ type ShoppingListItem struct {
 	UnitType *string `bun:"unit_type" json:"unit_type"`
 
 	// State
-	IsChecked        bool       `bun:"is_checked,default:false" json:"is_checked"`
-	CheckedAt        *time.Time `bun:"checked_at" json:"checked_at"`
-	CheckedByUserID  *uuid.UUID `bun:"checked_by_user_id" json:"checked_by_user_id"`
+	IsChecked       bool       `bun:"is_checked,default:false" json:"is_checked"`
+	CheckedAt       *time.Time `bun:"checked_at" json:"checked_at"`
+	CheckedByUserID *uuid.UUID `bun:"checked_by_user_id" json:"checked_by_user_id"`
 
 	// Ordering
 	SortOrder int `bun:"sort_order,default:0" json:"sort_order"`
 
 	// Product linking
-	ProductMasterID  *int64 `bun:"product_master_id" json:"product_master_id"`
-	LinkedProductID  *int64 `bun:"linked_product_id" json:"linked_product_id"`
-	StoreID          *int   `bun:"store_id" json:"store_id"`
-	FlyerID          *int   `bun:"flyer_id" json:"flyer_id"`
+	ProductMasterID *int64 `bun:"product_master_id" json:"product_master_id"`
+	LinkedProductID *int64 `bun:"linked_product_id" json:"linked_product_id"`
+	StoreID         *int   `bun:"store_id" json:"store_id"`
+	FlyerID         *int   `bun:"flyer_id" json:"flyer_id"`
 
 	// Price tracking
 	EstimatedPrice *float64 `bun:"estimated_price" json:"estimated_price"`
@@ -48,8 +48,8 @@ type ShoppingListItem struct {
 	Tags     []string `bun:"tags,array" json:"tags"`
 
 	// Smart suggestions metadata
-	SuggestionSource    *string  `bun:"suggestion_source" json:"suggestion_source"`
-	MatchingConfidence  *float64 `bun:"matching_confidence" json:"matching_confidence"`
+	SuggestionSource   *string  `bun:"suggestion_source" json:"suggestion_source"`
+	MatchingConfidence *float64 `bun:"matching_confidence" json:"matching_confidence"`
 
 	// Product availability
 	AvailabilityStatus    string     `bun:"availability_status,default:'unknown'" json:"availability_status"`
@@ -63,13 +63,13 @@ type ShoppingListItem struct {
 	UpdatedAt time.Time `bun:"updated_at,default:now()" json:"updated_at"`
 
 	// Relations
-	ShoppingList    *ShoppingList  `bun:"rel:belongs-to,join:shopping_list_id=id" json:"shopping_list,omitempty"`
-	User            *User          `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
-	CheckedByUser   *User          `bun:"rel:belongs-to,join:checked_by_user_id=id" json:"checked_by_user,omitempty"`
-	ProductMaster   *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
-	LinkedProduct   *Product       `bun:"rel:belongs-to,join:linked_product_id=id" json:"linked_product,omitempty"`
-	Store           *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
-	Flyer           *Flyer         `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
+	ShoppingList  *ShoppingList  `bun:"rel:belongs-to,join:shopping_list_id=id" json:"shopping_list,omitempty"`
+	User          *User          `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
+	CheckedByUser *User          `bun:"rel:belongs-to,join:checked_by_user_id=id" json:"checked_by_user,omitempty"`
+	ProductMaster *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
+	LinkedProduct *Product       `bun:"rel:belongs-to,join:linked_product_id=id" json:"linked_product,omitempty"`
+	Store         *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	Flyer         *Flyer         `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
 }
 
 // SuggestionSource represents the source of item suggestions
@@ -87,10 +87,10 @@ const (
 type PriceSource string
 
 const (
-	PriceSourceFlyer         PriceSource = "flyer"
-	PriceSourceUserEstimate  PriceSource = "user_estimate"
-	PriceSourceHistorical    PriceSource = "historical"
-	PriceSourceActual        PriceSource = "actual"
+	PriceSourceFlyer        PriceSource = "flyer"
+	PriceSourceUserEstimate PriceSource = "user_estimate"
+	PriceSourceHistorical   PriceSource = "historical"
+	PriceSourceActual       PriceSource = "actual"
 )
 
 // AvailabilityStatus represents product availability status
