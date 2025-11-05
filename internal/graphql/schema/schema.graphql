@@ -950,6 +950,62 @@ type Query {
   myUserTags: [UserTag!]!
 
   myShoppingListCategories(listID: Int!): [ShoppingListCategory!]!
+
+  # Price History Queries
+  priceHistory(
+    productID: Int!
+    storeID: Int
+    filters: PriceHistoryFilters
+    first: Int
+    after: String
+  ): PriceHistoryConnection!
+
+  priceHistoryByDateRange(
+    productID: Int!
+    startDate: Time!
+    endDate: Time!
+    storeIDs: [Int!]
+  ): [PriceHistory!]!
+
+  currentPrice(productID: Int!, storeID: Int): PriceHistory
+  currentPrices(productID: Int!, storeIDs: [Int!]): [PriceHistory!]!
+
+  # Price Analysis Queries
+  analyzeTrend(
+    productID: Int!
+    period: String! # "7_days", "30_days", "90_days", "1_year"
+    storeID: Int
+  ): TrendAnalysis
+
+  compareStoreTrends(
+    productID: Int!
+    storeIDs: [Int!]!
+    period: String!
+  ): StoreTrendComparison
+
+  predictPrice(
+    productID: Int!
+    daysAhead: Int!
+  ): PricePrediction
+
+  buyingRecommendation(productID: Int!): BuyingRecommendation
+
+  priceAlertSuggestions(productID: Int!): PriceAlertSuggestions
+
+  trendSummary(productID: Int!): TrendSummary
+
+  seasonalTrends(productID: Int!): SeasonalTrendAnalysis
+
+  # Price Alert Queries (require auth)
+  priceAlert(id: ID!): PriceAlert
+  priceAlerts(
+    filters: PriceAlertFilters
+    first: Int
+    after: String
+  ): PriceAlertConnection!
+
+  myPriceAlerts: [PriceAlert!]!
+  activePriceAlerts: [PriceAlert!]!
 }
 
 # Search Input Types
@@ -1162,6 +1218,14 @@ type Mutation {
 
   deleteShoppingListCategory(id: Int!): Boolean!
 
+  # Price Alert Mutations (require auth)
+  createPriceAlert(input: CreatePriceAlertInput!): PriceAlert!
+  updatePriceAlert(id: ID!, input: UpdatePriceAlertInput!): PriceAlert!
+  deletePriceAlert(id: ID!): Boolean!
+  activatePriceAlert(id: ID!): PriceAlert!
+  deactivatePriceAlert(id: ID!): PriceAlert!
+  resetPriceAlertTriggerCount(id: ID!): PriceAlert!
+
   # Placeholder mutations for future implementation
   _placeholder: Boolean
 }
@@ -1170,4 +1234,340 @@ type RefreshSearchSuggestionsResponse {
   success: Boolean!
   refreshedAt: Time!
   suggestionCount: Int!
+}
+
+# Price History Types
+type PriceHistory {
+  id: ID!
+  productID: Int!
+  storeID: Int!
+  flyerID: Int
+  price: Float!
+  originalPrice: Float
+  currency: String!
+  isOnSale: Boolean!
+  recordedAt: Time!
+  validFrom: Time!
+  validTo: Time!
+  saleStartDate: Time
+  saleEndDate: Time
+  source: String!
+  extractionMethod: String!
+  confidence: Float!
+  isAvailable: Boolean!
+  stockLevel: String
+  notes: String
+  isActive: Boolean!
+  createdAt: Time!
+
+  # Computed fields
+  isCurrentlyValid: Boolean!
+  isCurrentlySale: Boolean!
+  discountAmount: Float!
+  discountPercent: Float!
+  isExpired: Boolean!
+  validityDuration: String!
+
+  # Relations
+  product: Product!
+  store: Store!
+  flyer: Flyer
+}
+
+type PriceTrend {
+  id: ID!
+  productID: Int!
+  storeID: Int
+  period: String!
+  startDate: Time!
+  endDate: Time!
+  calculatedAt: Time!
+  direction: TrendDirection!
+  trendPercent: Float!
+  confidence: Float!
+  dataPoints: Int!
+  volatilityScore: Float!
+  startPrice: Float!
+  endPrice: Float!
+  minPrice: Float!
+  maxPrice: Float!
+  avgPrice: Float!
+  medianPrice: Float!
+  slope: Float!
+  intercept: Float!
+  rSquared: Float!
+  isSignificant: Boolean!
+  ma7: Float!
+  ma14: Float!
+  ma30: Float!
+  isActive: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+
+  # Computed fields
+  isUpTrend: Boolean!
+  isDownTrend: Boolean!
+  isStable: Boolean!
+  isVolatile: Boolean!
+  trendStrength: String!
+  isCurrentTrend: Boolean!
+
+  # Relations
+  product: Product!
+  store: Store
+}
+
+enum TrendDirection {
+  RISING
+  FALLING
+  STABLE
+  VOLATILE
+}
+
+type PriceAlert {
+  id: ID!
+  userID: Int!
+  productID: Int!
+  storeID: Int
+  alertType: AlertType!
+  targetPrice: Float!
+  dropPercent: Float
+  isActive: Boolean!
+  notifyEmail: Boolean!
+  notifyPush: Boolean!
+  lastTriggered: Time
+  triggerCount: Int!
+  lastPrice: Float
+  notes: String
+  createdAt: Time!
+  updatedAt: Time!
+  expiresAt: Time
+
+  # Computed fields
+  isActiveAlert: Boolean!
+
+  # Relations
+  user: User!
+  product: Product!
+  store: Store
+}
+
+enum AlertType {
+  PRICE_DROP
+  TARGET_PRICE
+  PERCENTAGE_DROP
+}
+
+# Price Analysis Types
+type TrendAnalysis {
+  productID: Int!
+  period: String!
+  direction: TrendDirection!
+  trendPercentage: Float!
+  confidence: Float!
+  startPrice: Float!
+  endPrice: Float!
+  averageChange: Float!
+  volatilityScore: Float!
+  dataPoints: Int!
+  linearRegression: RegressionData!
+  movingAverages: MovingAverages!
+  trendStrength: String!
+}
+
+type RegressionData {
+  slope: Float!
+  intercept: Float!
+  rSquared: Float!
+  pValue: Float!
+  significant: Boolean!
+}
+
+type MovingAverages {
+  ma7: Float!
+  ma14: Float!
+  ma30: Float!
+  ma7AboveMa30: Boolean!
+}
+
+type StoreTrendComparison {
+  productID: Int!
+  storeTrends: [StoreTrend!]!
+  bestStore: StoreTrend
+  worstStore: StoreTrend
+  divergence: Float!
+}
+
+type StoreTrend {
+  storeID: Int!
+  storeName: String!
+  trendAnalysis: TrendAnalysis!
+  currentPrice: Float!
+  priceStability: Float!
+}
+
+type PricePrediction {
+  productID: Int!
+  predictionDate: Time!
+  predictedPrice: Float!
+  confidenceInterval: ConfidenceInterval!
+  methodology: String!
+  accuracy: Float!
+  factors: [PredictionFactor!]!
+}
+
+type ConfidenceInterval {
+  lower: Float!
+  upper: Float!
+  confidence: Float!
+}
+
+type PredictionFactor {
+  name: String!
+  impact: Float!
+  description: String!
+}
+
+type BuyingRecommendation {
+  productID: Int!
+  recommendation: RecommendationType!
+  currentPrice: Float!
+  recommendedAction: String!
+  confidence: Float!
+  reasoning: [String!]!
+  nextSaleDate: Time
+  potentialSavings: Float!
+  waitDays: Int!
+}
+
+enum RecommendationType {
+  BUY_NOW
+  WAIT
+  MONITOR
+}
+
+type PriceAlertSuggestions {
+  productID: Int!
+  currentPrice: Float!
+  thresholds: [AlertThreshold!]!
+  historicalStats: HistoricalStats!
+}
+
+type AlertThreshold {
+  level: String!
+  price: Float!
+  frequency: String!
+  lastSeen: Time!
+  description: String!
+}
+
+type HistoricalStats {
+  averagePrice: Float!
+  medianPrice: Float!
+  percentile10: Float!
+  percentile25: Float!
+  percentile75: Float!
+  percentile90: Float!
+}
+
+type TrendSummary {
+  productID: Int!
+  shortTermTrend: TrendAnalysis
+  mediumTermTrend: TrendAnalysis
+  longTermTrend: TrendAnalysis
+  buyingAdvice: BuyingRecommendation
+  priceAlerts: PriceAlertSuggestions
+  seasonalPattern: SeasonalTrendAnalysis
+  keyInsights: [String!]!
+}
+
+type SeasonalTrendAnalysis {
+  productID: Int!
+  hasSeasonality: Boolean!
+  seasonalIndex: Float!
+  seasons: [SeasonalPeriod!]!
+  nextPeakSeason: SeasonalPeriod
+  nextLowSeason: SeasonalPeriod
+  recommendations: [SeasonalAdvice!]!
+}
+
+type SeasonalPeriod {
+  season: String!
+  startMonth: Int!
+  endMonth: Int!
+  avgPrice: Float!
+  priceIndex: Float!
+  nextStart: Time!
+}
+
+type SeasonalAdvice {
+  period: String!
+  advice: String!
+  potentialSavings: Float!
+  timing: String!
+}
+
+# Price History Connections
+type PriceHistoryConnection {
+  edges: [PriceHistoryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceHistoryEdge {
+  node: PriceHistory!
+  cursor: String!
+}
+
+# Price Alert Connections
+type PriceAlertConnection {
+  edges: [PriceAlertEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceAlertEdge {
+  node: PriceAlert!
+  cursor: String!
+}
+
+# Input Types for Price History
+input PriceHistoryFilters {
+  productID: Int
+  storeID: Int
+  startDate: Time
+  endDate: Time
+  isOnSale: Boolean
+  minPrice: Float
+  maxPrice: Float
+  source: String
+}
+
+input PriceAlertFilters {
+  productID: Int
+  storeID: Int
+  alertType: AlertType
+  isActive: Boolean
+}
+
+input CreatePriceAlertInput {
+  productID: Int!
+  storeID: Int
+  alertType: AlertType!
+  targetPrice: Float!
+  dropPercent: Float
+  notifyEmail: Boolean = true
+  notifyPush: Boolean = false
+  notes: String
+  expiresAt: Time
+}
+
+input UpdatePriceAlertInput {
+  targetPrice: Float
+  dropPercent: Float
+  isActive: Boolean
+  notifyEmail: Boolean
+  notifyPush: Boolean
+  notes: String
+  expiresAt: Time
 }
