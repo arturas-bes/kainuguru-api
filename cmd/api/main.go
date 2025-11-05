@@ -1,81 +1,73 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/joho/godotenv"
-	"github.com/kainuguru/kainuguru-api/pkg/config"
+	"github.com/kainuguru/kainuguru-api/cmd/api/server"
+	"github.com/kainuguru/kainuguru-api/internal/config"
+	"github.com/kainuguru/kainuguru-api/pkg/logger"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+	// Get environment
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "development"
 	}
 
-	// Initialize configuration
-	cfg := config.New()
+	// Load configuration
+	cfg, err := config.Load(env)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to load configuration")
+	}
 
-	// Create fiber app
-	app := fiber.New(fiber.Config{
-		AppName:      "Kainuguru API",
-		ErrorHandler: errorHandler,
-	})
+	// Setup logger
+	loggerConfig := logger.Config{
+		Level:  cfg.Logging.Level,
+		Format: cfg.Logging.Format,
+		Output: cfg.Logging.Output,
+	}
+	if err := logger.Setup(loggerConfig); err != nil {
+		log.Fatal().Err(err).Msg("Failed to setup logger")
+	}
 
-	// Middleware
-	app.Use(recover.New())
-	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.AllowedOrigins,
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
-	}))
-
-	// Health check endpoint
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "healthy",
-			"app":    "kainuguru-api",
-		})
-	})
-
-	// API routes
-	api := app.Group("/api/v1")
-
-	// GraphQL endpoint will be added here
-	api.Post("/graphql", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "GraphQL endpoint will be implemented",
-		})
-	})
+	// Create server
+	srv, err := server.New(cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create server")
+	}
 
 	// Start server
-	port := cfg.Port
-	if port == "" {
-		port = "8080"
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Fatal().Err(err).Msg("Failed to start server")
+		}
+	}()
+
+	log.Info().
+		Str("env", env).
+		Str("host", cfg.Server.Host).
+		Int("port", cfg.Server.Port).
+		Msg("API server started")
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Info().Msg("Shutting down server...")
+
+	// Graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to shutdown server gracefully")
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := app.Listen(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
-}
-
-func errorHandler(c *fiber.Ctx, err error) error {
-	code := fiber.StatusInternalServerError
-	message := "Internal Server Error"
-
-	if e, ok := err.(*fiber.Error); ok {
-		code = e.Code
-		message = e.Message
-	}
-
-	return c.Status(code).JSON(fiber.Map{
-		"error": message,
-	})
+	log.Info().Msg("Server shutdown complete")
 }
