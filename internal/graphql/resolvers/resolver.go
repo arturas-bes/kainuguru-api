@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
 )
 
@@ -14,6 +15,7 @@ type Resolver struct {
 	productMasterService services.ProductMasterService
 	extractionJobService services.ExtractionJobService
 	searchService       search.Service
+	authService         auth.AuthService
 }
 
 // NewResolver creates a new resolver instance with all services
@@ -25,6 +27,7 @@ func NewResolver(
 	productMasterService services.ProductMasterService,
 	extractionJobService services.ExtractionJobService,
 	searchService search.Service,
+	authService auth.AuthService,
 ) *Resolver {
 	return &Resolver{
 		storeService:        storeService,
@@ -34,5 +37,6 @@ func NewResolver(
 		productMasterService: productMasterService,
 		extractionJobService: extractionJobService,
 		searchService:       searchService,
+		authService:         authService,
 	}
 }

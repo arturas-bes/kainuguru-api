@@ -3,6 +3,60 @@
 
 scalar Time
 scalar JSON
+scalar UUID
+
+# Authentication Types
+type User {
+  id: UUID!
+  email: String!
+  emailVerified: Boolean!
+  fullName: String
+  preferredLanguage: String!
+  isActive: Boolean!
+  lastLoginAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  refreshToken: String!
+  expiresAt: Time!
+  tokenType: String!
+}
+
+# Authentication Input Types
+input RegisterInput {
+  email: String!
+  password: String!
+  fullName: String
+  preferredLanguage: String = "lt"
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input UpdateUserInput {
+  fullName: String
+  preferredLanguage: String
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input RequestPasswordResetInput {
+  email: String!
+}
+
+input ResetPasswordInput {
+  token: String!
+  newPassword: String!
+}
 
 # Store Types
 type Store {
@@ -357,6 +411,9 @@ input ProductMasterFilters {
 
 # Query Root
 type Query {
+  # Authentication Queries (require auth)
+  me: User
+
   # Store Queries
   store(id: Int!): Store
   storeByCode(code: String!): Store
@@ -602,6 +659,24 @@ type SearchIndexStatus {
 
 # Mutation Root
 type Mutation {
+  # Authentication Mutations
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  logout: Boolean!
+  refreshToken: AuthPayload!
+
+  # User Management (require auth)
+  updateProfile(input: UpdateUserInput!): User!
+  changePassword(input: ChangePasswordInput!): Boolean!
+
+  # Password Reset
+  requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
+  resetPassword(input: ResetPasswordInput!): Boolean!
+
+  # Email Verification
+  verifyEmail(token: String!): Boolean!
+  resendEmailVerification: Boolean!
+
   # Search Management
   refreshSearchSuggestions: RefreshSearchSuggestionsResponse!
 

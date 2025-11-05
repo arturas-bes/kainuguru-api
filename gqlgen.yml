@@ -34,6 +34,12 @@ models:
     model: time.Time
   JSON:
     model: interface{}
+  UUID:
+    model: github.com/google/uuid.UUID
+
+  # Authentication types
+  User:
+    model: github.com/kainuguru/kainuguru-api/internal/models.User
 
   # Skip existing types to avoid conflicts
   Store:
@@ -97,3 +103,47 @@ models:
     model: github.com/kainuguru/kainuguru-api/internal/graphql/model.PageInfo
   ImageDimensions:
     model: github.com/kainuguru/kainuguru-api/internal/graphql/model.ImageDimensions
+
+  # Search types
+  AdvancedSearchInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.AdvancedSearchInput
+  AdvancedSearchResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.AdvancedSearchResponse
+  FuzzySearchInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.FuzzySearchInput
+  FuzzySearchResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.FuzzySearchResponse
+  FuzzyProductResult:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.FuzzyProductResult
+  HybridSearchInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.HybridSearchInput
+  HybridSearchResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.HybridSearchResponse
+  HybridProductResult:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.HybridProductResult
+  ProductSearchResult:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.ProductSearchResult
+  QueryCorrection:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.QueryCorrection
+  QueryCorrectionsInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.QueryCorrectionsInput
+  QueryCorrectionsResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.QueryCorrectionsResponse
+  SearchSuggestionsInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SearchSuggestionsInput
+  SearchSuggestionsResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SearchSuggestionsResponse
+  SearchSuggestion:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SearchSuggestion
+  SimilarProductsInput:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SimilarProductsInput
+  SimilarProductsResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SimilarProductsResponse
+  SimilarProduct:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SimilarProduct
+  SearchHealthResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SearchHealthResponse
+  SearchIndexStatus:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.SearchIndexStatus
+  RefreshSearchSuggestionsResponse:
+    model: github.com/kainuguru/kainuguru-api/internal/graphql/model.RefreshSearchSuggestionsResponse

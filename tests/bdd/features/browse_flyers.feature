@@ -1,45 +1,76 @@
-Feature: Browse Current Weekly Flyers
-  As a Lithuanian grocery shopper
-  I want to browse current weekly flyers from all major stores
-  So that I can find deals and plan my shopping
+Feature: Browse Weekly Grocery Flyers
+  As a user
+  I want to browse current weekly flyers from grocery stores
+  So that I can see what products are available and plan my shopping
 
   Background:
-    Given the system has current flyers from major stores
-    And today is within a valid flyer period
+    Given the system has the following stores:
+      | name    | code   | enabled |
+      | IKI     | iki    | true    |
+      | Maxima  | maxima | true    |
+      | Rimi    | rimi   | true    |
+    And there are current flyers available for all stores
 
-  Scenario: View list of current flyers
-    When I request the current flyers list
-    Then I should see flyers from active stores
-    And each flyer should show store name, valid dates, and page count
-    And flyers should be sorted by store popularity
+  Scenario: View list of all stores
+    When I request all stores via GraphQL
+    Then I should see 3 stores
+    And each store should have id, name, code, and enabled fields
+    And only enabled stores should be returned
 
-  Scenario: View flyers only for current week
-    Given there are flyers for current week and previous week
-    When I request the current flyers list
-    Then I should only see current week flyers
-    And I should not see expired flyers
+  Scenario: View current flyers for all stores
+    When I request current flyers via GraphQL
+    Then I should see flyers from all enabled stores
+    And each flyer should have id, store_id, valid_from, valid_to, and page_count
+    And all flyers should be currently valid
+    And flyers should be ordered by valid_from descending
 
-  Scenario: Handle no current flyers gracefully
-    Given there are no current flyers available
-    When I request the current flyers list
-    Then I should receive an empty list
-    And I should get a helpful message about checking back later
+  Scenario: View current flyers for specific store
+    Given I want to see flyers only for "IKI"
+    When I request current flyers for store_ids [1] via GraphQL
+    Then I should see only flyers from IKI store
+    And the flyers should be currently valid
 
-  Scenario: View flyer details
-    Given there is a current flyer for "IKI" store
-    When I request details for that flyer
-    Then I should see the flyer information
-    And I should see the valid date range
-    And I should see the number of pages available
+  Scenario: View flyer pages for a specific flyer
+    Given there is a current flyer for IKI with pages
+    When I request pages for that flyer via GraphQL
+    Then I should see all pages for the flyer
+    And each page should have id, flyer_id, page_number, and image_url
+    And pages should be ordered by page_number ascending
+
+  Scenario: View flyer details by ID
+    Given there is a flyer with ID 1
+    When I request flyer details for ID 1 via GraphQL
+    Then I should see the complete flyer information
+    And it should include store details
+    And it should include valid date range
+
+  Scenario: Handle empty flyer results
+    Given there are no current flyers for store_ids [999]
+    When I request current flyers for store_ids [999] via GraphQL
+    Then I should see an empty flyers list
+    And the response should be successful
+
+  Scenario: View store details by code
+    When I request store by code "iki" via GraphQL
+    Then I should see the IKI store details
+    And the store should include id, name, code, and enabled status
+
+  Scenario: Pagination of flyers
+    Given there are more than 10 flyers available
+    When I request the first 5 flyers via GraphQL
+    Then I should see exactly 5 flyers
+    And I should receive pagination information with hasNextPage
+    When I request the next 5 flyers using pagination cursor
+    Then I should see the next 5 flyers
 
   Scenario: Access flyers without authentication
     Given I am not logged in
-    When I request the current flyers list
+    When I request current flyers via GraphQL
     Then I should successfully receive the flyers
     And no authentication should be required
 
   Scenario: System performance requirements
-    Given there are flyers from all major Lithuanian stores
-    When I request the current flyers list
+    Given there are flyers from all major stores
+    When I request current flyers via GraphQL
     Then the response should be returned within 500ms
-    And the API should handle concurrent requests efficiently
+    And the GraphQL query should execute efficiently

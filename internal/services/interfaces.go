@@ -11,6 +11,7 @@ import (
 type StoreService interface {
 	// Basic CRUD operations
 	GetByID(ctx context.Context, id int) (*models.Store, error)
+	GetByIDs(ctx context.Context, ids []int) ([]*models.Store, error)
 	GetByCode(ctx context.Context, code string) (*models.Store, error)
 	GetAll(ctx context.Context, filters StoreFilters) ([]*models.Store, error)
 	Create(ctx context.Context, store *models.Store) error
@@ -32,10 +33,14 @@ type StoreService interface {
 type FlyerService interface {
 	// Basic CRUD operations
 	GetByID(ctx context.Context, id int) (*models.Flyer, error)
+	GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error)
 	GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error)
 	Create(ctx context.Context, flyer *models.Flyer) error
 	Update(ctx context.Context, flyer *models.Flyer) error
 	Delete(ctx context.Context, id int) error
+
+	// DataLoader batch operations
+	GetFlyersByStoreIDs(ctx context.Context, storeIDs []int) ([]*models.Flyer, error)
 
 	// Flyer-specific operations
 	GetCurrentFlyers(ctx context.Context, storeIDs []int) ([]*models.Flyer, error)
@@ -60,12 +65,16 @@ type FlyerService interface {
 type FlyerPageService interface {
 	// Basic CRUD operations
 	GetByID(ctx context.Context, id int) (*models.FlyerPage, error)
+	GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error)
 	GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error)
 	GetAll(ctx context.Context, filters FlyerPageFilters) ([]*models.FlyerPage, error)
 	Create(ctx context.Context, page *models.FlyerPage) error
 	CreateBatch(ctx context.Context, pages []*models.FlyerPage) error
 	Update(ctx context.Context, page *models.FlyerPage) error
 	Delete(ctx context.Context, id int) error
+
+	// DataLoader batch operations
+	GetPagesByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.FlyerPage, error)
 
 	// Processing operations
 	GetProcessablePages(ctx context.Context) ([]*models.FlyerPage, error)
@@ -84,11 +93,16 @@ type FlyerPageService interface {
 type ProductService interface {
 	// Basic CRUD operations
 	GetByID(ctx context.Context, id int) (*models.Product, error)
+	GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error)
 	GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error)
 	Create(ctx context.Context, product *models.Product) error
 	CreateBatch(ctx context.Context, products []*models.Product) error
 	Update(ctx context.Context, product *models.Product) error
 	Delete(ctx context.Context, id int) error
+
+	// DataLoader batch operations
+	GetProductsByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.Product, error)
+	GetProductsByFlyerPageIDs(ctx context.Context, flyerPageIDs []int) ([]*models.Product, error)
 
 	// Product-specific operations
 	GetByFlyer(ctx context.Context, flyerID int, filters ProductFilters) ([]*models.Product, error)
@@ -116,6 +130,7 @@ type ProductService interface {
 type ProductMasterService interface {
 	// Basic CRUD operations
 	GetByID(ctx context.Context, id int) (*models.ProductMaster, error)
+	GetByIDs(ctx context.Context, ids []int) ([]*models.ProductMaster, error)
 	GetAll(ctx context.Context, filters ProductMasterFilters) ([]*models.ProductMaster, error)
 	Create(ctx context.Context, master *models.ProductMaster) error
 	Update(ctx context.Context, master *models.ProductMaster) error

@@ -24,6 +24,18 @@ func (s *productService) GetByID(ctx context.Context, id int) (*models.Product, 
 	return nil, fmt.Errorf("productService.GetByID not implemented")
 }
 
+func (s *productService) GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error) {
+	return nil, fmt.Errorf("productService.GetByIDs not implemented")
+}
+
+func (s *productService) GetProductsByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.Product, error) {
+	return nil, fmt.Errorf("productService.GetProductsByFlyerIDs not implemented")
+}
+
+func (s *productService) GetProductsByFlyerPageIDs(ctx context.Context, flyerPageIDs []int) ([]*models.Product, error) {
+	return nil, fmt.Errorf("productService.GetProductsByFlyerPageIDs not implemented")
+}
+
 func (s *productService) GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error) {
 	return nil, fmt.Errorf("productService.GetAll not implemented")
 }

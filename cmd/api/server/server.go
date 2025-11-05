@@ -76,7 +76,7 @@ func (s *Server) Start() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Info().Msg("Shutting down HTTP server")
-	
+
 	// Shutdown HTTP server
 	if err := s.app.ShutdownWithContext(ctx); err != nil {
 		log.Error().Err(err).Msg("Failed to shutdown HTTP server")
@@ -93,6 +93,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Server) App() *fiber.App {
+	return s.app
 }
 
 func setupMiddleware(app *fiber.App, cfg *config.Config, redis *cache.RedisClient) {
