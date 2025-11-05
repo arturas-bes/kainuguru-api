@@ -3,6 +3,60 @@
 
 scalar Time
 scalar JSON
+scalar UUID
+
+# Authentication Types
+type User {
+  id: UUID!
+  email: String!
+  emailVerified: Boolean!
+  fullName: String
+  preferredLanguage: String!
+  isActive: Boolean!
+  lastLoginAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  refreshToken: String!
+  expiresAt: Time!
+  tokenType: String!
+}
+
+# Authentication Input Types
+input RegisterInput {
+  email: String!
+  password: String!
+  fullName: String
+  preferredLanguage: String = "lt"
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input UpdateUserInput {
+  fullName: String
+  preferredLanguage: String
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input RequestPasswordResetInput {
+  email: String!
+}
+
+input ResetPasswordInput {
+  token: String!
+  newPassword: String!
+}
 
 # Store Types
 type Store {
@@ -357,6 +411,9 @@ input ProductMasterFilters {
 
 # Query Root
 type Query {
+  # Authentication Queries (require auth)
+  me: User
+
   # Store Queries
   store(id: Int!): Store
   storeByCode(code: String!): Store
@@ -411,6 +468,39 @@ type Query {
     after: String
   ): ProductConnection!
 
+  # Advanced Product Search
+  advancedSearchProducts(
+    input: AdvancedSearchInput!
+  ): AdvancedSearchResponse!
+
+  # Fuzzy Product Search
+  fuzzySearchProducts(
+    input: FuzzySearchInput!
+  ): FuzzySearchResponse!
+
+  # Hybrid Product Search
+  hybridSearchProducts(
+    input: HybridSearchInput!
+  ): HybridSearchResponse!
+
+  # Search Suggestions
+  searchSuggestions(
+    input: SearchSuggestionsInput!
+  ): SearchSuggestionsResponse!
+
+  # Similar Products
+  similarProducts(
+    input: SimilarProductsInput!
+  ): SimilarProductsResponse!
+
+  # Query Corrections
+  queryCorrections(
+    input: QueryCorrectionsInput!
+  ): QueryCorrectionsResponse!
+
+  # Search Health
+  searchHealth: SearchHealthResponse!
+
   # Products on Sale
   productsOnSale(
     storeIDs: [Int!]
@@ -428,8 +518,174 @@ type Query {
   ): ProductMasterConnection!
 }
 
-# Mutation Root (placeholder for future features)
+# Search Input Types
+input AdvancedSearchInput {
+  query: String!
+  storeIDs: [Int!]
+  minPrice: Float
+  maxPrice: Float
+  onSaleOnly: Boolean = false
+  category: String
+  limit: Int = 50
+  offset: Int = 0
+  preferFuzzy: Boolean = false
+}
+
+input FuzzySearchInput {
+  query: String!
+  storeIDs: [Int!]
+  minPrice: Float
+  maxPrice: Float
+  category: String
+  limit: Int = 50
+  offset: Int = 0
+  similarityThreshold: Float = 0.3
+}
+
+input HybridSearchInput {
+  query: String!
+  storeIDs: [Int!]
+  minPrice: Float
+  maxPrice: Float
+  limit: Int = 50
+  offset: Int = 0
+  preferFuzzy: Boolean = false
+}
+
+input SearchSuggestionsInput {
+  partialQuery: String!
+  limit: Int = 10
+}
+
+input SimilarProductsInput {
+  productID: Int!
+  limit: Int = 10
+}
+
+input QueryCorrectionsInput {
+  query: String!
+  limit: Int = 5
+}
+
+# Search Response Types
+type AdvancedSearchResponse {
+  products: [ProductSearchResult!]!
+  totalCount: Int!
+  queryTime: String!
+  suggestions: [String!]
+  hasMore: Boolean!
+}
+
+type FuzzySearchResponse {
+  products: [FuzzyProductResult!]!
+  totalCount: Int!
+  queryTime: String!
+  hasMore: Boolean!
+}
+
+type HybridSearchResponse {
+  products: [HybridProductResult!]!
+  totalCount: Int!
+  queryTime: String!
+  hasMore: Boolean!
+}
+
+type ProductSearchResult {
+  product: Product!
+  searchScore: Float!
+  matchType: String!
+  similarity: Float
+  highlights: [String!]
+}
+
+type FuzzyProductResult {
+  product: Product!
+  searchScore: Float!
+  nameSimilarity: Float!
+  brandSimilarity: Float!
+  combinedSimilarity: Float!
+}
+
+type HybridProductResult {
+  product: Product!
+  searchScore: Float!
+  matchType: String!
+}
+
+type SearchSuggestionsResponse {
+  suggestions: [SearchSuggestion!]!
+}
+
+type SearchSuggestion {
+  text: String!
+  frequency: Int!
+  minPrice: Float!
+  maxPrice: Float!
+  storeCount: Int!
+}
+
+type SimilarProductsResponse {
+  products: [SimilarProduct!]!
+}
+
+type SimilarProduct {
+  product: Product!
+  similarityScore: Float!
+}
+
+type QueryCorrectionsResponse {
+  corrections: [QueryCorrection!]!
+}
+
+type QueryCorrection {
+  suggestion: String!
+  confidence: Float!
+}
+
+type SearchHealthResponse {
+  indexStatus: [SearchIndexStatus!]!
+  lastRefreshTime: Time!
+  suggestionCount: Int!
+  averageQueryTime: String!
+  totalSearches: Int!
+  errorRate: Float!
+}
+
+type SearchIndexStatus {
+  indexName: String!
+  isHealthy: Boolean!
+  isUsed: Boolean!
+}
+
+# Mutation Root
 type Mutation {
+  # Authentication Mutations
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  logout: Boolean!
+  refreshToken: AuthPayload!
+
+  # User Management (require auth)
+  updateProfile(input: UpdateUserInput!): User!
+  changePassword(input: ChangePasswordInput!): Boolean!
+
+  # Password Reset
+  requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
+  resetPassword(input: ResetPasswordInput!): Boolean!
+
+  # Email Verification
+  verifyEmail(token: String!): Boolean!
+  resendEmailVerification: Boolean!
+
+  # Search Management
+  refreshSearchSuggestions: RefreshSearchSuggestionsResponse!
+
   # Placeholder mutations for future implementation
   _placeholder: Boolean
+}
+
+type RefreshSearchSuggestionsResponse {
+  success: Boolean!
+  refreshedAt: Time!
+  suggestionCount: Int!
 }

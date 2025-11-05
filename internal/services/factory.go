@@ -1,7 +1,10 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/uptrace/bun"
+	"github.com/kainuguru/kainuguru-api/internal/services/search"
 )
 
 // ServiceFactory creates and manages all service instances
@@ -44,6 +47,12 @@ func (f *ServiceFactory) ProductMasterService() ProductMasterService {
 // ExtractionJobService returns an extraction job service instance
 func (f *ServiceFactory) ExtractionJobService() ExtractionJobService {
 	return NewExtractionJobService(f.db)
+}
+
+// SearchService returns a search service instance
+func (f *ServiceFactory) SearchService() search.Service {
+	logger := slog.Default()
+	return search.NewSearchService(f.db, logger)
 }
 
 // Close closes all connections and resources

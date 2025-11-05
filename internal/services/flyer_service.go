@@ -36,6 +36,37 @@ func (fs *flyerService) GetByID(ctx context.Context, id int) (*models.Flyer, err
 	return flyer, err
 }
 
+// GetByIDs retrieves multiple flyers by their IDs
+func (fs *flyerService) GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error) {
+	if len(ids) == 0 {
+		return []*models.Flyer{}, nil
+	}
+
+	var flyers []*models.Flyer
+	err := fs.db.NewSelect().
+		Model(&flyers).
+		Where("f.id IN (?)", bun.In(ids)).
+		Scan(ctx)
+
+	return flyers, err
+}
+
+// GetFlyersByStoreIDs retrieves flyers for multiple store IDs (for DataLoader)
+func (fs *flyerService) GetFlyersByStoreIDs(ctx context.Context, storeIDs []int) ([]*models.Flyer, error) {
+	if len(storeIDs) == 0 {
+		return []*models.Flyer{}, nil
+	}
+
+	var flyers []*models.Flyer
+	err := fs.db.NewSelect().
+		Model(&flyers).
+		Where("f.store_id IN (?)", bun.In(storeIDs)).
+		Order("f.valid_from DESC").
+		Scan(ctx)
+
+	return flyers, err
+}
+
 // GetAll retrieves flyers with optional filtering
 func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error) {
 	query := fs.db.NewSelect().Model((*models.Flyer)(nil))

@@ -324,3 +324,148 @@ type ProductMasterFilters struct {
 	MinMatches    *int                  `json:"minMatches"`
 	MinConfidence *float64              `json:"minConfidence"`
 }
+
+// Search Input Types
+type AdvancedSearchInput struct {
+	Query       string   `json:"query"`
+	StoreIDs    []int    `json:"storeIDs"`
+	MinPrice    *float64 `json:"minPrice"`
+	MaxPrice    *float64 `json:"maxPrice"`
+	OnSaleOnly  *bool    `json:"onSaleOnly"`
+	Category    *string  `json:"category"`
+	Limit       *int     `json:"limit"`
+	Offset      *int     `json:"offset"`
+	PreferFuzzy *bool    `json:"preferFuzzy"`
+}
+
+type FuzzySearchInput struct {
+	Query               string   `json:"query"`
+	StoreIDs            []int    `json:"storeIDs"`
+	MinPrice            *float64 `json:"minPrice"`
+	MaxPrice            *float64 `json:"maxPrice"`
+	Category            *string  `json:"category"`
+	Limit               *int     `json:"limit"`
+	Offset              *int     `json:"offset"`
+	SimilarityThreshold *float64 `json:"similarityThreshold"`
+}
+
+type HybridSearchInput struct {
+	Query       string   `json:"query"`
+	StoreIDs    []int    `json:"storeIDs"`
+	MinPrice    *float64 `json:"minPrice"`
+	MaxPrice    *float64 `json:"maxPrice"`
+	Limit       *int     `json:"limit"`
+	Offset      *int     `json:"offset"`
+	PreferFuzzy *bool    `json:"preferFuzzy"`
+}
+
+type SearchSuggestionsInput struct {
+	PartialQuery string `json:"partialQuery"`
+	Limit        *int   `json:"limit"`
+}
+
+type SimilarProductsInput struct {
+	ProductID int  `json:"productID"`
+	Limit     *int `json:"limit"`
+}
+
+type QueryCorrectionsInput struct {
+	Query string `json:"query"`
+	Limit *int   `json:"limit"`
+}
+
+// Search Response Types
+type AdvancedSearchResponse struct {
+	Products    []*ProductSearchResult `json:"products"`
+	TotalCount  int                    `json:"totalCount"`
+	QueryTime   string                 `json:"queryTime"`
+	Suggestions []string               `json:"suggestions"`
+	HasMore     bool                   `json:"hasMore"`
+}
+
+type FuzzySearchResponse struct {
+	Products   []*FuzzyProductResult `json:"products"`
+	TotalCount int                   `json:"totalCount"`
+	QueryTime  string                `json:"queryTime"`
+	HasMore    bool                  `json:"hasMore"`
+}
+
+type HybridSearchResponse struct {
+	Products   []*HybridProductResult `json:"products"`
+	TotalCount int                    `json:"totalCount"`
+	QueryTime  string                 `json:"queryTime"`
+	HasMore    bool                   `json:"hasMore"`
+}
+
+type ProductSearchResult struct {
+	Product     *Product `json:"product"`
+	SearchScore float64  `json:"searchScore"`
+	MatchType   string   `json:"matchType"`
+	Similarity  *float64 `json:"similarity"`
+	Highlights  []string `json:"highlights"`
+}
+
+type FuzzyProductResult struct {
+	Product            *Product `json:"product"`
+	SearchScore        float64  `json:"searchScore"`
+	NameSimilarity     float64  `json:"nameSimilarity"`
+	BrandSimilarity    float64  `json:"brandSimilarity"`
+	CombinedSimilarity float64  `json:"combinedSimilarity"`
+}
+
+type HybridProductResult struct {
+	Product     *Product `json:"product"`
+	SearchScore float64  `json:"searchScore"`
+	MatchType   string   `json:"matchType"`
+}
+
+type SearchSuggestionsResponse struct {
+	Suggestions []*SearchSuggestion `json:"suggestions"`
+}
+
+type SearchSuggestion struct {
+	Text       string  `json:"text"`
+	Frequency  int     `json:"frequency"`
+	MinPrice   float64 `json:"minPrice"`
+	MaxPrice   float64 `json:"maxPrice"`
+	StoreCount int     `json:"storeCount"`
+}
+
+type SimilarProductsResponse struct {
+	Products []*SimilarProduct `json:"products"`
+}
+
+type SimilarProduct struct {
+	Product         *Product `json:"product"`
+	SimilarityScore float64  `json:"similarityScore"`
+}
+
+type QueryCorrectionsResponse struct {
+	Corrections []*QueryCorrection `json:"corrections"`
+}
+
+type QueryCorrection struct {
+	Suggestion string  `json:"suggestion"`
+	Confidence float64 `json:"confidence"`
+}
+
+type SearchHealthResponse struct {
+	IndexStatus      []*SearchIndexStatus `json:"indexStatus"`
+	LastRefreshTime  time.Time            `json:"lastRefreshTime"`
+	SuggestionCount  int                  `json:"suggestionCount"`
+	AverageQueryTime string               `json:"averageQueryTime"`
+	TotalSearches    int                  `json:"totalSearches"`
+	ErrorRate        float64              `json:"errorRate"`
+}
+
+type SearchIndexStatus struct {
+	IndexName string `json:"indexName"`
+	IsHealthy bool   `json:"isHealthy"`
+	IsUsed    bool   `json:"isUsed"`
+}
+
+type RefreshSearchSuggestionsResponse struct {
+	Success         bool      `json:"success"`
+	RefreshedAt     time.Time `json:"refreshedAt"`
+	SuggestionCount int       `json:"suggestionCount"`
+}

@@ -24,6 +24,10 @@ func (s *productMasterService) GetByID(ctx context.Context, id int) (*models.Pro
 	return nil, fmt.Errorf("productMasterService.GetByID not implemented")
 }
 
+func (s *productMasterService) GetByIDs(ctx context.Context, ids []int) ([]*models.ProductMaster, error) {
+	return nil, fmt.Errorf("productMasterService.GetByIDs not implemented")
+}
+
 func (s *productMasterService) GetAll(ctx context.Context, filters ProductMasterFilters) ([]*models.ProductMaster, error) {
 	return nil, fmt.Errorf("productMasterService.GetAll not implemented")
 }

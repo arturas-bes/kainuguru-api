@@ -4,6 +4,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/services/auth"
+	"github.com/kainuguru/kainuguru-api/internal/services/search"
 )
 
 // GraphQLConfig holds configuration for GraphQL handler
@@ -14,10 +16,13 @@ type GraphQLConfig struct {
 	ProductService      services.ProductService
 	ProductMasterService services.ProductMasterService
 	ExtractionJobService services.ExtractionJobService
+	SearchService       search.Service
+	AuthService         auth.AuthService
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
 func GraphQLHandler(config GraphQLConfig) fiber.Handler {
+	// Create resolver with services
 	resolver := resolvers.NewResolver(
 		config.StoreService,
 		config.FlyerService,
@@ -25,17 +30,34 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ProductService,
 		config.ProductMasterService,
 		config.ExtractionJobService,
+		config.SearchService,
+		config.AuthService,
+	)
+
+	// Create DataLoaders for N+1 query prevention
+	dataLoaders := NewDataLoaders(
+		config.StoreService,
+		config.FlyerService,
+		config.FlyerPageService,
+		config.ProductService,
+		config.ProductMasterService,
+		config.SearchService,
 	)
 
 	return func(c *fiber.Ctx) error {
+		// Add DataLoaders to the request context
+		ctx := DataLoaderMiddleware(dataLoaders)(c.Context())
+		c.SetUserContext(ctx)
+
 		// For now, return a configured response with resolver info
 		// TODO: Implement actual GraphQL server using gqlgen
 		return c.JSON(fiber.Map{
-			"message": "GraphQL endpoint - Phase 3 implementation",
+			"message": "GraphQL endpoint - Phase 3 implementation with DataLoaders",
 			"status":  "configured",
 			"schema":  "Browse Weekly Grocery Flyers",
 			"resolver": fiber.Map{
-				"configured": resolver != nil,
+				"configured":  resolver != nil,
+				"dataLoaders": dataLoaders != nil,
 				"services": fiber.Map{
 					"store":         config.StoreService != nil,
 					"flyer":         config.FlyerService != nil,
@@ -43,6 +65,8 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 					"product":       config.ProductService != nil,
 					"productMaster": config.ProductMasterService != nil,
 					"extractionJob": config.ExtractionJobService != nil,
+					"search":        config.SearchService != nil,
+					"auth":          config.AuthService != nil,
 				},
 			},
 		})

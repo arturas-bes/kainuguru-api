@@ -36,6 +36,21 @@ func (s *storeService) GetByID(ctx context.Context, id int) (*models.Store, erro
 	return store, err
 }
 
+// GetByIDs retrieves multiple stores by their IDs
+func (s *storeService) GetByIDs(ctx context.Context, ids []int) ([]*models.Store, error) {
+	if len(ids) == 0 {
+		return []*models.Store{}, nil
+	}
+
+	var stores []*models.Store
+	err := s.db.NewSelect().
+		Model(&stores).
+		Where("s.id IN (?)", bun.In(ids)).
+		Scan(ctx)
+
+	return stores, err
+}
+
 // GetByCode retrieves a store by its code
 func (s *storeService) GetByCode(ctx context.Context, code string) (*models.Store, error) {
 	store := &models.Store{}

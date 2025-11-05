@@ -35,6 +35,8 @@ build-migrator:
 	@go build -o bin/migrator cmd/migrator/main.go
 
 # Run targets
+run: run-api
+
 run-api:
 	@echo "Starting API server..."
 	@go run cmd/api/main.go
@@ -69,6 +71,8 @@ lint:
 	@golangci-lint run
 
 # Dependencies
+install: deps
+
 deps:
 	@echo "Installing dependencies..."
 	@go mod download

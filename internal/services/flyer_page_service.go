@@ -24,6 +24,14 @@ func (s *flyerPageService) GetByID(ctx context.Context, id int) (*models.FlyerPa
 	return nil, fmt.Errorf("flyerPageService.GetByID not implemented")
 }
 
+func (s *flyerPageService) GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
+	return nil, fmt.Errorf("flyerPageService.GetByIDs not implemented")
+}
+
+func (s *flyerPageService) GetPagesByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.FlyerPage, error) {
+	return nil, fmt.Errorf("flyerPageService.GetPagesByFlyerIDs not implemented")
+}
+
 func (s *flyerPageService) GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error) {
 	return nil, fmt.Errorf("flyerPageService.GetByFlyerID not implemented")
 }

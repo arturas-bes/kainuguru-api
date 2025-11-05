@@ -547,6 +547,11 @@ func mapProductMasterFiltersFromGraphQL(filters *model.ProductMasterFilters) ser
 	}
 }
 
+// MapProductToGraphQL is a public wrapper for mapProductToGraphQL
+func MapProductToGraphQL(product *models.Product) (*model.Product, error) {
+	return mapProductToGraphQL(product), nil
+}
+
 // Utility functions
 func stringPtrWithDefault(ptr *string, defaultVal string) string {
 	if ptr != nil {
