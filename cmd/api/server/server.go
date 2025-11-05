@@ -15,6 +15,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/handlers"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
+	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
 type Server struct {
@@ -122,8 +123,22 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 	// Health check endpoint
 	app.Get("/health", handlers.Health(db, redis))
 
-	// GraphQL endpoint (will be implemented later)
-	app.All("/graphql", handlers.GraphQLPlaceholder())
+	// Initialize service factory
+	serviceFactory := services.NewServiceFactory(db.DB)
+
+	// Configure GraphQL handler with all services
+	graphqlConfig := handlers.GraphQLConfig{
+		StoreService:         serviceFactory.StoreService(),
+		FlyerService:         serviceFactory.FlyerService(),
+		FlyerPageService:     serviceFactory.FlyerPageService(),
+		ProductService:       serviceFactory.ProductService(),
+		ProductMasterService: serviceFactory.ProductMasterService(),
+		ExtractionJobService: serviceFactory.ExtractionJobService(),
+		SearchService:        serviceFactory.SearchService(),
+	}
+
+	// GraphQL endpoint with full service integration
+	app.All("/graphql", handlers.GraphQLHandler(graphqlConfig))
 
 	// GraphQL playground (development only)
 	app.Get("/playground", handlers.PlaygroundHandler())

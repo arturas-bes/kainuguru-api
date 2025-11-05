@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/services/search"
 )
 
 // GraphQLConfig holds configuration for GraphQL handler
@@ -14,6 +15,7 @@ type GraphQLConfig struct {
 	ProductService      services.ProductService
 	ProductMasterService services.ProductMasterService
 	ExtractionJobService services.ExtractionJobService
+	SearchService       search.Service
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
@@ -25,6 +27,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ProductService,
 		config.ProductMasterService,
 		config.ExtractionJobService,
+		config.SearchService,
 	)
 
 	return func(c *fiber.Ctx) error {
@@ -43,6 +46,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 					"product":       config.ProductService != nil,
 					"productMaster": config.ProductMasterService != nil,
 					"extractionJob": config.ExtractionJobService != nil,
+					"search":        config.SearchService != nil,
 				},
 			},
 		})

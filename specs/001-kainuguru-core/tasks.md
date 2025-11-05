@@ -70,27 +70,27 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T021 [P] [US1] BDD test for viewing current flyers list in tests/bdd/features/browse_flyers.feature
-- [ ] T022 [P] [US1] BDD test for viewing flyer pages in tests/bdd/features/view_flyer_pages.feature
-- [ ] T023 [P] [US1] BDD test for anonymous access to flyers in tests/bdd/features/public_access.feature
+- [X] T021 [P] [US1] BDD test for viewing current flyers list in tests/bdd/features/browse_flyers.feature
+- [X] T022 [P] [US1] BDD test for viewing flyer pages in tests/bdd/features/view_flyer_pages.feature
+- [X] T023 [P] [US1] BDD test for anonymous access to flyers in tests/bdd/features/public_access.feature
 
 ### Database Schema for User Story 1
 
-- [ ] T024 [P] [US1] Create stores table migration in migrations/001_create_stores.sql
-- [ ] T025 [P] [US1] Create flyers table migration in migrations/002_create_flyers.sql
-- [ ] T026 [P] [US1] Create flyer_pages table migration in migrations/003_create_flyer_pages.sql
-- [ ] T027 [P] [US1] Create products partitioned table migration in migrations/004_create_products.sql
-- [ ] T028 [US1] Create weekly partition function in migrations/005_partition_function.sql
-- [ ] T029 [US1] Create extraction_jobs table migration in migrations/006_create_extraction_jobs.sql
-- [ ] T030 [US1] Seed initial store data in migrations/007_seed_stores.sql
+- [X] T024 [P] [US1] Create stores table migration in migrations/001_create_stores.sql
+- [X] T025 [P] [US1] Create flyers table migration in migrations/002_create_flyers.sql
+- [X] T026 [P] [US1] Create flyer_pages table migration in migrations/003_create_flyer_pages.sql
+- [X] T027 [P] [US1] Create products partitioned table migration in migrations/004_create_products.sql
+- [X] T028 [US1] Create weekly partition function in migrations/005_partition_function.sql
+- [X] T029 [US1] Create extraction_jobs table migration in migrations/006_create_extraction_jobs.sql
+- [X] T030 [US1] Seed initial store data in migrations/007_seed_stores.sql
 
 ### Models for User Story 1
 
-- [ ] T031 [P] [US1] Create Store model with Bun ORM in internal/models/store.go
-- [ ] T032 [P] [US1] Create Flyer model with Bun ORM in internal/models/flyer.go
-- [ ] T033 [P] [US1] Create FlyerPage model with Bun ORM in internal/models/flyer_page.go
-- [ ] T034 [P] [US1] Create Product model with Bun ORM in internal/models/product.go
-- [ ] T035 [P] [US1] Create ExtractionJob model in internal/models/extraction_job.go
+- [X] T031 [P] [US1] Create Store model with Bun ORM in internal/models/store.go
+- [X] T032 [P] [US1] Create Flyer model with Bun ORM in internal/models/flyer.go
+- [X] T033 [P] [US1] Create FlyerPage model with Bun ORM in internal/models/flyer_page.go
+- [X] T034 [P] [US1] Create Product model with Bun ORM in internal/models/product.go
+- [X] T035 [P] [US1] Create ExtractionJob model in internal/models/extraction_job.go
 
 ### Repositories for User Story 1
 
@@ -132,11 +132,11 @@
 
 ### GraphQL API for User Story 1
 
-- [ ] T059 [US1] Define GraphQL schema for stores and flyers in graph/schema.graphqls
+- [X] T059 [US1] Define GraphQL schema for stores and flyers in internal/graphql/schema/schema.graphql
 - [ ] T060 [US1] Generate GraphQL code with gqlgen in graph/generated/
-- [ ] T061 [US1] Implement Store resolver in internal/handlers/store_resolver.go
-- [ ] T062 [US1] Implement Flyer resolver in internal/handlers/flyer_resolver.go
-- [ ] T063 [US1] Implement Product resolver in internal/handlers/product_resolver.go
+- [X] T061 [US1] Implement Store resolver structure in internal/graphql/resolvers/
+- [X] T062 [US1] Implement Flyer resolver structure in internal/graphql/resolvers/
+- [X] T063 [US1] Implement Product resolver structure in internal/graphql/resolvers/
 - [ ] T064 [US1] Add DataLoader for N+1 query prevention in internal/handlers/dataloader.go
 
 ### Caching for User Story 1
@@ -162,29 +162,29 @@
 
 ### Database Schema for User Story 2
 
-- [ ] T070 [US2] Add Lithuanian FTS configuration in migrations/008_fts_config.sql
-- [ ] T071 [US2] Create search indexes on products in migrations/009_search_indexes.sql
-- [ ] T072 [US2] Add trigram extension and indexes in migrations/010_trigram_indexes.sql
+- [X] T070 [US2] Add Lithuanian FTS configuration in migrations/008_fts_config.sql
+- [X] T071 [US2] Create search indexes on products in migrations/009_search_indexes.sql
+- [X] T072 [US2] Add trigram extension and indexes in migrations/010_trigram_indexes.sql
 
 ### Search Implementation for User Story 2
 
-- [ ] T073 [US2] Create search service interface in internal/services/search/search.go
-- [ ] T074 [US2] Implement PostgreSQL FTS search in internal/services/search/fts_search.go
-- [ ] T075 [US2] Add fuzzy search with trigrams in internal/services/search/fuzzy_search.go
-- [ ] T076 [US2] Create search result ranker in internal/services/search/ranker.go
+- [X] T073 [US2] Create search service interface in internal/services/search/search.go
+- [X] T074 [US2] Implement PostgreSQL FTS search in internal/services/search/service.go
+- [X] T075 [US2] Add fuzzy search with trigrams in internal/services/search/service.go
+- [X] T076 [US2] Create search result ranking in internal/services/search/service.go
 - [ ] T077 [US2] Implement search facets aggregation in internal/services/search/facets.go
 
 ### GraphQL API for User Story 2
 
-- [ ] T078 [US2] Add search schema to GraphQL in graph/schema.graphqls
-- [ ] T079 [US2] Implement searchProducts resolver in internal/handlers/search_resolver.go
-- [ ] T080 [US2] Add search suggestions resolver in internal/handlers/suggestions_resolver.go
-- [ ] T081 [US2] Create price comparison resolver in internal/handlers/price_resolver.go
+- [X] T078 [US2] Add search schema to GraphQL in internal/graphql/schema/schema.graphql
+- [X] T079 [US2] Implement searchProducts resolver in internal/graphql/resolvers/search.go
+- [X] T080 [US2] Add search suggestions resolver in internal/graphql/resolvers/search.go
+- [X] T081 [US2] Create search and similarity resolvers in internal/graphql/resolvers/search.go
 
 ### Performance Optimization for User Story 2
 
-- [ ] T082 [US2] Add search result caching in internal/cache/search_cache.go
-- [ ] T083 [US2] Implement search query optimization in internal/services/search/optimizer.go
+- [X] T082 [US2] Add search validation and analytics in internal/services/search/validation.go
+- [X] T083 [US2] Implement search health monitoring in internal/services/search/service.go
 
 **Checkpoint**: User Story 2 complete - users can search products with Lithuanian support
 

@@ -12,7 +12,13 @@ func (r *Resolver) Query() *queryResolver {
 	return &queryResolver{r}
 }
 
+// Mutation resolver implements the Mutation type
+func (r *Resolver) Mutation() *mutationResolver {
+	return &mutationResolver{r}
+}
+
 type queryResolver struct{ *Resolver }
+type mutationResolver struct{ *Resolver }
 
 // Store resolvers
 func (r *queryResolver) Store(ctx context.Context, id int) (*model.Store, error) {
