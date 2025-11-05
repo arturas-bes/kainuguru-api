@@ -1,225 +1,61 @@
 # Kainuguru GraphQL Schema
-# Browse Weekly Grocery Flyers API
+# Lithuanian Grocery Price Comparison & Shopping Lists API
+# Following Hyena-style professional GraphQL patterns
 
-scalar Time
-scalar JSON
-scalar UUID
+# scalar String
+# scalar String
 
-# Authentication Types
-type User {
-  id: UUID!
-  email: String!
-  emailVerified: Boolean!
-  fullName: String
-  preferredLanguage: String!
-  isActive: Boolean!
-  lastLoginAt: Time
-  createdAt: Time!
-  updatedAt: Time!
-}
-
-type AuthPayload {
-  user: User!
-  accessToken: String!
-  refreshToken: String!
-  expiresAt: Time!
-  tokenType: String!
-}
-
-# Authentication Input Types
-input RegisterInput {
-  email: String!
-  password: String!
-  fullName: String
-  preferredLanguage: String = "lt"
-}
-
-input LoginInput {
-  email: String!
-  password: String!
-}
-
-input UpdateUserInput {
-  fullName: String
-  preferredLanguage: String
-}
-
-input ChangePasswordInput {
-  currentPassword: String!
-  newPassword: String!
-}
-
-input RequestPasswordResetInput {
-  email: String!
-}
-
-input ResetPasswordInput {
-  token: String!
-  newPassword: String!
-}
-
-# Store Types
-type Store {
-  id: Int!
-  code: String!
-  name: String!
-  logoURL: String
-  websiteURL: String
-  flyerSourceURL: String
-  locations: [StoreLocation!]!
-  scraperConfig: JSON
-  scrapeSchedule: String!
-  lastScrapedAt: Time
-  isActive: Boolean!
-  createdAt: Time!
-  updatedAt: Time!
-
-  # Relations
-  flyers(
-    filters: FlyerFilters
-    first: Int
-    after: String
-  ): FlyerConnection!
-}
-
-type StoreLocation {
-  city: String!
-  lat: Float!
-  lng: Float!
-  address: String!
-}
-
-# Flyer Types
-type Flyer {
-  id: Int!
-  storeID: Int!
-  title: String
-  validFrom: Time!
-  validTo: Time!
-  pageCount: Int
-  sourceURL: String
-  isArchived: Boolean!
-  archivedAt: Time
-  status: FlyerStatus!
-  extractionStartedAt: Time
-  extractionCompletedAt: Time
-  productsExtracted: Int!
-  createdAt: Time!
-  updatedAt: Time!
-
-  # Computed fields
-  isValid: Boolean!
-  isCurrent: Boolean!
-  daysRemaining: Int!
-  validityPeriod: String!
-  processingDuration: String
-
-  # Relations
-  store: Store!
-  flyerPages(
-    filters: FlyerPageFilters
-    first: Int
-    after: String
-  ): FlyerPageConnection!
-  products(
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
-}
-
-enum FlyerStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-# Flyer Page Types
-type FlyerPage {
-  id: Int!
-  flyerID: Int!
-  pageNumber: Int!
-  imageURL: String
-  imageWidth: Int
-  imageHeight: Int
-  status: FlyerPageStatus!
-  extractionStartedAt: Time
-  extractionCompletedAt: Time
-  productsExtracted: Int!
-  extractionErrors: Int!
-  lastExtractionError: String
-  lastErrorAt: Time
-  createdAt: Time!
-  updatedAt: Time!
-
-  # Computed fields
-  hasImage: Boolean!
-  imageDimensions: ImageDimensions
-  processingDuration: String
-  extractionEfficiency: Float!
-
-  # Relations
-  flyer: Flyer!
-  products(
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
-}
-
-enum FlyerPageStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-type ImageDimensions {
-  width: Int!
-  height: Int!
-}
-
-# Product Types
+# Core Product Types (following Hyena's nested structure pattern)
 type Product {
+  # Identity & Basic Info
   id: Int!
-  flyerID: Int!
-  flyerPageID: Int
-  storeID: Int!
-  productMasterID: Int
+  sku: String!
+  slug: String!
   name: String!
   normalizedName: String!
   brand: String
+
+  # Rich Content
+  description: String
   category: String
   subcategory: String
-  description: String
-  currentPrice: Float!
-  originalPrice: Float
-  discountPercent: Float
-  currency: String!
+
+  # Pricing (Complex structure like Hyena)
+  price: ProductPrice!
+  isOnSale: Boolean!
+
+  # Physical Properties
   unitSize: String
   unitType: String
   unitPrice: String
   packageSize: String
   weight: String
   volume: String
+
+  # Visual Assets
   imageURL: String
   boundingBox: ProductBoundingBox
   pagePosition: ProductPosition
-  isOnSale: Boolean!
-  saleStartDate: Time
-  saleEndDate: Time
+
+  # Store Context
+  store: Store!
+  flyer: Flyer!
+  flyerPage: FlyerPage
+
+  # Business Logic
   isAvailable: Boolean!
   stockLevel: String
   extractionConfidence: Float!
   extractionMethod: String!
   requiresReview: Boolean!
-  validFrom: Time!
-  validTo: Time!
-  createdAt: Time!
-  updatedAt: Time!
 
-  # Computed fields
+  # Temporal Data
+  validFrom: String!
+  validTo: String!
+  saleStartDate: String
+  saleEndDate: String
+
+  # Computed Fields (Hyena pattern)
   isCurrentlyOnSale: Boolean!
   discountAmount: Float!
   isValid: Boolean!
@@ -227,10 +63,20 @@ type Product {
   validityPeriod: String!
 
   # Relations
-  flyer: Flyer!
-  flyerPage: FlyerPage
-  store: Store!
   productMaster: ProductMaster
+  priceHistory: [PriceHistory!]!
+}
+
+type ProductPrice {
+  current: Float!
+  original: Float
+  currency: String!
+  discount: Float
+  discountPercent: Float
+
+  # Computed pricing fields
+  discountAmount: Float!
+  isDiscounted: Boolean!
 }
 
 type ProductBoundingBox {
@@ -246,119 +92,227 @@ type ProductPosition {
   zone: String!
 }
 
-# Product Master Types
-type ProductMaster {
+# Store Management (following Hyena's category pattern)
+type Store {
   id: Int!
-  canonicalName: String!
-  normalizedName: String!
-  brand: String!
-  category: String!
-  subcategory: String
-  standardUnitSize: String
-  standardUnitType: String
-  standardPackageSize: String
-  standardWeight: String
-  standardVolume: String
-  matchingKeywords: JSON!
-  alternativeNames: JSON!
-  exclusionKeywords: JSON!
-  confidenceScore: Float!
-  matchedProducts: Int!
-  successfulMatches: Int!
-  failedMatches: Int!
-  status: ProductMasterStatus!
-  isVerified: Boolean!
-  lastMatchedAt: Time
-  verifiedAt: Time
-  verifiedBy: String
-  createdAt: Time!
-  updatedAt: Time!
+  code: String!
+  name: String!
+  logoURL: String
+  websiteURL: String
+  flyerSourceURL: String
 
-  # Computed fields
-  matchSuccessRate: Float!
+  # Configuration
+  scraperConfig: String
+  scrapeSchedule: String!
+  lastScrapedAt: String
+  isActive: Boolean!
+
+  # Location Data
+  locations: [StoreLocation!]!
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
+
+  # Relations with pagination (Hyena pattern)
+  flyers(filters: FlyerFilters, first: Int, after: String): FlyerConnection!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+type StoreLocation {
+  city: String!
+  lat: Float!
+  lng: Float!
+  address: String!
+}
+
+# Flyer System (Rich nested structure)
+type Flyer {
+  id: Int!
+  storeID: Int!
+  title: String
+  validFrom: String!
+  validTo: String!
+  pageCount: Int
+  sourceURL: String
+
+  # Processing Status
+  status: FlyerStatus!
+  isArchived: Boolean!
+  archivedAt: String
+  extractionStartedAt: String
+  extractionCompletedAt: String
+  productsExtracted: Int!
+
+  # Computed fields (Hyena pattern)
+  isValid: Boolean!
+  isCurrent: Boolean!
+  daysRemaining: Int!
+  validityPeriod: String!
+  processingDuration: String
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
 
   # Relations
-  products(
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
+  store: Store!
+  flyerPages(filters: FlyerPageFilters, first: Int, after: String): FlyerPageConnection!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
 }
 
-enum ProductMasterStatus {
-  ACTIVE
-  INACTIVE
+enum FlyerStatus {
   PENDING
-  DUPLICATE
-  DEPRECATED
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
-# Shopping List Types
+type FlyerPage {
+  id: Int!
+  flyerID: Int!
+  pageNumber: Int!
+  imageURL: String
+  imageWidth: Int
+  imageHeight: Int
+
+  # Processing Status
+  status: FlyerPageStatus!
+  extractionStartedAt: String
+  extractionCompletedAt: String
+  productsExtracted: Int!
+  extractionErrors: Int!
+  lastExtractionError: String
+  lastErrorAt: String
+
+  # Computed fields
+  hasImage: Boolean!
+  imageDimensions: ImageDimensions
+  processingDuration: String
+  extractionEfficiency: Float!
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
+
+  # Relations
+  flyer: Flyer!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+}
+
+enum FlyerPageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type ImageDimensions {
+  width: Int!
+  height: Int!
+}
+
+# Authentication & User Management (Hyena pattern)
+type User {
+  id: ID!
+  email: String!
+  emailVerified: Boolean!
+  fullName: String
+  preferredLanguage: String!
+  isActive: Boolean!
+  lastLoginAt: String
+  createdAt: String!
+  updatedAt: String!
+
+  # Relations
+  shoppingLists: [ShoppingList!]!
+  priceAlerts: [PriceAlert!]!
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  refreshToken: String!
+  expiresAt: String!
+  tokenType: String!
+}
+
+# Shopping Lists (following Hyena's cart pattern)
 type ShoppingList {
   id: Int!
-  userID: UUID!
+  userID: ID!
   name: String!
   description: String
   isDefault: Boolean!
   isArchived: Boolean!
   isPublic: Boolean!
   shareCode: String
+
+  # Statistics
   itemCount: Int!
   completedItemCount: Int!
   estimatedTotalPrice: Float
-  createdAt: Time!
-  updatedAt: Time!
-  lastAccessedAt: Time!
 
-  # Computed fields
+  # Computed fields (Hyena pattern)
   completionPercentage: Float!
   isCompleted: Boolean!
   canBeShared: Boolean!
 
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
+  lastAccessedAt: String!
+
   # Relations
   user: User!
-  items(
-    filters: ShoppingListItemFilters
-    first: Int
-    after: String
-  ): ShoppingListItemConnection!
+  items(filters: ShoppingListItemFilters, first: Int, after: String): ShoppingListItemConnection!
   categories: [ShoppingListCategory!]!
 }
 
 type ShoppingListItem {
   id: Int!
   shoppingListID: Int!
-  userID: UUID!
+  userID: ID!
   description: String!
   normalizedDescription: String!
   notes: String
   quantity: Float!
   unit: String
   unitType: String
+
+  # State Management
   isChecked: Boolean!
-  checkedAt: Time
-  checkedByUserID: UUID
+  checkedAt: String
+  checkedByUserID: ID
   sortOrder: Int!
+
+  # Product Linking
   productMasterID: Int
   linkedProductID: Int
   storeID: Int
   flyerID: Int
+
+  # Pricing
   estimatedPrice: Float
   actualPrice: Float
   priceSource: String
+
+  # Organization
   category: String
   tags: [String!]!
   suggestionSource: String
   matchingConfidence: Float
   availabilityStatus: String!
-  availabilityCheckedAt: Time
-  createdAt: Time!
-  updatedAt: Time!
+  availabilityCheckedAt: String
 
   # Computed fields
   totalEstimatedPrice: Float!
   totalActualPrice: Float!
   isLinked: Boolean!
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
 
   # Relations
   shoppingList: ShoppingList!
@@ -373,307 +327,221 @@ type ShoppingListItem {
 type ShoppingListCategory {
   id: Int!
   shoppingListID: Int!
-  userID: UUID!
+  userID: ID!
   name: String!
   colorHex: String
   iconName: String
   sortOrder: Int!
   itemCount: Int!
-  createdAt: Time!
+  createdAt: String!
 
   # Relations
   shoppingList: ShoppingList!
   user: User!
 }
 
-type ProductCategory {
+# Product Master System (Hyena's designer pattern)
+type ProductMaster {
   id: Int!
-  name: String!
+  canonicalName: String!
   normalizedName: String!
-  parentID: Int
-  displayNameLT: String!
-  displayNameEN: String
-  description: String
-  iconName: String
-  colorHex: String
-  level: Int!
-  sortOrder: Int!
-  keywords: [String!]!
-  excludedKeywords: [String!]!
-  productCount: Int!
-  usageCount: Int!
-  isActive: Boolean!
-  createdAt: Time!
-  updatedAt: Time!
+  brand: String!
+  category: String!
+  subcategory: String
+
+  # Standardization
+  standardUnitSize: String
+  standardUnitType: String
+  standardPackageSize: String
+  standardWeight: String
+  standardVolume: String
+
+  # Matching Logic
+  matchingKeywords: String!
+  alternativeNames: String!
+  exclusionKeywords: String!
+  confidenceScore: Float!
+
+  # Statistics
+  matchedProducts: Int!
+  successfulMatches: Int!
+  failedMatches: Int!
+
+  # Status
+  status: ProductMasterStatus!
+  isVerified: Boolean!
+  lastMatchedAt: String
+  verifiedAt: String
+  verifiedBy: String
+
+  # Computed fields
+  matchSuccessRate: Float!
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
 
   # Relations
-  parent: ProductCategory
-  children: [ProductCategory!]!
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
 }
 
-type ProductTag {
-  id: Int!
+enum ProductMasterStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  DUPLICATE
+  DEPRECATED
+}
+
+# Search System (Hyena's advanced search pattern)
+type SearchResult {
+  products: [ProductSearchResult!]!
+  totalCount: Int!
+  queryString: String!
+  suggestions: [String!]
+  hasMore: Boolean!
+  facets: SearchFacets!
+  pagination: Pagination!
+}
+
+type ProductSearchResult {
+  product: Product!
+  searchScore: Float!
+  matchType: String!
+  similarity: Float
+  highlights: [String!]
+}
+
+type SearchFacets {
+  stores: StoreFacet!
+  categories: CategoryFacet!
+  brands: BrandFacet!
+  priceRanges: PriceRangeFacet!
+  availability: AvailabilityFacet!
+}
+
+type StoreFacet {
   name: String!
-  normalizedName: String!
-  displayNameLT: String!
-  displayNameEN: String
-  description: String
-  colorHex: String
-  tagType: String!
-  isSystemTag: Boolean!
-  usageCount: Int!
-  isActive: Boolean!
-  createdAt: Time!
-  updatedAt: Time!
+  options: [FacetOption!]!
+  activeValue: [String!]!
 }
 
-type UserTag {
-  id: Int!
-  userID: UUID!
-  tagName: String!
-  displayName: String
-  colorHex: String
-  usageCount: Int!
-  lastUsedAt: Time
-  createdAt: Time!
+type CategoryFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type BrandFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type PriceRangeFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type AvailabilityFacet {
+  name: String!
+  options: [FacetOption!]!
+  activeValue: [String!]!
+}
+
+type FacetOption {
+  id: String
+  value: String!
+  count: Int!
+  name: String
+  slug: String
+}
+
+type Pagination {
+  totalItems: Int!
+  currentPage: Int!
+  totalPages: Int!
+  itemsPerPage: Int!
+}
+
+# Price History & Analytics (Rich data structure)
+type PriceHistory {
+  id: ID!
+  productID: Int!
+  storeID: Int!
+  flyerID: Int
+  price: Float!
+  originalPrice: Float
+  currency: String!
+  isOnSale: Boolean!
+  recordedAt: String!
+  validFrom: String!
+  validTo: String!
+  saleStartDate: String
+  saleEndDate: String
+  source: String!
+  extractionMethod: String!
+  confidence: Float!
+  isAvailable: Boolean!
+  stockLevel: String
+  notes: String
+  isActive: Boolean!
+
+  # Computed fields
+  isCurrentlyValid: Boolean!
+  isCurrentlySale: Boolean!
+  discountAmount: Float!
+  discountPercent: Float!
+  isExpired: Boolean!
+  validityDuration: String!
+
+  # Temporal
+  createdAt: String!
+
+  # Relations
+  product: Product!
+  store: Store!
+  flyer: Flyer
+}
+
+type PriceAlert {
+  id: ID!
+  userID: Int!
+  productID: Int!
+  storeID: Int
+  alertType: AlertType!
+  targetPrice: Float!
+  dropPercent: Float
+  isActive: Boolean!
+  notifyEmail: Boolean!
+  notifyPush: Boolean!
+  lastTriggered: String
+  triggerCount: Int!
+  lastPrice: Float
+  notes: String
+  expiresAt: String
+
+  # Computed fields
+  isActiveAlert: Boolean!
+
+  # Temporal
+  createdAt: String!
+  updatedAt: String!
 
   # Relations
   user: User!
-}
-
-enum SuggestionSource {
-  MANUAL
-  FLYER
-  PREVIOUS_ITEMS
-  POPULAR
-  AUTO_COMPLETE
-}
-
-enum PriceSource {
-  FLYER
-  USER_ESTIMATE
-  HISTORICAL
-  ACTUAL
-}
-
-enum AvailabilityStatus {
-  AVAILABLE
-  UNAVAILABLE
-  UNKNOWN
-  SEASONAL
-}
-
-enum UnitType {
-  VOLUME
-  WEIGHT
-  COUNT
-}
-
-enum TagType {
-  GENERAL
-  DIETARY
-  ALLERGEN
-  QUALITY
-  SEASONAL
-}
-
-# Shopping List Connection Types
-type ShoppingListConnection {
-  edges: [ShoppingListEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type ShoppingListEdge {
-  node: ShoppingList!
-  cursor: String!
-}
-
-type ShoppingListItemConnection {
-  edges: [ShoppingListItemEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type ShoppingListItemEdge {
-  node: ShoppingListItem!
-  cursor: String!
-}
-
-type ProductCategoryConnection {
-  edges: [ProductCategoryEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type ProductCategoryEdge {
-  node: ProductCategory!
-  cursor: String!
-}
-
-type ProductTagConnection {
-  edges: [ProductTagEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type ProductTagEdge {
-  node: ProductTag!
-  cursor: String!
-}
-
-# Shopping List Input Types
-input CreateShoppingListInput {
-  name: String!
-  description: String
-  isDefault: Boolean = false
-}
-
-input UpdateShoppingListInput {
-  name: String
-  description: String
-  isDefault: Boolean
-}
-
-input ShoppingListFilters {
-  isDefault: Boolean
-  isArchived: Boolean
-  isPublic: Boolean
-  hasItems: Boolean
-  createdAfter: Time
-  createdBefore: Time
-  updatedAfter: Time
-  updatedBefore: Time
-}
-
-input CreateShoppingListItemInput {
-  shoppingListID: Int!
-  description: String!
-  notes: String
-  quantity: Float = 1
-  unit: String
-  unitType: String
-  category: String
-  tags: [String!] = []
-  estimatedPrice: Float
-  productMasterID: Int
-  linkedProductID: Int
-  storeID: Int
-}
-
-input UpdateShoppingListItemInput {
-  description: String
-  notes: String
-  quantity: Float
-  unit: String
-  unitType: String
-  category: String
-  tags: [String!]
-  estimatedPrice: Float
-  actualPrice: Float
-}
-
-input ShoppingListItemFilters {
-  isChecked: Boolean
-  categories: [String!]
-  tags: [String!]
-  hasPrice: Boolean
-  isLinked: Boolean
-  storeIDs: [Int!]
-  createdAfter: Time
-  createdBefore: Time
-}
-
-input BulkItemOperationInput {
-  itemIDs: [Int!]!
-}
-
-input ReorderItemsInput {
-  listID: Int!
-  itemOrders: [ItemOrderInput!]!
-}
-
-input ItemOrderInput {
-  itemID: Int!
-  sortOrder: Int!
-}
-
-input ProductMatchFilters {
-  storeIDs: [Int!]
-  categories: [String!]
-  brands: [String!]
-  minConfidence: Float
-  onlyAvailable: Boolean = false
-  onlyOnSale: Boolean = false
-  priceRange: PriceRangeInput
-}
-
-input PriceRangeInput {
-  min: Float
-  max: Float
-}
-
-input CategoryFilters {
-  parentID: Int
-  level: Int
-  isActive: Boolean
-}
-
-input TagFilters {
-  tagType: [TagType!]
-  isSystem: Boolean
-  isActive: Boolean
-}
-
-# Response Types
-type ShoppingListStats {
-  totalItems: Int!
-  completedItems: Int!
-  completionRate: Float!
-  estimatedTotal: Float
-  categoriesUsed: Int!
-  tagsUsed: Int!
-  lastUpdated: Time!
-  averageItemPrice: Float
-  linkedItemsCount: Int!
-  unlinkedItemsCount: Int!
-}
-
-type ItemSuggestion {
-  description: String!
-  source: String!
-  productMaster: ProductMaster
-  product: Product
-  estimatedPrice: Float
-  confidence: Float!
-}
-
-type ProductMatch {
   product: Product!
-  productMaster: ProductMaster
-  confidence: Float!
-  priceMatch: Boolean!
-  brandMatch: Boolean!
-  sizeMatch: Boolean!
+  store: Store
 }
 
-type AutoMatchResult {
-  itemID: Int!
-  item: ShoppingListItem!
-  match: ProductMatch
-  success: Boolean!
-  reason: String!
+enum AlertType {
+  PRICE_DROP
+  TARGET_PRICE
+  PERCENTAGE_DROP
 }
 
-type SmartSuggestion {
-  type: String!
-  productMaster: ProductMaster!
-  reason: String!
-  confidence: Float!
-  estimatedPrice: Float
-}
-
-# Connection Types for Pagination
+# Connection Types (Hyena pagination pattern)
 type StoreConnection {
   edges: [StoreEdge!]!
   pageInfo: PageInfo!
@@ -729,6 +597,50 @@ type ProductMasterEdge {
   cursor: String!
 }
 
+type ShoppingListConnection {
+  edges: [ShoppingListEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListEdge {
+  node: ShoppingList!
+  cursor: String!
+}
+
+type ShoppingListItemConnection {
+  edges: [ShoppingListItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShoppingListItemEdge {
+  node: ShoppingListItem!
+  cursor: String!
+}
+
+type PriceHistoryConnection {
+  edges: [PriceHistoryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceHistoryEdge {
+  node: PriceHistory!
+  cursor: String!
+}
+
+type PriceAlertConnection {
+  edges: [PriceAlertEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PriceAlertEdge {
+  node: PriceAlert!
+  cursor: String!
+}
+
 type PageInfo {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
@@ -736,7 +648,19 @@ type PageInfo {
   endCursor: String
 }
 
-# Filter Input Types
+# Input Types (Hyena pattern)
+input RegisterInput {
+  email: String!
+  password: String!
+  fullName: String
+  preferredLanguage: String = "lt"
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
 input StoreFilters {
   isActive: Boolean
   hasFlyers: Boolean
@@ -748,8 +672,8 @@ input FlyerFilters {
   storeCodes: [String!]
   status: [FlyerStatus!]
   isArchived: Boolean
-  validFrom: Time
-  validTo: Time
+  validFrom: String
+  validTo: String
   isCurrent: Boolean
   isValid: Boolean
 }
@@ -775,8 +699,8 @@ input ProductFilters {
   minPrice: Float
   maxPrice: Float
   currency: String
-  validFrom: Time
-  validTo: Time
+  validFrom: String
+  validTo: String
 }
 
 input ProductMasterFilters {
@@ -789,754 +713,33 @@ input ProductMasterFilters {
   minConfidence: Float
 }
 
-# Query Root
-type Query {
-  # Authentication Queries (require auth)
-  me: User
-
-  # Store Queries
-  store(id: Int!): Store
-  storeByCode(code: String!): Store
-  stores(
-    filters: StoreFilters
-    first: Int
-    after: String
-  ): StoreConnection!
-
-  # Flyer Queries
-  flyer(id: Int!): Flyer
-  flyers(
-    filters: FlyerFilters
-    first: Int
-    after: String
-  ): FlyerConnection!
-
-  # Current and Valid Flyers (Main Browse Feature)
-  currentFlyers(
-    storeIDs: [Int!]
-    first: Int
-    after: String
-  ): FlyerConnection!
-
-  validFlyers(
-    storeIDs: [Int!]
-    first: Int
-    after: String
-  ): FlyerConnection!
-
-  # Flyer Page Queries
-  flyerPage(id: Int!): FlyerPage
-  flyerPages(
-    filters: FlyerPageFilters
-    first: Int
-    after: String
-  ): FlyerPageConnection!
-
-  # Product Queries
-  product(id: Int!): Product
-  products(
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
-
-  # Product Search
-  searchProducts(
-    query: String!
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
-
-  # Advanced Product Search
-  advancedSearchProducts(
-    input: AdvancedSearchInput!
-  ): AdvancedSearchResponse!
-
-  # Fuzzy Product Search
-  fuzzySearchProducts(
-    input: FuzzySearchInput!
-  ): FuzzySearchResponse!
-
-  # Hybrid Product Search
-  hybridSearchProducts(
-    input: HybridSearchInput!
-  ): HybridSearchResponse!
-
-  # Search Suggestions
-  searchSuggestions(
-    input: SearchSuggestionsInput!
-  ): SearchSuggestionsResponse!
-
-  # Similar Products
-  similarProducts(
-    input: SimilarProductsInput!
-  ): SimilarProductsResponse!
-
-  # Query Corrections
-  queryCorrections(
-    input: QueryCorrectionsInput!
-  ): QueryCorrectionsResponse!
-
-  # Search Health
-  searchHealth: SearchHealthResponse!
-
-  # Products on Sale
-  productsOnSale(
-    storeIDs: [Int!]
-    filters: ProductFilters
-    first: Int
-    after: String
-  ): ProductConnection!
-
-  # Product Master Queries
-  productMaster(id: Int!): ProductMaster
-  productMasters(
-    filters: ProductMasterFilters
-    first: Int
-    after: String
-  ): ProductMasterConnection!
-
-  # Shopping List Queries (require auth)
-  shoppingList(id: Int!): ShoppingList
-  shoppingLists(
-    filters: ShoppingListFilters
-    first: Int
-    after: String
-  ): ShoppingListConnection!
-
-  sharedShoppingList(shareCode: String!): ShoppingList
-  myDefaultShoppingList: ShoppingList
-  myShoppingListStats: ShoppingListStats!
-
-  # Shopping List Item Queries (require auth)
-  shoppingListItem(id: Int!): ShoppingListItem
-  shoppingListItems(
-    listID: Int!
-    filters: ShoppingListItemFilters
-    first: Int
-    after: String
-  ): ShoppingListItemConnection!
-
-  # Item suggestions and matching
-  suggestItems(
-    query: String!
-    limit: Int = 10
-  ): [ItemSuggestion!]!
-
-  findMatchingProducts(
-    description: String!
-    filters: ProductMatchFilters
-  ): [ProductMatch!]!
-
-  smartSuggestions(
-    listID: Int!
-    limit: Int = 10
-  ): [SmartSuggestion!]!
-
-  # Category and Tag Queries
-  productCategories(
-    filters: CategoryFilters
-    first: Int
-    after: String
-  ): ProductCategoryConnection!
-
-  productTags(
-    filters: TagFilters
-    first: Int
-    after: String
-  ): ProductTagConnection!
-
-  myUserTags: [UserTag!]!
-
-  myShoppingListCategories(listID: Int!): [ShoppingListCategory!]!
-
-  # Price History Queries
-  priceHistory(
-    productID: Int!
-    storeID: Int
-    filters: PriceHistoryFilters
-    first: Int
-    after: String
-  ): PriceHistoryConnection!
-
-  priceHistoryByDateRange(
-    productID: Int!
-    startDate: Time!
-    endDate: Time!
-    storeIDs: [Int!]
-  ): [PriceHistory!]!
-
-  currentPrice(productID: Int!, storeID: Int): PriceHistory
-  currentPrices(productID: Int!, storeIDs: [Int!]): [PriceHistory!]!
-
-  # Price Analysis Queries
-  analyzeTrend(
-    productID: Int!
-    period: String! # "7_days", "30_days", "90_days", "1_year"
-    storeID: Int
-  ): TrendAnalysis
-
-  compareStoreTrends(
-    productID: Int!
-    storeIDs: [Int!]!
-    period: String!
-  ): StoreTrendComparison
-
-  predictPrice(
-    productID: Int!
-    daysAhead: Int!
-  ): PricePrediction
-
-  buyingRecommendation(productID: Int!): BuyingRecommendation
-
-  priceAlertSuggestions(productID: Int!): PriceAlertSuggestions
-
-  trendSummary(productID: Int!): TrendSummary
-
-  seasonalTrends(productID: Int!): SeasonalTrendAnalysis
-
-  # Price Alert Queries (require auth)
-  priceAlert(id: ID!): PriceAlert
-  priceAlerts(
-    filters: PriceAlertFilters
-    first: Int
-    after: String
-  ): PriceAlertConnection!
-
-  myPriceAlerts: [PriceAlert!]!
-  activePriceAlerts: [PriceAlert!]!
+input ShoppingListFilters {
+  isDefault: Boolean
+  isArchived: Boolean
+  isPublic: Boolean
+  hasItems: Boolean
+  createdAfter: String
+  createdBefore: String
+  updatedAfter: String
+  updatedBefore: String
 }
 
-# Search Input Types
-input AdvancedSearchInput {
-  query: String!
+input ShoppingListItemFilters {
+  isChecked: Boolean
+  categories: [String!]
+  tags: [String!]
+  hasPrice: Boolean
+  isLinked: Boolean
   storeIDs: [Int!]
-  minPrice: Float
-  maxPrice: Float
-  onSaleOnly: Boolean = false
-  category: String
-  limit: Int = 50
-  offset: Int = 0
-  preferFuzzy: Boolean = false
+  createdAfter: String
+  createdBefore: String
 }
 
-input FuzzySearchInput {
-  query: String!
-  storeIDs: [Int!]
-  minPrice: Float
-  maxPrice: Float
-  category: String
-  limit: Int = 50
-  offset: Int = 0
-  similarityThreshold: Float = 0.3
-}
-
-input HybridSearchInput {
-  query: String!
-  storeIDs: [Int!]
-  minPrice: Float
-  maxPrice: Float
-  limit: Int = 50
-  offset: Int = 0
-  preferFuzzy: Boolean = false
-}
-
-input SearchSuggestionsInput {
-  partialQuery: String!
-  limit: Int = 10
-}
-
-input SimilarProductsInput {
-  productID: Int!
-  limit: Int = 10
-}
-
-input QueryCorrectionsInput {
-  query: String!
-  limit: Int = 5
-}
-
-# Search Response Types
-type AdvancedSearchResponse {
-  products: [ProductSearchResult!]!
-  totalCount: Int!
-  queryTime: String!
-  suggestions: [String!]
-  hasMore: Boolean!
-}
-
-type FuzzySearchResponse {
-  products: [FuzzyProductResult!]!
-  totalCount: Int!
-  queryTime: String!
-  hasMore: Boolean!
-}
-
-type HybridSearchResponse {
-  products: [HybridProductResult!]!
-  totalCount: Int!
-  queryTime: String!
-  hasMore: Boolean!
-}
-
-type ProductSearchResult {
-  product: Product!
-  searchScore: Float!
-  matchType: String!
-  similarity: Float
-  highlights: [String!]
-}
-
-type FuzzyProductResult {
-  product: Product!
-  searchScore: Float!
-  nameSimilarity: Float!
-  brandSimilarity: Float!
-  combinedSimilarity: Float!
-}
-
-type HybridProductResult {
-  product: Product!
-  searchScore: Float!
-  matchType: String!
-}
-
-type SearchSuggestionsResponse {
-  suggestions: [SearchSuggestion!]!
-}
-
-type SearchSuggestion {
-  text: String!
-  frequency: Int!
-  minPrice: Float!
-  maxPrice: Float!
-  storeCount: Int!
-}
-
-type SimilarProductsResponse {
-  products: [SimilarProduct!]!
-}
-
-type SimilarProduct {
-  product: Product!
-  similarityScore: Float!
-}
-
-type QueryCorrectionsResponse {
-  corrections: [QueryCorrection!]!
-}
-
-type QueryCorrection {
-  suggestion: String!
-  confidence: Float!
-}
-
-type SearchHealthResponse {
-  indexStatus: [SearchIndexStatus!]!
-  lastRefreshTime: Time!
-  suggestionCount: Int!
-  averageQueryTime: String!
-  totalSearches: Int!
-  errorRate: Float!
-}
-
-type SearchIndexStatus {
-  indexName: String!
-  isHealthy: Boolean!
-  isUsed: Boolean!
-}
-
-# Mutation Root
-type Mutation {
-  # Authentication Mutations
-  register(input: RegisterInput!): AuthPayload!
-  login(input: LoginInput!): AuthPayload!
-  logout: Boolean!
-  refreshToken: AuthPayload!
-
-  # User Management (require auth)
-  updateProfile(input: UpdateUserInput!): User!
-  changePassword(input: ChangePasswordInput!): Boolean!
-
-  # Password Reset
-  requestPasswordReset(input: RequestPasswordResetInput!): Boolean!
-  resetPassword(input: ResetPasswordInput!): Boolean!
-
-  # Email Verification
-  verifyEmail(token: String!): Boolean!
-  resendEmailVerification: Boolean!
-
-  # Search Management
-  refreshSearchSuggestions: RefreshSearchSuggestionsResponse!
-
-  # Shopping List Mutations (require auth)
-  createShoppingList(input: CreateShoppingListInput!): ShoppingList!
-  updateShoppingList(id: Int!, input: UpdateShoppingListInput!): ShoppingList!
-  deleteShoppingList(id: Int!): Boolean!
-  archiveShoppingList(id: Int!): ShoppingList!
-  unarchiveShoppingList(id: Int!): ShoppingList!
-  setDefaultShoppingList(id: Int!): ShoppingList!
-  generateShareCode(id: Int!): ShoppingList!
-  disableSharing(id: Int!): ShoppingList!
-  duplicateShoppingList(id: Int!, newName: String!): ShoppingList!
-  clearCompletedItems(id: Int!): ShoppingList!
-
-  # Shopping List Item Mutations (require auth)
-  createShoppingListItem(input: CreateShoppingListItemInput!): ShoppingListItem!
-  updateShoppingListItem(id: Int!, input: UpdateShoppingListItemInput!): ShoppingListItem!
-  deleteShoppingListItem(id: Int!): Boolean!
-  checkShoppingListItem(id: Int!): ShoppingListItem!
-  uncheckShoppingListItem(id: Int!): ShoppingListItem!
-
-  # Bulk operations
-  bulkCheckItems(input: BulkItemOperationInput!): [ShoppingListItem!]!
-  bulkUncheckItems(input: BulkItemOperationInput!): [ShoppingListItem!]!
-  bulkDeleteItems(input: BulkItemOperationInput!): Boolean!
-  reorderItems(input: ReorderItemsInput!): [ShoppingListItem!]!
-
-  # Item matching and suggestions
-  matchItemToProduct(itemID: Int!, productID: Int!): ShoppingListItem!
-  matchItemToProductMaster(itemID: Int!, productMasterID: Int!): ShoppingListItem!
-  autoMatchItem(itemID: Int!): AutoMatchResult!
-  batchAutoMatchItems(listID: Int!): [AutoMatchResult!]!
-
-  # Category and tag management
-  createShoppingListCategory(
-    listID: Int!
-    name: String!
-    colorHex: String
-    iconName: String
-  ): ShoppingListCategory!
-
-  updateShoppingListCategory(
-    id: Int!
-    name: String
-    colorHex: String
-    iconName: String
-  ): ShoppingListCategory!
-
-  deleteShoppingListCategory(id: Int!): Boolean!
-
-  # Price Alert Mutations (require auth)
-  createPriceAlert(input: CreatePriceAlertInput!): PriceAlert!
-  updatePriceAlert(id: ID!, input: UpdatePriceAlertInput!): PriceAlert!
-  deletePriceAlert(id: ID!): Boolean!
-  activatePriceAlert(id: ID!): PriceAlert!
-  deactivatePriceAlert(id: ID!): PriceAlert!
-  resetPriceAlertTriggerCount(id: ID!): PriceAlert!
-
-  # Placeholder mutations for future implementation
-  _placeholder: Boolean
-}
-
-type RefreshSearchSuggestionsResponse {
-  success: Boolean!
-  refreshedAt: Time!
-  suggestionCount: Int!
-}
-
-# Price History Types
-type PriceHistory {
-  id: ID!
-  productID: Int!
-  storeID: Int!
-  flyerID: Int
-  price: Float!
-  originalPrice: Float
-  currency: String!
-  isOnSale: Boolean!
-  recordedAt: Time!
-  validFrom: Time!
-  validTo: Time!
-  saleStartDate: Time
-  saleEndDate: Time
-  source: String!
-  extractionMethod: String!
-  confidence: Float!
-  isAvailable: Boolean!
-  stockLevel: String
-  notes: String
-  isActive: Boolean!
-  createdAt: Time!
-
-  # Computed fields
-  isCurrentlyValid: Boolean!
-  isCurrentlySale: Boolean!
-  discountAmount: Float!
-  discountPercent: Float!
-  isExpired: Boolean!
-  validityDuration: String!
-
-  # Relations
-  product: Product!
-  store: Store!
-  flyer: Flyer
-}
-
-type PriceTrend {
-  id: ID!
-  productID: Int!
-  storeID: Int
-  period: String!
-  startDate: Time!
-  endDate: Time!
-  calculatedAt: Time!
-  direction: TrendDirection!
-  trendPercent: Float!
-  confidence: Float!
-  dataPoints: Int!
-  volatilityScore: Float!
-  startPrice: Float!
-  endPrice: Float!
-  minPrice: Float!
-  maxPrice: Float!
-  avgPrice: Float!
-  medianPrice: Float!
-  slope: Float!
-  intercept: Float!
-  rSquared: Float!
-  isSignificant: Boolean!
-  ma7: Float!
-  ma14: Float!
-  ma30: Float!
-  isActive: Boolean!
-  createdAt: Time!
-  updatedAt: Time!
-
-  # Computed fields
-  isUpTrend: Boolean!
-  isDownTrend: Boolean!
-  isStable: Boolean!
-  isVolatile: Boolean!
-  trendStrength: String!
-  isCurrentTrend: Boolean!
-
-  # Relations
-  product: Product!
-  store: Store
-}
-
-enum TrendDirection {
-  RISING
-  FALLING
-  STABLE
-  VOLATILE
-}
-
-type PriceAlert {
-  id: ID!
-  userID: Int!
-  productID: Int!
-  storeID: Int
-  alertType: AlertType!
-  targetPrice: Float!
-  dropPercent: Float
-  isActive: Boolean!
-  notifyEmail: Boolean!
-  notifyPush: Boolean!
-  lastTriggered: Time
-  triggerCount: Int!
-  lastPrice: Float
-  notes: String
-  createdAt: Time!
-  updatedAt: Time!
-  expiresAt: Time
-
-  # Computed fields
-  isActiveAlert: Boolean!
-
-  # Relations
-  user: User!
-  product: Product!
-  store: Store
-}
-
-enum AlertType {
-  PRICE_DROP
-  TARGET_PRICE
-  PERCENTAGE_DROP
-}
-
-# Price Analysis Types
-type TrendAnalysis {
-  productID: Int!
-  period: String!
-  direction: TrendDirection!
-  trendPercentage: Float!
-  confidence: Float!
-  startPrice: Float!
-  endPrice: Float!
-  averageChange: Float!
-  volatilityScore: Float!
-  dataPoints: Int!
-  linearRegression: RegressionData!
-  movingAverages: MovingAverages!
-  trendStrength: String!
-}
-
-type RegressionData {
-  slope: Float!
-  intercept: Float!
-  rSquared: Float!
-  pValue: Float!
-  significant: Boolean!
-}
-
-type MovingAverages {
-  ma7: Float!
-  ma14: Float!
-  ma30: Float!
-  ma7AboveMa30: Boolean!
-}
-
-type StoreTrendComparison {
-  productID: Int!
-  storeTrends: [StoreTrend!]!
-  bestStore: StoreTrend
-  worstStore: StoreTrend
-  divergence: Float!
-}
-
-type StoreTrend {
-  storeID: Int!
-  storeName: String!
-  trendAnalysis: TrendAnalysis!
-  currentPrice: Float!
-  priceStability: Float!
-}
-
-type PricePrediction {
-  productID: Int!
-  predictionDate: Time!
-  predictedPrice: Float!
-  confidenceInterval: ConfidenceInterval!
-  methodology: String!
-  accuracy: Float!
-  factors: [PredictionFactor!]!
-}
-
-type ConfidenceInterval {
-  lower: Float!
-  upper: Float!
-  confidence: Float!
-}
-
-type PredictionFactor {
-  name: String!
-  impact: Float!
-  description: String!
-}
-
-type BuyingRecommendation {
-  productID: Int!
-  recommendation: RecommendationType!
-  currentPrice: Float!
-  recommendedAction: String!
-  confidence: Float!
-  reasoning: [String!]!
-  nextSaleDate: Time
-  potentialSavings: Float!
-  waitDays: Int!
-}
-
-enum RecommendationType {
-  BUY_NOW
-  WAIT
-  MONITOR
-}
-
-type PriceAlertSuggestions {
-  productID: Int!
-  currentPrice: Float!
-  thresholds: [AlertThreshold!]!
-  historicalStats: HistoricalStats!
-}
-
-type AlertThreshold {
-  level: String!
-  price: Float!
-  frequency: String!
-  lastSeen: Time!
-  description: String!
-}
-
-type HistoricalStats {
-  averagePrice: Float!
-  medianPrice: Float!
-  percentile10: Float!
-  percentile25: Float!
-  percentile75: Float!
-  percentile90: Float!
-}
-
-type TrendSummary {
-  productID: Int!
-  shortTermTrend: TrendAnalysis
-  mediumTermTrend: TrendAnalysis
-  longTermTrend: TrendAnalysis
-  buyingAdvice: BuyingRecommendation
-  priceAlerts: PriceAlertSuggestions
-  seasonalPattern: SeasonalTrendAnalysis
-  keyInsights: [String!]!
-}
-
-type SeasonalTrendAnalysis {
-  productID: Int!
-  hasSeasonality: Boolean!
-  seasonalIndex: Float!
-  seasons: [SeasonalPeriod!]!
-  nextPeakSeason: SeasonalPeriod
-  nextLowSeason: SeasonalPeriod
-  recommendations: [SeasonalAdvice!]!
-}
-
-type SeasonalPeriod {
-  season: String!
-  startMonth: Int!
-  endMonth: Int!
-  avgPrice: Float!
-  priceIndex: Float!
-  nextStart: Time!
-}
-
-type SeasonalAdvice {
-  period: String!
-  advice: String!
-  potentialSavings: Float!
-  timing: String!
-}
-
-# Price History Connections
-type PriceHistoryConnection {
-  edges: [PriceHistoryEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type PriceHistoryEdge {
-  node: PriceHistory!
-  cursor: String!
-}
-
-# Price Alert Connections
-type PriceAlertConnection {
-  edges: [PriceAlertEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type PriceAlertEdge {
-  node: PriceAlert!
-  cursor: String!
-}
-
-# Input Types for Price History
 input PriceHistoryFilters {
   productID: Int
   storeID: Int
-  startDate: Time
-  endDate: Time
+  startDate: String
+  endDate: String
   isOnSale: Boolean
   minPrice: Float
   maxPrice: Float
@@ -1550,6 +753,39 @@ input PriceAlertFilters {
   isActive: Boolean
 }
 
+input SearchInput {
+  q: String!
+  storeIDs: [Int!]
+  minPrice: Float
+  maxPrice: Float
+  onSaleOnly: Boolean = false
+  category: String
+  first: Int = 50
+  after: String
+  preferFuzzy: Boolean = false
+}
+
+input CreateShoppingListInput {
+  name: String!
+  description: String
+  isDefault: Boolean = false
+}
+
+input CreateShoppingListItemInput {
+  shoppingListID: Int!
+  description: String!
+  notes: String
+  quantity: Float = 1
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!] = []
+  estimatedPrice: Float
+  productMasterID: Int
+  linkedProductID: Int
+  storeID: Int
+}
+
 input CreatePriceAlertInput {
   productID: Int!
   storeID: Int
@@ -1559,7 +795,99 @@ input CreatePriceAlertInput {
   notifyEmail: Boolean = true
   notifyPush: Boolean = false
   notes: String
-  expiresAt: Time
+  expiresAt: String
+}
+
+# Query Root (following Hyena's organization)
+type Query {
+  # Store Queries
+  store(id: Int!): Store
+  storeByCode(code: String!): Store
+  stores(filters: StoreFilters, first: Int, after: String): StoreConnection!
+
+  # Flyer Queries
+  flyer(id: Int!): Flyer
+  flyers(filters: FlyerFilters, first: Int, after: String): FlyerConnection!
+  currentFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
+  validFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
+
+  # Product Queries
+  product(id: Int!): Product
+  products(filters: ProductFilters, first: Int, after: String): ProductConnection!
+  productsOnSale(storeIDs: [Int!], filters: ProductFilters, first: Int, after: String): ProductConnection!
+
+  # Search (Hyena pattern)
+  searchProducts(input: SearchInput!): SearchResult!
+
+  # Product Master Queries
+  productMaster(id: Int!): ProductMaster
+  productMasters(filters: ProductMasterFilters, first: Int, after: String): ProductMasterConnection!
+
+  # User Queries (require auth)
+  me: User
+
+  # Shopping List Queries (require auth)
+  shoppingList(id: Int!): ShoppingList
+  shoppingLists(filters: ShoppingListFilters, first: Int, after: String): ShoppingListConnection!
+  myDefaultShoppingList: ShoppingList
+  sharedShoppingList(shareCode: String!): ShoppingList
+
+  # Price Queries
+  priceHistory(productID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
+  currentPrice(productID: Int!, storeID: Int): PriceHistory
+
+  # Price Alert Queries (require auth)
+  priceAlert(id: ID!): PriceAlert
+  priceAlerts(filters: PriceAlertFilters, first: Int, after: String): PriceAlertConnection!
+  myPriceAlerts: [PriceAlert!]!
+}
+
+# Mutation Root (following Hyena's action-based naming)
+type Mutation {
+  # Authentication (Hyena pattern)
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  logout: Boolean!
+  refreshToken: AuthPayload!
+
+  # Shopping List Management
+  createShoppingList(input: CreateShoppingListInput!): ShoppingList!
+  updateShoppingList(id: Int!, input: UpdateShoppingListInput!): ShoppingList!
+  deleteShoppingList(id: Int!): Boolean!
+  setDefaultShoppingList(id: Int!): ShoppingList!
+
+  # Shopping List Item Management
+  createShoppingListItem(input: CreateShoppingListItemInput!): ShoppingListItem!
+  updateShoppingListItem(id: Int!, input: UpdateShoppingListItemInput!): ShoppingListItem!
+  deleteShoppingListItem(id: Int!): Boolean!
+  checkShoppingListItem(id: Int!): ShoppingListItem!
+  uncheckShoppingListItem(id: Int!): ShoppingListItem!
+
+  # Price Alert Management
+  createPriceAlert(input: CreatePriceAlertInput!): PriceAlert!
+  updatePriceAlert(id: ID!, input: UpdatePriceAlertInput!): PriceAlert!
+  deletePriceAlert(id: ID!): Boolean!
+  activatePriceAlert(id: ID!): PriceAlert!
+  deactivatePriceAlert(id: ID!): PriceAlert!
+}
+
+# Additional Input Types for Updates
+input UpdateShoppingListInput {
+  name: String
+  description: String
+  isDefault: Boolean
+}
+
+input UpdateShoppingListItemInput {
+  description: String
+  notes: String
+  quantity: Float
+  unit: String
+  unitType: String
+  category: String
+  tags: [String!]
+  estimatedPrice: Float
+  actualPrice: Float
 }
 
 input UpdatePriceAlertInput {
@@ -1569,5 +897,5 @@ input UpdatePriceAlertInput {
   notifyEmail: Boolean
   notifyPush: Boolean
   notes: String
-  expiresAt: Time
+  expiresAt: String
 }

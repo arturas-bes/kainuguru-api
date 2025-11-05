@@ -512,22 +512,22 @@ func (r *sessionRepository) GetSessionsByDateRange(ctx context.Context, from, to
 
 // SessionRepositoryStats represents session statistics for a user
 type SessionRepositoryStats struct {
-	UserID             uuid.UUID  `json:"userId"`
-	ActiveSessions     int        `json:"activeSessions"`
-	RecentSessions     int        `json:"recentSessions"`
-	TotalSessions      int        `json:"totalSessions"`
-	LastSessionAt      *time.Time `json:"lastSessionAt"`
-	LastIPAddress      *net.IP    `json:"lastIpAddress"`
-	LastUserAgent      *string    `json:"lastUserAgent"`
-	LastDeviceType     string     `json:"lastDeviceType"`
-	UniqueIPs          int        `json:"uniqueIPs"`
+	UserID         uuid.UUID  `json:"userId"`
+	ActiveSessions int        `json:"activeSessions"`
+	RecentSessions int        `json:"recentSessions"`
+	TotalSessions  int        `json:"totalSessions"`
+	LastSessionAt  *time.Time `json:"lastSessionAt"`
+	LastIPAddress  *net.IP    `json:"lastIpAddress"`
+	LastUserAgent  *string    `json:"lastUserAgent"`
+	LastDeviceType string     `json:"lastDeviceType"`
+	UniqueIPs      int        `json:"uniqueIPs"`
 }
 
 // GlobalSessionStats represents global session statistics
 type GlobalSessionStats struct {
-	ActiveSessions       int           `json:"activeSessions"`
-	SessionsToday        int           `json:"sessionsToday"`
-	SessionsThisWeek     int           `json:"sessionsThisWeek"`
-	ActiveUsers          int           `json:"activeUsers"`
-	AvgSessionDuration   time.Duration `json:"avgSessionDuration"`
+	ActiveSessions     int           `json:"activeSessions"`
+	SessionsToday      int           `json:"sessionsToday"`
+	SessionsThisWeek   int           `json:"sessionsThisWeek"`
+	ActiveUsers        int           `json:"activeUsers"`
+	AvgSessionDuration time.Duration `json:"avgSessionDuration"`
 }

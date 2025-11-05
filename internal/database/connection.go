@@ -19,7 +19,6 @@ type Config struct {
 	MaxOpenConns    int           `mapstructure:"max_open_conns"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
-	Timezone        string        `mapstructure:"timezone"`
 }
 
 type Database struct {
@@ -31,15 +30,15 @@ func New(cfg Config) (*Database, error) {
 
 	// Build connection string
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=%s",
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		cfg.User,
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
 		cfg.Name,
 		cfg.SSLMode,
-		cfg.Timezone,
 	)
+
 
 	// Parse connection configuration
 	poolConfig, err := pgxpool.ParseConfig(dsn)

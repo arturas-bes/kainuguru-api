@@ -46,28 +46,28 @@ type ArchiverService interface {
 type ArchiveDataType string
 
 const (
-	ArchiveTypePriceHistory    ArchiveDataType = "price_history"
-	ArchiveTypeFlyers          ArchiveDataType = "flyers"
-	ArchiveTypeProducts        ArchiveDataType = "products"
-	ArchiveTypeExtractionJobs  ArchiveDataType = "extraction_jobs"
-	ArchiveTypeUserSessions    ArchiveDataType = "user_sessions"
-	ArchiveTypeShoppingLists   ArchiveDataType = "shopping_lists"
+	ArchiveTypePriceHistory   ArchiveDataType = "price_history"
+	ArchiveTypeFlyers         ArchiveDataType = "flyers"
+	ArchiveTypeProducts       ArchiveDataType = "products"
+	ArchiveTypeExtractionJobs ArchiveDataType = "extraction_jobs"
+	ArchiveTypeUserSessions   ArchiveDataType = "user_sessions"
+	ArchiveTypeShoppingLists  ArchiveDataType = "shopping_lists"
 )
 
 // ArchivalResult contains the results of an archival operation
 type ArchivalResult struct {
-	ArchiveID       string          `json:"archive_id"`
-	DataType        ArchiveDataType `json:"data_type"`
-	RecordsArchived int             `json:"records_archived"`
-	StartDate       time.Time       `json:"start_date"`
-	EndDate         time.Time       `json:"end_date"`
-	ArchiveSize     int64           `json:"archive_size_bytes"`
-	CompressionRatio float64        `json:"compression_ratio"`
-	Duration        time.Duration   `json:"duration"`
-	StoragePath     string          `json:"storage_path"`
-	Status          ArchiveStatus   `json:"status"`
-	Error           string          `json:"error,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
+	ArchiveID        string          `json:"archive_id"`
+	DataType         ArchiveDataType `json:"data_type"`
+	RecordsArchived  int             `json:"records_archived"`
+	StartDate        time.Time       `json:"start_date"`
+	EndDate          time.Time       `json:"end_date"`
+	ArchiveSize      int64           `json:"archive_size_bytes"`
+	CompressionRatio float64         `json:"compression_ratio"`
+	Duration         time.Duration   `json:"duration"`
+	StoragePath      string          `json:"storage_path"`
+	Status           ArchiveStatus   `json:"status"`
+	Error            string          `json:"error,omitempty"`
+	CreatedAt        time.Time       `json:"created_at"`
 }
 
 // ArchiveStatus represents the status of an archive operation
@@ -117,16 +117,16 @@ type ArchivalConfig struct {
 
 // ArchivalStatistics contains statistics about archival operations
 type ArchivalStatistics struct {
-	TotalArchives       int                          `json:"total_archives"`
-	TotalArchivedBytes  int64                        `json:"total_archived_bytes"`
-	ArchivesByType      map[ArchiveDataType]int      `json:"archives_by_type"`
-	SizeByType          map[ArchiveDataType]int64    `json:"size_by_type"`
-	AverageCompression  float64                      `json:"average_compression_ratio"`
-	OldestArchive       *time.Time                   `json:"oldest_archive"`
-	NewestArchive       *time.Time                   `json:"newest_archive"`
-	ArchivesSizeByMonth map[string]int64             `json:"archives_size_by_month"`
-	RecentOperations    []*RecentArchivalOperation   `json:"recent_operations"`
-	StorageHealth       *StorageHealthStatus         `json:"storage_health"`
+	TotalArchives       int                        `json:"total_archives"`
+	TotalArchivedBytes  int64                      `json:"total_archived_bytes"`
+	ArchivesByType      map[ArchiveDataType]int    `json:"archives_by_type"`
+	SizeByType          map[ArchiveDataType]int64  `json:"size_by_type"`
+	AverageCompression  float64                    `json:"average_compression_ratio"`
+	OldestArchive       *time.Time                 `json:"oldest_archive"`
+	NewestArchive       *time.Time                 `json:"newest_archive"`
+	ArchivesSizeByMonth map[string]int64           `json:"archives_size_by_month"`
+	RecentOperations    []*RecentArchivalOperation `json:"recent_operations"`
+	StorageHealth       *StorageHealthStatus       `json:"storage_health"`
 }
 
 // RecentArchivalOperation represents a recent archival operation
@@ -143,13 +143,13 @@ type RecentArchivalOperation struct {
 
 // StorageHealthStatus represents the health of archive storage
 type StorageHealthStatus struct {
-	Available     bool    `json:"available"`
-	FreeSpace     int64   `json:"free_space_bytes"`
-	UsedSpace     int64   `json:"used_space_bytes"`
-	TotalSpace    int64   `json:"total_space_bytes"`
-	UsagePercent  float64 `json:"usage_percent"`
-	LastChecked   time.Time `json:"last_checked"`
-	Issues        []string `json:"issues"`
+	Available    bool      `json:"available"`
+	FreeSpace    int64     `json:"free_space_bytes"`
+	UsedSpace    int64     `json:"used_space_bytes"`
+	TotalSpace   int64     `json:"total_space_bytes"`
+	UsagePercent float64   `json:"usage_percent"`
+	LastChecked  time.Time `json:"last_checked"`
+	Issues       []string  `json:"issues"`
 }
 
 // ArchiveFilter represents filtering options for archive operations
@@ -310,17 +310,17 @@ func (s *archiverService) ArchiveOldPrices(ctx context.Context, olderThan time.D
 	}
 
 	return &ArchivalResult{
-		ArchiveID:       archiveID,
-		DataType:        ArchiveTypePriceHistory,
-		RecordsArchived: len(oldPrices),
-		StartDate:       startDate,
-		EndDate:         endDate,
-		ArchiveSize:     int64(len(archiveData)),
+		ArchiveID:        archiveID,
+		DataType:         ArchiveTypePriceHistory,
+		RecordsArchived:  len(oldPrices),
+		StartDate:        startDate,
+		EndDate:          endDate,
+		ArchiveSize:      int64(len(archiveData)),
 		CompressionRatio: s.calculateCompressionRatio(len(oldPrices), len(archiveData)),
-		Duration:        time.Since(startTime),
-		StoragePath:     archivePath,
-		Status:          ArchiveStatusCompleted,
-		CreatedAt:       startTime,
+		Duration:         time.Since(startTime),
+		StoragePath:      archivePath,
+		Status:           ArchiveStatusCompleted,
+		CreatedAt:        startTime,
 	}, nil
 }
 
@@ -374,15 +374,15 @@ func (s *archiverService) ArchiveOldFlyers(ctx context.Context, olderThan time.D
 	}
 
 	return &ArchivalResult{
-		ArchiveID:       archiveID,
-		DataType:        ArchiveTypeFlyers,
-		RecordsArchived: len(oldFlyers),
-		ArchiveSize:     int64(len(archiveData)),
+		ArchiveID:        archiveID,
+		DataType:         ArchiveTypeFlyers,
+		RecordsArchived:  len(oldFlyers),
+		ArchiveSize:      int64(len(archiveData)),
 		CompressionRatio: s.calculateCompressionRatio(len(oldFlyers), len(archiveData)),
-		Duration:        time.Since(startTime),
-		StoragePath:     archivePath,
-		Status:          ArchiveStatusCompleted,
-		CreatedAt:       startTime,
+		Duration:         time.Since(startTime),
+		StoragePath:      archivePath,
+		Status:           ArchiveStatusCompleted,
+		CreatedAt:        startTime,
 	}, nil
 }
 
@@ -436,15 +436,15 @@ func (s *archiverService) ArchiveOldProducts(ctx context.Context, olderThan time
 	}
 
 	return &ArchivalResult{
-		ArchiveID:       archiveID,
-		DataType:        ArchiveTypeProducts,
-		RecordsArchived: len(oldProducts),
-		ArchiveSize:     int64(len(archiveData)),
+		ArchiveID:        archiveID,
+		DataType:         ArchiveTypeProducts,
+		RecordsArchived:  len(oldProducts),
+		ArchiveSize:      int64(len(archiveData)),
 		CompressionRatio: s.calculateCompressionRatio(len(oldProducts), len(archiveData)),
-		Duration:        time.Since(startTime),
-		StoragePath:     archivePath,
-		Status:          ArchiveStatusCompleted,
-		CreatedAt:       startTime,
+		Duration:         time.Since(startTime),
+		StoragePath:      archivePath,
+		Status:           ArchiveStatusCompleted,
+		CreatedAt:        startTime,
 	}, nil
 }
 
@@ -498,15 +498,15 @@ func (s *archiverService) ArchiveCompletedExtractionJobs(ctx context.Context, ol
 	}
 
 	return &ArchivalResult{
-		ArchiveID:       archiveID,
-		DataType:        ArchiveTypeExtractionJobs,
-		RecordsArchived: len(oldJobs),
-		ArchiveSize:     int64(len(archiveData)),
+		ArchiveID:        archiveID,
+		DataType:         ArchiveTypeExtractionJobs,
+		RecordsArchived:  len(oldJobs),
+		ArchiveSize:      int64(len(archiveData)),
 		CompressionRatio: s.calculateCompressionRatio(len(oldJobs), len(archiveData)),
-		Duration:        time.Since(startTime),
-		StoragePath:     archivePath,
-		Status:          ArchiveStatusCompleted,
-		CreatedAt:       startTime,
+		Duration:         time.Since(startTime),
+		StoragePath:      archivePath,
+		Status:           ArchiveStatusCompleted,
+		CreatedAt:        startTime,
 	}, nil
 }
 

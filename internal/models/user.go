@@ -69,14 +69,14 @@ type UserProfile struct {
 
 // UserNotifications represents notification settings
 type UserNotifications struct {
-	EmailEnabled      bool `json:"emailEnabled"`
-	PushEnabled       bool `json:"pushEnabled"`
-	WeeklyDigest      bool `json:"weeklyDigest"`
-	PriceAlerts       bool `json:"priceAlerts"`
-	NewFlyerAlerts    bool `json:"newFlyerAlerts"`
-	ProductMatches    bool `json:"productMatches"`
-	SecurityAlerts    bool `json:"securityAlerts"`
-	MarketingEmails   bool `json:"marketingEmails"`
+	EmailEnabled    bool `json:"emailEnabled"`
+	PushEnabled     bool `json:"pushEnabled"`
+	WeeklyDigest    bool `json:"weeklyDigest"`
+	PriceAlerts     bool `json:"priceAlerts"`
+	NewFlyerAlerts  bool `json:"newFlyerAlerts"`
+	ProductMatches  bool `json:"productMatches"`
+	SecurityAlerts  bool `json:"securityAlerts"`
+	MarketingEmails bool `json:"marketingEmails"`
 }
 
 // UserPrivacy represents privacy settings
@@ -160,10 +160,10 @@ func (u *User) GetDisplayName() string {
 // hasNonZeroMetadata checks if metadata has any non-zero values
 func (u *User) hasNonZeroMetadata() bool {
 	return len(u.MetadataJSON) > 0 ||
-		   u.Metadata.Preferences.Theme != "" ||
-		   u.Metadata.Profile.Bio != "" ||
-		   u.Metadata.Notifications.EmailEnabled != false ||
-		   u.Metadata.Privacy.ProfileVisibility != ""
+		u.Metadata.Preferences.Theme != "" ||
+		u.Metadata.Profile.Bio != "" ||
+		u.Metadata.Notifications.EmailEnabled != false ||
+		u.Metadata.Privacy.ProfileVisibility != ""
 }
 
 // DefaultUserMetadata returns default metadata for new users

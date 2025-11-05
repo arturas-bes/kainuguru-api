@@ -51,6 +51,12 @@ configs/production.yml
 .cache
 tmp/
 
+# Test output
+test_output/
+*.pdf
+*.jpg
+*.png
+
 # Terraform
 *.tf
 *.tfstate*

@@ -60,44 +60,44 @@ type PriceAggregation struct {
 
 // StorePriceAggregation represents aggregated price data by store
 type StorePriceAggregation struct {
-	StoreID     int     `json:"store_id"`
-	StoreName   string  `json:"store_name"`
-	MinPrice    float64 `json:"min_price"`
-	MaxPrice    float64 `json:"max_price"`
-	AvgPrice    float64 `json:"avg_price"`
-	CurrentPrice float64 `json:"current_price"`
-	DataPoints  int     `json:"data_points"`
-	LastUpdated time.Time `json:"last_updated"`
-	Reliability float64 `json:"reliability"` // Based on data frequency and recency
+	StoreID      int       `json:"store_id"`
+	StoreName    string    `json:"store_name"`
+	MinPrice     float64   `json:"min_price"`
+	MaxPrice     float64   `json:"max_price"`
+	AvgPrice     float64   `json:"avg_price"`
+	CurrentPrice float64   `json:"current_price"`
+	DataPoints   int       `json:"data_points"`
+	LastUpdated  time.Time `json:"last_updated"`
+	Reliability  float64   `json:"reliability"` // Based on data frequency and recency
 }
 
 // ProductPriceAggregation represents aggregated data for a product
 type ProductPriceAggregation struct {
-	ProductID   int                      `json:"product_id"`
-	ProductName string                   `json:"product_name"`
-	Periods     []*PriceAggregation      `json:"periods"`
-	Stores      []*StorePriceAggregation `json:"stores"`
-	OverallStats *PriceStatistics        `json:"overall_stats"`
+	ProductID    int                      `json:"product_id"`
+	ProductName  string                   `json:"product_name"`
+	Periods      []*PriceAggregation      `json:"periods"`
+	Stores       []*StorePriceAggregation `json:"stores"`
+	OverallStats *PriceStatistics         `json:"overall_stats"`
 }
 
 // PriceRange represents min and max prices
 type PriceRange struct {
-	MinPrice  float64   `json:"min_price"`
-	MaxPrice  float64   `json:"max_price"`
-	Range     float64   `json:"range"`
-	MinDate   time.Time `json:"min_date"`
-	MaxDate   time.Time `json:"max_date"`
+	MinPrice float64   `json:"min_price"`
+	MaxPrice float64   `json:"max_price"`
+	Range    float64   `json:"range"`
+	MinDate  time.Time `json:"min_date"`
+	MaxDate  time.Time `json:"max_date"`
 }
 
 // VolatilityMetrics represents price volatility calculations
 type VolatilityMetrics struct {
-	StandardDeviation float64               `json:"standard_deviation"`
-	Variance          float64               `json:"variance"`
-	CoefficientOfVar  float64               `json:"coefficient_of_variation"`
-	VolatilityLevel   VolatilityLevel       `json:"volatility_level"`
-	PriceSwings       []*PriceSwing         `json:"price_swings"`
-	AverageChange     float64               `json:"average_change"`
-	MedianChange      float64               `json:"median_change"`
+	StandardDeviation float64         `json:"standard_deviation"`
+	Variance          float64         `json:"variance"`
+	CoefficientOfVar  float64         `json:"coefficient_of_variation"`
+	VolatilityLevel   VolatilityLevel `json:"volatility_level"`
+	PriceSwings       []*PriceSwing   `json:"price_swings"`
+	AverageChange     float64         `json:"average_change"`
+	MedianChange      float64         `json:"median_change"`
 }
 
 // VolatilityLevel represents the level of price volatility
@@ -111,53 +111,53 @@ const (
 
 // PriceSwing represents a significant price change
 type PriceSwing struct {
-	StartDate   time.Time `json:"start_date"`
-	EndDate     time.Time `json:"end_date"`
-	StartPrice  float64   `json:"start_price"`
-	EndPrice    float64   `json:"end_price"`
-	Change      float64   `json:"change"`
-	ChangePercent float64 `json:"change_percent"`
-	Direction   string    `json:"direction"` // "UP" or "DOWN"
+	StartDate     time.Time `json:"start_date"`
+	EndDate       time.Time `json:"end_date"`
+	StartPrice    float64   `json:"start_price"`
+	EndPrice      float64   `json:"end_price"`
+	Change        float64   `json:"change"`
+	ChangePercent float64   `json:"change_percent"`
+	Direction     string    `json:"direction"` // "UP" or "DOWN"
 }
 
 // StorePriceComparison compares prices across stores
 type StorePriceComparison struct {
-	ProductID      int                      `json:"product_id"`
-	Stores         []*StorePriceAggregation `json:"stores"`
-	CheapestStore  *StorePriceAggregation   `json:"cheapest_store"`
-	MostExpensive  *StorePriceAggregation   `json:"most_expensive_store"`
-	PriceDiff      float64                  `json:"price_difference"`
-	PriceDiffPercent float64                `json:"price_difference_percent"`
-	MostReliable   *StorePriceAggregation   `json:"most_reliable_store"`
+	ProductID        int                      `json:"product_id"`
+	Stores           []*StorePriceAggregation `json:"stores"`
+	CheapestStore    *StorePriceAggregation   `json:"cheapest_store"`
+	MostExpensive    *StorePriceAggregation   `json:"most_expensive_store"`
+	PriceDiff        float64                  `json:"price_difference"`
+	PriceDiffPercent float64                  `json:"price_difference_percent"`
+	MostReliable     *StorePriceAggregation   `json:"most_reliable_store"`
 }
 
 // SeasonalAggregation represents seasonal price patterns
 type SeasonalAggregation struct {
-	ProductID     int               `json:"product_id"`
-	Quarters      []*QuarterData    `json:"quarters"`
-	Months        []*MonthData      `json:"months"`
-	PeakSeason    *SeasonInfo       `json:"peak_season"`
-	LowSeason     *SeasonInfo       `json:"low_season"`
-	SeasonalIndex float64           `json:"seasonal_index"`
-	HasPattern    bool              `json:"has_seasonal_pattern"`
+	ProductID     int            `json:"product_id"`
+	Quarters      []*QuarterData `json:"quarters"`
+	Months        []*MonthData   `json:"months"`
+	PeakSeason    *SeasonInfo    `json:"peak_season"`
+	LowSeason     *SeasonInfo    `json:"low_season"`
+	SeasonalIndex float64        `json:"seasonal_index"`
+	HasPattern    bool           `json:"has_seasonal_pattern"`
 }
 
 // QuarterData represents quarterly price data
 type QuarterData struct {
-	Quarter  int     `json:"quarter"`
-	AvgPrice float64 `json:"avg_price"`
-	MinPrice float64 `json:"min_price"`
-	MaxPrice float64 `json:"max_price"`
-	DataPoints int   `json:"data_points"`
+	Quarter    int     `json:"quarter"`
+	AvgPrice   float64 `json:"avg_price"`
+	MinPrice   float64 `json:"min_price"`
+	MaxPrice   float64 `json:"max_price"`
+	DataPoints int     `json:"data_points"`
 }
 
 // MonthData represents monthly price data
 type MonthData struct {
-	Month    int     `json:"month"`
-	AvgPrice float64 `json:"avg_price"`
-	MinPrice float64 `json:"min_price"`
-	MaxPrice float64 `json:"max_price"`
-	DataPoints int   `json:"data_points"`
+	Month      int     `json:"month"`
+	AvgPrice   float64 `json:"avg_price"`
+	MinPrice   float64 `json:"min_price"`
+	MaxPrice   float64 `json:"max_price"`
+	DataPoints int     `json:"data_points"`
 }
 
 // SeasonInfo represents seasonal information
@@ -171,7 +171,7 @@ type SeasonInfo struct {
 
 // aggregatorService implements AggregatorService
 type aggregatorService struct {
-	historyRepo PriceHistoryRepository
+	historyRepo    PriceHistoryRepository
 	historyService HistoryService
 }
 

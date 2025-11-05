@@ -8,31 +8,31 @@ import (
 )
 
 type SearchRequest struct {
-	Query       string    `json:"query" validate:"required,min=1,max=255"`
-	StoreIDs    []int     `json:"store_ids,omitempty"`
-	MinPrice    *float64  `json:"min_price,omitempty" validate:"omitempty,gte=0"`
-	MaxPrice    *float64  `json:"max_price,omitempty" validate:"omitempty,gte=0"`
-	OnSaleOnly  bool      `json:"on_sale_only"`
-	Category    string    `json:"category,omitempty"`
-	Limit       int       `json:"limit" validate:"min=1,max=100"`
-	Offset      int       `json:"offset" validate:"min=0"`
-	PreferFuzzy bool      `json:"prefer_fuzzy"`
+	Query       string   `json:"query" validate:"required,min=1,max=255"`
+	StoreIDs    []int    `json:"store_ids,omitempty"`
+	MinPrice    *float64 `json:"min_price,omitempty" validate:"omitempty,gte=0"`
+	MaxPrice    *float64 `json:"max_price,omitempty" validate:"omitempty,gte=0"`
+	OnSaleOnly  bool     `json:"on_sale_only"`
+	Category    string   `json:"category,omitempty"`
+	Limit       int      `json:"limit" validate:"min=1,max=100"`
+	Offset      int      `json:"offset" validate:"min=0"`
+	PreferFuzzy bool     `json:"prefer_fuzzy"`
 }
 
 type SearchResponse struct {
-	Products      []ProductSearchResult `json:"products"`
-	TotalCount    int                   `json:"total_count"`
-	QueryTime     time.Duration         `json:"query_time"`
-	Suggestions   []string              `json:"suggestions,omitempty"`
-	HasMore       bool                  `json:"has_more"`
+	Products    []ProductSearchResult `json:"products"`
+	TotalCount  int                   `json:"total_count"`
+	QueryTime   time.Duration         `json:"query_time"`
+	Suggestions []string              `json:"suggestions,omitempty"`
+	HasMore     bool                  `json:"has_more"`
 }
 
 type ProductSearchResult struct {
-	Product        *models.Product `json:"product"`
-	SearchScore    float64         `json:"search_score"`
-	MatchType      string          `json:"match_type"`
-	Similarity     float64         `json:"similarity,omitempty"`
-	Highlights     []string        `json:"highlights,omitempty"`
+	Product     *models.Product `json:"product"`
+	SearchScore float64         `json:"search_score"`
+	MatchType   string          `json:"match_type"`
+	Similarity  float64         `json:"similarity,omitempty"`
+	Highlights  []string        `json:"highlights,omitempty"`
 }
 
 type SuggestionRequest struct {
@@ -81,13 +81,13 @@ type QueryCorrection struct {
 }
 
 type SearchAnalytics struct {
-	QueryText      string        `json:"query_text"`
-	ResultCount    int           `json:"result_count"`
-	ExecutionTime  time.Duration `json:"execution_time"`
-	MethodUsed     string        `json:"method_used"`
-	UserAgent      string        `json:"user_agent,omitempty"`
-	IPAddress      string        `json:"ip_address,omitempty"`
-	Timestamp      time.Time     `json:"timestamp"`
+	QueryText     string        `json:"query_text"`
+	ResultCount   int           `json:"result_count"`
+	ExecutionTime time.Duration `json:"execution_time"`
+	MethodUsed    string        `json:"method_used"`
+	UserAgent     string        `json:"user_agent,omitempty"`
+	IPAddress     string        `json:"ip_address,omitempty"`
+	Timestamp     time.Time     `json:"timestamp"`
 }
 
 type Service interface {
@@ -116,10 +116,10 @@ type Service interface {
 }
 
 type SearchHealthStatus struct {
-	IndexStatus       map[string]bool `json:"index_status"`
-	LastRefreshTime   time.Time       `json:"last_refresh_time"`
-	SuggestionCount   int64           `json:"suggestion_count"`
-	AverageQueryTime  time.Duration   `json:"average_query_time"`
-	TotalSearches     int64           `json:"total_searches"`
-	ErrorRate         float64         `json:"error_rate"`
+	IndexStatus      map[string]bool `json:"index_status"`
+	LastRefreshTime  time.Time       `json:"last_refresh_time"`
+	SuggestionCount  int64           `json:"suggestion_count"`
+	AverageQueryTime time.Duration   `json:"average_query_time"`
+	TotalSearches    int64           `json:"total_searches"`
+	ErrorRate        float64         `json:"error_rate"`
 }

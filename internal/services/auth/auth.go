@@ -91,12 +91,12 @@ type EmailService interface {
 
 // AuthResult represents the result of authentication operations
 type AuthResult struct {
-	User         *models.User         `json:"user"`
-	Session      *models.UserSession  `json:"session"`
-	AccessToken  string               `json:"accessToken"`
-	RefreshToken string               `json:"refreshToken"`
-	ExpiresAt    time.Time            `json:"expiresAt"`
-	TokenType    string               `json:"tokenType"`
+	User         *models.User        `json:"user"`
+	Session      *models.UserSession `json:"session"`
+	AccessToken  string              `json:"accessToken"`
+	RefreshToken string              `json:"refreshToken"`
+	ExpiresAt    time.Time           `json:"expiresAt"`
+	TokenType    string              `json:"tokenType"`
 }
 
 // TokenPair represents access and refresh tokens
@@ -109,24 +109,24 @@ type TokenPair struct {
 
 // TokenClaims represents JWT token claims
 type TokenClaims struct {
-	UserID     uuid.UUID `json:"userId"`
-	SessionID  uuid.UUID `json:"sessionId"`
-	Email      string    `json:"email"`
-	IssuedAt   time.Time `json:"issuedAt"`
-	ExpiresAt  time.Time `json:"expiresAt"`
-	TokenType  string    `json:"tokenType"` // "access" or "refresh"
-	Subject    string    `json:"subject"`   // "auth"
-	Audience   string    `json:"audience"`  // "kainuguru-api"
-	Issuer     string    `json:"issuer"`    // "kainuguru-auth"
+	UserID    uuid.UUID `json:"userId"`
+	SessionID uuid.UUID `json:"sessionId"`
+	Email     string    `json:"email"`
+	IssuedAt  time.Time `json:"issuedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	TokenType string    `json:"tokenType"` // "access" or "refresh"
+	Subject   string    `json:"subject"`   // "auth"
+	Audience  string    `json:"audience"`  // "kainuguru-api"
+	Issuer    string    `json:"issuer"`    // "kainuguru-auth"
 }
 
 // SessionMetadata represents metadata for session creation
 type SessionMetadata struct {
-	IPAddress    *net.IP                  `json:"ipAddress"`
-	UserAgent    *string                  `json:"userAgent"`
-	DeviceType   string                   `json:"deviceType"`
-	BrowserInfo  *models.BrowserInfo      `json:"browserInfo"`
-	LocationInfo *models.LocationInfo     `json:"locationInfo"`
+	IPAddress    *net.IP              `json:"ipAddress"`
+	UserAgent    *string              `json:"userAgent"`
+	DeviceType   string               `json:"deviceType"`
+	BrowserInfo  *models.BrowserInfo  `json:"browserInfo"`
+	LocationInfo *models.LocationInfo `json:"locationInfo"`
 }
 
 // PasswordResetResult represents the result of password reset request
@@ -150,24 +150,24 @@ type LoginAttempt struct {
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
 	// JWT configuration
-	JWTSecret              string        `json:"jwtSecret"`
-	AccessTokenExpiry      time.Duration `json:"accessTokenExpiry"`
-	RefreshTokenExpiry     time.Duration `json:"refreshTokenExpiry"`
-	TokenIssuer            string        `json:"tokenIssuer"`
-	TokenAudience          string        `json:"tokenAudience"`
+	JWTSecret          string        `json:"jwtSecret"`
+	AccessTokenExpiry  time.Duration `json:"accessTokenExpiry"`
+	RefreshTokenExpiry time.Duration `json:"refreshTokenExpiry"`
+	TokenIssuer        string        `json:"tokenIssuer"`
+	TokenAudience      string        `json:"tokenAudience"`
 
 	// Password configuration
-	PasswordMinLength      int           `json:"passwordMinLength"`
-	PasswordRequireUpper   bool          `json:"passwordRequireUpper"`
-	PasswordRequireLower   bool          `json:"passwordRequireLower"`
-	PasswordRequireNumber  bool          `json:"passwordRequireNumber"`
-	PasswordRequireSymbol  bool          `json:"passwordRequireSymbol"`
-	BcryptCost             int           `json:"bcryptCost"`
+	PasswordMinLength     int  `json:"passwordMinLength"`
+	PasswordRequireUpper  bool `json:"passwordRequireUpper"`
+	PasswordRequireLower  bool `json:"passwordRequireLower"`
+	PasswordRequireNumber bool `json:"passwordRequireNumber"`
+	PasswordRequireSymbol bool `json:"passwordRequireSymbol"`
+	BcryptCost            int  `json:"bcryptCost"`
 
 	// Session configuration
-	SessionExpiry          time.Duration `json:"sessionExpiry"`
-	MaxSessionsPerUser     int           `json:"maxSessionsPerUser"`
-	CleanupInterval        time.Duration `json:"cleanupInterval"`
+	SessionExpiry      time.Duration `json:"sessionExpiry"`
+	MaxSessionsPerUser int           `json:"maxSessionsPerUser"`
+	CleanupInterval    time.Duration `json:"cleanupInterval"`
 
 	// Rate limiting
 	MaxLoginAttempts       int           `json:"maxLoginAttempts"`
@@ -175,37 +175,37 @@ type AuthConfig struct {
 	AccountLockoutDuration time.Duration `json:"accountLockoutDuration"`
 
 	// Email verification
-	EmailVerificationExpiry time.Duration `json:"emailVerificationExpiry"`
-	PasswordResetExpiry     time.Duration `json:"passwordResetExpiry"`
-	RequireEmailVerification bool         `json:"requireEmailVerification"`
+	EmailVerificationExpiry  time.Duration `json:"emailVerificationExpiry"`
+	PasswordResetExpiry      time.Duration `json:"passwordResetExpiry"`
+	RequireEmailVerification bool          `json:"requireEmailVerification"`
 
 	// Security
-	EnableSecurityAlerts   bool          `json:"enableSecurityAlerts"`
-	EnableLocationTracking bool          `json:"enableLocationTracking"`
-	EnableDeviceTracking   bool          `json:"enableDeviceTracking"`
+	EnableSecurityAlerts   bool `json:"enableSecurityAlerts"`
+	EnableLocationTracking bool `json:"enableLocationTracking"`
+	EnableDeviceTracking   bool `json:"enableDeviceTracking"`
 }
 
 // DefaultAuthConfig returns default authentication configuration
 func DefaultAuthConfig() *AuthConfig {
 	return &AuthConfig{
 		// JWT
-		AccessTokenExpiry:      15 * time.Minute,
-		RefreshTokenExpiry:     7 * 24 * time.Hour, // 7 days
-		TokenIssuer:            "kainuguru-auth",
-		TokenAudience:          "kainuguru-api",
+		AccessTokenExpiry:  15 * time.Minute,
+		RefreshTokenExpiry: 7 * 24 * time.Hour, // 7 days
+		TokenIssuer:        "kainuguru-auth",
+		TokenAudience:      "kainuguru-api",
 
 		// Password
-		PasswordMinLength:      8,
-		PasswordRequireUpper:   true,
-		PasswordRequireLower:   true,
-		PasswordRequireNumber:  true,
-		PasswordRequireSymbol:  false,
-		BcryptCost:             12,
+		PasswordMinLength:     8,
+		PasswordRequireUpper:  true,
+		PasswordRequireLower:  true,
+		PasswordRequireNumber: true,
+		PasswordRequireSymbol: false,
+		BcryptCost:            12,
 
 		// Session
-		SessionExpiry:          30 * 24 * time.Hour, // 30 days
-		MaxSessionsPerUser:     5,
-		CleanupInterval:        1 * time.Hour,
+		SessionExpiry:      30 * 24 * time.Hour, // 30 days
+		MaxSessionsPerUser: 5,
+		CleanupInterval:    1 * time.Hour,
 
 		// Rate limiting
 		MaxLoginAttempts:       5,

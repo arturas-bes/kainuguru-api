@@ -13,30 +13,30 @@ type Flyer struct {
 	StoreID int `bun:"store_id,notnull" json:"store_id"`
 
 	// Basic information
-	Title     *string `bun:"title" json:"title,omitempty"`
+	Title     *string   `bun:"title" json:"title,omitempty"`
 	ValidFrom time.Time `bun:"valid_from,notnull" json:"valid_from"`
 	ValidTo   time.Time `bun:"valid_to,notnull" json:"valid_to"`
-	PageCount *int    `bun:"page_count" json:"page_count,omitempty"`
-	SourceURL *string `bun:"source_url" json:"source_url,omitempty"`
+	PageCount *int      `bun:"page_count" json:"page_count,omitempty"`
+	SourceURL *string   `bun:"source_url" json:"source_url,omitempty"`
 
 	// Archival status
 	IsArchived bool       `bun:"is_archived,default:false" json:"is_archived"`
 	ArchivedAt *time.Time `bun:"archived_at" json:"archived_at,omitempty"`
 
 	// Processing metadata
-	Status                  string     `bun:"status,default:'pending'" json:"status"`
-	ExtractionStartedAt     *time.Time `bun:"extraction_started_at" json:"extraction_started_at,omitempty"`
-	ExtractionCompletedAt   *time.Time `bun:"extraction_completed_at" json:"extraction_completed_at,omitempty"`
-	ProductsExtracted       int        `bun:"products_extracted,default:0" json:"products_extracted"`
+	Status                string     `bun:"status,default:'pending'" json:"status"`
+	ExtractionStartedAt   *time.Time `bun:"extraction_started_at" json:"extraction_started_at,omitempty"`
+	ExtractionCompletedAt *time.Time `bun:"extraction_completed_at" json:"extraction_completed_at,omitempty"`
+	ProductsExtracted     int        `bun:"products_extracted,default:0" json:"products_extracted"`
 
 	// Timestamps
 	CreatedAt time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
 
 	// Relations
-	Store       *Store        `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
-	FlyerPages  []*FlyerPage  `bun:"rel:has-many,join:id=flyer_id" json:"flyer_pages,omitempty"`
-	Products    []*Product    `bun:"rel:has-many,join:id=flyer_id" json:"products,omitempty"`
+	Store      *Store       `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	FlyerPages []*FlyerPage `bun:"rel:has-many,join:id=flyer_id" json:"flyer_pages,omitempty"`
+	Products   []*Product   `bun:"rel:has-many,join:id=flyer_id" json:"products,omitempty"`
 }
 
 // FlyerStatus represents possible flyer processing statuses
@@ -53,8 +53,8 @@ const (
 func (f *Flyer) IsValid() bool {
 	now := time.Now()
 	return !f.IsArchived &&
-		   f.ValidFrom.Before(now.Add(24*time.Hour)) && // Valid from today or earlier
-		   f.ValidTo.After(now) // Valid until after now
+		f.ValidFrom.Before(now.Add(24*time.Hour)) && // Valid from today or earlier
+		f.ValidTo.After(now) // Valid until after now
 }
 
 // IsCurrent checks if the flyer is for the current week
@@ -66,8 +66,8 @@ func (f *Flyer) IsCurrent() bool {
 	weekEnd := weekStart.AddDate(0, 0, 7)
 
 	return f.IsValid() &&
-		   f.ValidFrom.Before(weekEnd) &&
-		   f.ValidTo.After(weekStart)
+		f.ValidFrom.Before(weekEnd) &&
+		f.ValidTo.After(weekStart)
 }
 
 // GetDaysRemaining returns the number of days until the flyer expires
@@ -91,8 +91,8 @@ func (f *Flyer) IsProcessingComplete() bool {
 // CanBeProcessed checks if the flyer can be processed
 func (f *Flyer) CanBeProcessed() bool {
 	return f.IsValid() &&
-		   f.Status != string(FlyerStatusCompleted) &&
-		   f.Status != string(FlyerStatusProcessing)
+		f.Status != string(FlyerStatusCompleted) &&
+		f.Status != string(FlyerStatusProcessing)
 }
 
 // GetProcessingDuration returns how long the processing took or is taking

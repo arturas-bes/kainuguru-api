@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uptrace/bun"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/uptrace/bun"
 )
 
 type extractionJobService struct {

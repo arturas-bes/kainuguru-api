@@ -1,8 +1,8 @@
 package models
 
 import (
-	"time"
 	"encoding/json"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -15,17 +15,17 @@ type Store struct {
 	Name string `bun:"name,notnull" json:"name"`
 
 	// URLs
-	LogoURL       *string `bun:"logo_url" json:"logo_url,omitempty"`
-	WebsiteURL    *string `bun:"website_url" json:"website_url,omitempty"`
+	LogoURL        *string `bun:"logo_url" json:"logo_url,omitempty"`
+	WebsiteURL     *string `bun:"website_url" json:"website_url,omitempty"`
 	FlyerSourceURL *string `bun:"flyer_source_url" json:"flyer_source_url,omitempty"`
 
 	// Location data (JSON field)
 	Locations json.RawMessage `bun:"locations,type:jsonb" json:"locations"`
 
 	// Scraping configuration (JSON field)
-	ScraperConfig   json.RawMessage `bun:"scraper_config,type:jsonb" json:"scraper_config"`
-	ScrapeSchedule  string          `bun:"scrape_schedule,default:'weekly'" json:"scrape_schedule"`
-	LastScrapedAt   *time.Time      `bun:"last_scraped_at" json:"last_scraped_at,omitempty"`
+	ScraperConfig  json.RawMessage `bun:"scraper_config,type:jsonb" json:"scraper_config"`
+	ScrapeSchedule string          `bun:"scrape_schedule,default:'weekly'" json:"scrape_schedule"`
+	LastScrapedAt  *time.Time      `bun:"last_scraped_at" json:"last_scraped_at,omitempty"`
 
 	// Status
 	IsActive bool `bun:"is_active,default:true" json:"is_active"`
@@ -48,20 +48,20 @@ type StoreLocation struct {
 
 // ScraperConfig represents scraper configuration for a store
 type ScraperConfig struct {
-	UserAgent       string            `json:"user_agent,omitempty"`
-	RequestDelay    int               `json:"request_delay,omitempty"`
-	MaxRetries      int               `json:"max_retries,omitempty"`
-	RespectRobotsTxt bool             `json:"respect_robots_txt,omitempty"`
-	FlyerSelector   string            `json:"flyer_selector,omitempty"`
-	APIEndpoint     string            `json:"api_endpoint,omitempty"`
-	RequiresJS      bool              `json:"requires_js,omitempty"`
-	RequiresAuth    bool              `json:"requires_auth,omitempty"`
-	MarketShare     float64           `json:"market_share,omitempty"`
-	Priority        int               `json:"priority,omitempty"`
-	Type            string            `json:"type,omitempty"`
-	RegionalFocus   string            `json:"regional_focus,omitempty"`
-	WeeklySchedule  string            `json:"weekly_schedule,omitempty"`
-	Headers         map[string]string `json:"headers,omitempty"`
+	UserAgent        string            `json:"user_agent,omitempty"`
+	RequestDelay     int               `json:"request_delay,omitempty"`
+	MaxRetries       int               `json:"max_retries,omitempty"`
+	RespectRobotsTxt bool              `json:"respect_robots_txt,omitempty"`
+	FlyerSelector    string            `json:"flyer_selector,omitempty"`
+	APIEndpoint      string            `json:"api_endpoint,omitempty"`
+	RequiresJS       bool              `json:"requires_js,omitempty"`
+	RequiresAuth     bool              `json:"requires_auth,omitempty"`
+	MarketShare      float64           `json:"market_share,omitempty"`
+	Priority         int               `json:"priority,omitempty"`
+	Type             string            `json:"type,omitempty"`
+	RegionalFocus    string            `json:"regional_focus,omitempty"`
+	WeeklySchedule   string            `json:"weekly_schedule,omitempty"`
+	Headers          map[string]string `json:"headers,omitempty"`
 }
 
 // GetLocations parses the locations JSON field

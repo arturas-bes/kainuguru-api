@@ -1,0 +1,835 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-11-05T15:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "graphql_endpoint": "{{ _.base_url }}/graphql"
+      }
+    },
+    {
+      "_id": "env_dev",
+      "_type": "environment",
+      "name": "Development",
+      "parentId": "env_base",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "auth_token": ""
+      }
+    },
+    {
+      "_id": "env_prod",
+      "_type": "environment",
+      "name": "Production",
+      "parentId": "env_base",
+      "data": {
+        "base_url": "https://api.kainuguru.lt",
+        "auth_token": ""
+      }
+    },
+    {
+      "_id": "folder_public",
+      "_type": "request_group",
+      "name": "📋 Public Queries",
+      "description": "Public GraphQL queries that don't require authentication"
+    },
+    {
+      "_id": "folder_auth",
+      "_type": "request_group",
+      "name": "🔐 Authentication",
+      "description": "User authentication and account management"
+    },
+    {
+      "_id": "folder_shopping",
+      "_type": "request_group",
+      "name": "🛒 Shopping Lists",
+      "description": "Shopping list management (requires auth)"
+    },
+    {
+      "_id": "folder_search",
+      "_type": "request_group",
+      "name": "🔍 Advanced Search",
+      "description": "Advanced product search with fuzzy matching"
+    },
+    {
+      "_id": "folder_price",
+      "_type": "request_group",
+      "name": "💰 Price Analytics",
+      "description": "Price history, trends, and predictions"
+    },
+    {
+      "_id": "folder_admin",
+      "_type": "request_group",
+      "name": "⚙️ Admin Operations",
+      "description": "Administrative operations and system management"
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Health Check",
+      "url": "{{ _.base_url }}/health",
+      "method": "GET",
+      "description": "Basic health check endpoint"
+    },
+    {
+      "_id": "req_playground",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "GraphQL Playground",
+      "url": "{{ _.base_url }}/playground",
+      "method": "GET",
+      "description": "GraphQL playground interface"
+    },
+    {
+      "_id": "req_stores",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get All Stores",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetStores($first: Int, $filters: StoreFilters) {\\n    stores(first: $first, filters: $filters) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          code\\n          name\\n          logoURL\\n          websiteURL\\n          flyerSourceURL\\n          isActive\\n          lastScrapedAt\\n          scrapeSchedule\\n          createdAt\\n          updatedAt\\n          locations {\\n            city\\n            lat\\n            lng\\n            address\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 10,\n    \"filters\": {\n      \"isActive\": true\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_store_by_code",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get Store by Code",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetStoreByCode($code: String!) {\\n    storeByCode(code: $code) {\\n      id\\n      code\\n      name\\n      logoURL\\n      websiteURL\\n      flyerSourceURL\\n      isActive\\n      lastScrapedAt\\n      scrapeSchedule\\n      locations {\\n        city\\n        lat\\n        lng\\n        address\\n      }\\n      flyers(first: 5, filters: { isCurrent: true }) {\\n        totalCount\\n        edges {\\n          node {\\n            id\\n            title\\n            validFrom\\n            validTo\\n            isValid\\n            isCurrent\\n            daysRemaining\\n            pageCount\\n            productsExtracted\\n            status\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"code\": \"iki\"\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_current_flyers",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get Current Flyers",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetCurrentFlyers($storeIDs: [Int!], $first: Int) {\\n    currentFlyers(storeIDs: $storeIDs, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          title\\n          validFrom\\n          validTo\\n          isValid\\n          isCurrent\\n          daysRemaining\\n          validityPeriod\\n          pageCount\\n          productsExtracted\\n          status\\n          extractionStartedAt\\n          extractionCompletedAt\\n          processingDuration\\n          store {\\n            id\\n            code\\n            name\\n            logoURL\\n          }\\n          flyerPages(first: 3) {\\n            totalCount\\n            edges {\\n              node {\\n                id\\n                pageNumber\\n                imageURL\\n                imageWidth\\n                imageHeight\\n                hasImage\\n                productsExtracted\\n                status\\n              }\\n            }\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 20\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_flyer_details",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get Flyer Details",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetFlyerDetails($id: Int!) {\\n    flyer(id: $id) {\\n      id\\n      title\\n      validFrom\\n      validTo\\n      isValid\\n      isCurrent\\n      daysRemaining\\n      validityPeriod\\n      pageCount\\n      sourceURL\\n      productsExtracted\\n      status\\n      extractionStartedAt\\n      extractionCompletedAt\\n      processingDuration\\n      store {\\n        id\\n        code\\n        name\\n        logoURL\\n        websiteURL\\n      }\\n      flyerPages(first: 50) {\\n        totalCount\\n        edges {\\n          node {\\n            id\\n            pageNumber\\n            imageURL\\n            imageWidth\\n            imageHeight\\n            hasImage\\n            imageDimensions {\\n              width\\n              height\\n            }\\n            productsExtracted\\n            extractionEfficiency\\n            status\\n            extractionStartedAt\\n            extractionCompletedAt\\n            processingDuration\\n          }\\n        }\\n      }\\n      products(first: 10) {\\n        totalCount\\n        edges {\\n          node {\\n            id\\n            name\\n            brand\\n            category\\n            currentPrice\\n            originalPrice\\n            discountPercent\\n            discountAmount\\n            currency\\n            isOnSale\\n            isCurrentlyOnSale\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"id\": 1\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_search_products",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Search Products",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query SearchProducts($query: String!, $filters: ProductFilters, $first: Int) {\\n    searchProducts(query: $query, filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          name\\n          normalizedName\\n          brand\\n          category\\n          subcategory\\n          description\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          discountAmount\\n          currency\\n          unitSize\\n          unitType\\n          unitPrice\\n          packageSize\\n          weight\\n          volume\\n          imageURL\\n          isOnSale\\n          isCurrentlyOnSale\\n          isAvailable\\n          validFrom\\n          validTo\\n          isValid\\n          extractionConfidence\\n          store {\\n            id\\n            code\\n            name\\n            logoURL\\n          }\\n          flyer {\\n            id\\n            title\\n            validFrom\\n            validTo\\n            isCurrent\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"query\": \"pienas\",\n    \"first\": 20,\n    \"filters\": {\n      \"isAvailable\": true,\n      \"isOnSale\": false\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_products_on_sale",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Products on Sale",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetProductsOnSale($storeIDs: [Int!], $filters: ProductFilters, $first: Int) {\\n    productsOnSale(storeIDs: $storeIDs, filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          name\\n          brand\\n          category\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          discountAmount\\n          currency\\n          unitSize\\n          unitPrice\\n          imageURL\\n          isOnSale\\n          isCurrentlyOnSale\\n          saleStartDate\\n          saleEndDate\\n          validFrom\\n          validTo\\n          store {\\n            id\\n            code\\n            name\\n            logoURL\\n          }\\n          flyer {\\n            id\\n            title\\n            validFrom\\n            validTo\\n            isCurrent\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 50,\n    \"filters\": {\n      \"minPrice\": 0.5,\n      \"maxPrice\": 50.0,\n      \"categories\": [\"Pieno produktai\"]\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_register",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Register User",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation RegisterUser($input: RegisterInput!) {\\n    register(input: $input) {\\n      user {\\n        id\\n        email\\n        fullName\\n        preferredLanguage\\n        isActive\\n        emailVerified\\n        createdAt\\n      }\\n      accessToken\\n      refreshToken\\n      expiresAt\\n      tokenType\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"email\": \"test@example.com\",\n      \"password\": \"SecurePassword123!\",\n      \"fullName\": \"Test User\",\n      \"preferredLanguage\": \"lt\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Login User",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation LoginUser($input: LoginInput!) {\\n    login(input: $input) {\\n      user {\\n        id\\n        email\\n        fullName\\n        preferredLanguage\\n        isActive\\n        emailVerified\\n        lastLoginAt\\n      }\\n      accessToken\\n      refreshToken\\n      expiresAt\\n      tokenType\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"email\": \"test@example.com\",\n      \"password\": \"SecurePassword123!\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_me",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Get Current User",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetCurrentUser {\\n    me {\\n      id\\n      email\\n      fullName\\n      preferredLanguage\\n      isActive\\n      emailVerified\\n      lastLoginAt\\n      createdAt\\n      updatedAt\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_refresh_token",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Refresh Token",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation RefreshToken {\\n    refreshToken {\\n      user {\\n        id\\n        email\\n        fullName\\n      }\\n      accessToken\\n      refreshToken\\n      expiresAt\\n      tokenType\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_update_profile",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Update Profile",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation UpdateProfile($input: UpdateUserInput!) {\\n    updateProfile(input: $input) {\\n      id\\n      email\\n      fullName\\n      preferredLanguage\\n      updatedAt\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"fullName\": \"Updated Test User\",\n      \"preferredLanguage\": \"en\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_change_password",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Change Password",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation ChangePassword($input: ChangePasswordInput!) {\\n    changePassword(input: $input)\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"currentPassword\": \"SecurePassword123!\",\n      \"newPassword\": \"NewSecurePassword456!\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_logout",
+      "_type": "request",
+      "parentId": "folder_auth",
+      "name": "Logout",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation Logout {\\n    logout\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_my_shopping_lists",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Get My Shopping Lists",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetMyShoppingLists($filters: ShoppingListFilters, $first: Int) {\\n    shoppingLists(filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          name\\n          description\\n          isDefault\\n          isArchived\\n          isPublic\\n          shareCode\\n          itemCount\\n          completedItemCount\\n          estimatedTotalPrice\\n          completionPercentage\\n          isCompleted\\n          canBeShared\\n          createdAt\\n          updatedAt\\n          lastAccessedAt\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 20,\n    \"filters\": {\n      \"isArchived\": false\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_default_shopping_list",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Get Default Shopping List",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetDefaultShoppingList {\\n    myDefaultShoppingList {\\n      id\\n      name\\n      description\\n      isDefault\\n      itemCount\\n      completedItemCount\\n      estimatedTotalPrice\\n      completionPercentage\\n      items(first: 50) {\\n        totalCount\\n        edges {\\n          node {\\n            id\\n            description\\n            normalizedDescription\\n            notes\\n            quantity\\n            unit\\n            unitType\\n            isChecked\\n            checkedAt\\n            sortOrder\\n            estimatedPrice\\n            actualPrice\\n            totalEstimatedPrice\\n            totalActualPrice\\n            priceSource\\n            category\\n            tags\\n            isLinked\\n            availabilityStatus\\n            matchingConfidence\\n            createdAt\\n            updatedAt\\n            linkedProduct {\\n              id\\n              name\\n              brand\\n              currentPrice\\n              imageURL\\n              store {\\n                name\\n                code\\n              }\\n            }\\n          }\\n        }\\n      }\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_create_shopping_list",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Create Shopping List",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation CreateShoppingList($input: CreateShoppingListInput!) {\\n    createShoppingList(input: $input) {\\n      id\\n      name\\n      description\\n      isDefault\\n      itemCount\\n      completedItemCount\\n      estimatedTotalPrice\\n      createdAt\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Weekly Groceries\",\n      \"description\": \"Regular weekly grocery shopping\",\n      \"isDefault\": false\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_add_shopping_item",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Add Shopping List Item",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation CreateShoppingListItem($input: CreateShoppingListItemInput!) {\\n    createShoppingListItem(input: $input) {\\n      id\\n      description\\n      normalizedDescription\\n      notes\\n      quantity\\n      unit\\n      unitType\\n      category\\n      tags\\n      estimatedPrice\\n      totalEstimatedPrice\\n      isChecked\\n      sortOrder\\n      createdAt\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"shoppingListID\": 1,\n      \"description\": \"Pienas 3.5% riebumo\",\n      \"notes\": \"Geriausia kaina\",\n      \"quantity\": 2,\n      \"unit\": \"l\",\n      \"unitType\": \"VOLUME\",\n      \"category\": \"Pieno produktai\",\n      \"tags\": [\"pienas\", \"3.5%\"],\n      \"estimatedPrice\": 1.50\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_check_item",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Check Shopping Item",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation CheckShoppingListItem($id: Int!) {\\n    checkShoppingListItem(id: $id) {\\n      id\\n      description\\n      isChecked\\n      checkedAt\\n      totalActualPrice\\n    }\\n  }\",\n  \"variables\": {\n    \"id\": 1\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_suggest_items",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Suggest Items",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query SuggestItems($query: String!, $limit: Int) {\\n    suggestItems(query: $query, limit: $limit) {\\n      description\\n      source\\n      estimatedPrice\\n      confidence\\n      productMaster {\\n        id\\n        canonicalName\\n        brand\\n        category\\n        standardUnitSize\\n      }\\n      product {\\n        id\\n        name\\n        brand\\n        currentPrice\\n        imageURL\\n        store {\\n          name\\n          code\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"query\": \"duona\",\n    \"limit\": 10\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_auto_match_item",
+      "_type": "request",
+      "parentId": "folder_shopping",
+      "name": "Auto Match Item",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation AutoMatchItem($itemID: Int!) {\\n    autoMatchItem(itemID: $itemID) {\\n      itemID\\n      success\\n      reason\\n      item {\\n        id\\n        description\\n        isLinked\\n        matchingConfidence\\n      }\\n      match {\\n        product {\\n          id\\n          name\\n          brand\\n          currentPrice\\n          store {\\n            name\\n            code\\n          }\\n        }\\n        confidence\\n        priceMatch\\n        brandMatch\\n        sizeMatch\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"itemID\": 1\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_advanced_search",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Advanced Search",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query AdvancedSearch($input: AdvancedSearchInput!) {\\n    advancedSearchProducts(input: $input) {\\n      totalCount\\n      queryTime\\n      hasMore\\n      suggestions\\n      products {\\n        searchScore\\n        matchType\\n        similarity\\n        highlights\\n        product {\\n          id\\n          name\\n          normalizedName\\n          brand\\n          category\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          currency\\n          unitSize\\n          unitPrice\\n          imageURL\\n          isOnSale\\n          isAvailable\\n          store {\\n            id\\n            code\\n            name\\n            logoURL\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"query\": \"ekologiskas pienas\",\n      \"minPrice\": 1.0,\n      \"maxPrice\": 5.0,\n      \"onSaleOnly\": false,\n      \"category\": \"Pieno produktai\",\n      \"limit\": 20,\n      \"offset\": 0,\n      \"preferFuzzy\": true\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_fuzzy_search",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Fuzzy Search",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query FuzzySearch($input: FuzzySearchInput!) {\\n    fuzzySearchProducts(input: $input) {\\n      totalCount\\n      queryTime\\n      hasMore\\n      products {\\n        searchScore\\n        nameSimilarity\\n        brandSimilarity\\n        combinedSimilarity\\n        product {\\n          id\\n          name\\n          normalizedName\\n          brand\\n          category\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          currency\\n          unitSize\\n          imageURL\\n          isOnSale\\n          store {\\n            id\\n            code\\n            name\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"query\": \"piens\",\n      \"similarityThreshold\": 0.5,\n      \"limit\": 15,\n      \"offset\": 0\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_hybrid_search",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Hybrid Search",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query HybridSearch($input: HybridSearchInput!) {\\n    hybridSearchProducts(input: $input) {\\n      totalCount\\n      queryTime\\n      hasMore\\n      products {\\n        searchScore\\n        matchType\\n        product {\\n          id\\n          name\\n          normalizedName\\n          brand\\n          category\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          currency\\n          unitSize\\n          imageURL\\n          isOnSale\\n          store {\\n            id\\n            code\\n            name\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"query\": \"organinis pienas 3.5%\",\n      \"preferFuzzy\": true,\n      \"limit\": 25,\n      \"offset\": 0\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_search_suggestions",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Search Suggestions",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query SearchSuggestions($input: SearchSuggestionsInput!) {\\n    searchSuggestions(input: $input) {\\n      suggestions {\\n        text\\n        frequency\\n        minPrice\\n        maxPrice\\n        storeCount\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"partialQuery\": \"pie\",\n      \"limit\": 10\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_similar_products",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Similar Products",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query SimilarProducts($input: SimilarProductsInput!) {\\n    similarProducts(input: $input) {\\n      products {\\n        similarityScore\\n        product {\\n          id\\n          name\\n          brand\\n          category\\n          currentPrice\\n          originalPrice\\n          discountPercent\\n          currency\\n          unitSize\\n          imageURL\\n          isOnSale\\n          store {\\n            id\\n            code\\n            name\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"productID\": 123,\n      \"limit\": 10\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_search_health",
+      "_type": "request",
+      "parentId": "folder_search",
+      "name": "Search Health",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query SearchHealth {\\n    searchHealth {\\n      indexStatus {\\n        indexName\\n        isHealthy\\n        isUsed\\n      }\\n      lastRefreshTime\\n      suggestionCount\\n      averageQueryTime\\n      totalSearches\\n      errorRate\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_price_history",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Get Price History",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetPriceHistory($productID: Int!, $storeID: Int, $filters: PriceHistoryFilters, $first: Int) {\\n    priceHistory(productID: $productID, storeID: $storeID, filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          price\\n          originalPrice\\n          currency\\n          isOnSale\\n          recordedAt\\n          validFrom\\n          validTo\\n          saleStartDate\\n          saleEndDate\\n          source\\n          extractionMethod\\n          confidence\\n          isAvailable\\n          stockLevel\\n          isCurrentlyValid\\n          isCurrentlySale\\n          discountAmount\\n          discountPercent\\n          isExpired\\n          validityDuration\\n          product {\\n            id\\n            name\\n            brand\\n          }\\n          store {\\n            id\\n            code\\n            name\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123,\n    \"first\": 30,\n    \"filters\": {\n      \"startDate\": \"2025-10-01T00:00:00Z\",\n      \"endDate\": \"2025-11-05T23:59:59Z\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_current_price",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Get Current Price",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetCurrentPrice($productID: Int!, $storeID: Int!) {\\n    currentPrice(productID: $productID, storeID: $storeID) {\\n      id\\n      price\\n      originalPrice\\n      currency\\n      isOnSale\\n      recordedAt\\n      validFrom\\n      validTo\\n      saleStartDate\\n      saleEndDate\\n      isCurrentlyValid\\n      isCurrentlySale\\n      discountAmount\\n      discountPercent\\n      product {\\n        id\\n        name\\n        brand\\n        category\\n      }\\n      store {\\n        id\\n        code\\n        name\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123,\n    \"storeID\": 1\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_analyze_trend",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Analyze Price Trend",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query AnalyzeTrend($productID: Int!, $period: String!, $storeID: Int) {\\n    analyzeTrend(productID: $productID, period: $period, storeID: $storeID) {\\n      productID\\n      period\\n      direction\\n      trendPercentage\\n      confidence\\n      startPrice\\n      endPrice\\n      averageChange\\n      volatilityScore\\n      dataPoints\\n      trendStrength\\n      linearRegression {\\n        slope\\n        intercept\\n        rSquared\\n        pValue\\n        significant\\n      }\\n      movingAverages {\\n        ma7\\n        ma14\\n        ma30\\n        ma7AboveMa30\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123,\n    \"period\": \"30_days\",\n    \"storeID\": 1\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_compare_store_trends",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Compare Store Trends",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query CompareStoreTrends($productID: Int!, $storeIDs: [Int!]!, $period: String!) {\\n    compareStoreTrends(productID: $productID, storeIDs: $storeIDs, period: $period) {\\n      productID\\n      divergence\\n      storeTrends {\\n        storeID\\n        storeName\\n        currentPrice\\n        priceStability\\n        trendAnalysis {\\n          direction\\n          trendPercentage\\n          confidence\\n          startPrice\\n          endPrice\\n          volatilityScore\\n          trendStrength\\n        }\\n      }\\n      bestStore {\\n        storeID\\n        storeName\\n        currentPrice\\n        priceStability\\n      }\\n      worstStore {\\n        storeID\\n        storeName\\n        currentPrice\\n        priceStability\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123,\n    \"storeIDs\": [1, 2, 3],\n    \"period\": \"30_days\"\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_predict_price",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Predict Price",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query PredictPrice($productID: Int!, $daysAhead: Int!) {\\n    predictPrice(productID: $productID, daysAhead: $daysAhead) {\\n      productID\\n      predictionDate\\n      predictedPrice\\n      methodology\\n      accuracy\\n      confidenceInterval {\\n        lower\\n        upper\\n        confidence\\n      }\\n      factors {\\n        name\\n        impact\\n        description\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123,\n    \"daysAhead\": 7\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_buying_recommendation",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Get Buying Recommendation",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetBuyingRecommendation($productID: Int!) {\\n    buyingRecommendation(productID: $productID) {\\n      productID\\n      recommendation\\n      currentPrice\\n      recommendedAction\\n      confidence\\n      reasoning\\n      nextSaleDate\\n      potentialSavings\\n      waitDays\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_seasonal_trends",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Seasonal Trends",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetSeasonalTrends($productID: Int!) {\\n    seasonalTrends(productID: $productID) {\\n      productID\\n      hasSeasonality\\n      seasonalIndex\\n      seasons {\\n        season\\n        startMonth\\n        endMonth\\n        avgPrice\\n        priceIndex\\n        nextStart\\n      }\\n      nextPeakSeason {\\n        season\\n        startMonth\\n        endMonth\\n        avgPrice\\n        priceIndex\\n        nextStart\\n      }\\n      nextLowSeason {\\n        season\\n        startMonth\\n        endMonth\\n        avgPrice\\n        priceIndex\\n        nextStart\\n      }\\n      recommendations {\\n        period\\n        advice\\n        potentialSavings\\n        timing\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"productID\": 123\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_create_price_alert",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Create Price Alert",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation CreatePriceAlert($input: CreatePriceAlertInput!) {\\n    createPriceAlert(input: $input) {\\n      id\\n      alertType\\n      targetPrice\\n      dropPercent\\n      isActive\\n      notifyEmail\\n      notifyPush\\n      notes\\n      expiresAt\\n      createdAt\\n      product {\\n        id\\n        name\\n        brand\\n      }\\n      store {\\n        id\\n        code\\n        name\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"productID\": 123,\n      \"storeID\": 1,\n      \"alertType\": \"TARGET_PRICE\",\n      \"targetPrice\": 1.20,\n      \"notifyEmail\": true,\n      \"notifyPush\": false,\n      \"notes\": \"Best price for this milk brand\",\n      \"expiresAt\": \"2025-12-31T23:59:59Z\"\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_my_price_alerts",
+      "_type": "request",
+      "parentId": "folder_price",
+      "name": "Get My Price Alerts",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetMyPriceAlerts {\\n    myPriceAlerts {\\n      id\\n      alertType\\n      targetPrice\\n      dropPercent\\n      isActive\\n      notifyEmail\\n      notifyPush\\n      lastTriggered\\n      triggerCount\\n      lastPrice\\n      notes\\n      createdAt\\n      expiresAt\\n      isActiveAlert\\n      product {\\n        id\\n        name\\n        brand\\n        category\\n        currentPrice\\n        imageURL\\n      }\\n      store {\\n        id\\n        code\\n        name\\n        logoURL\\n      }\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_refresh_search",
+      "_type": "request",
+      "parentId": "folder_admin",
+      "name": "Refresh Search Suggestions",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.auth_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"mutation RefreshSearchSuggestions {\\n    refreshSearchSuggestions {\\n      success\\n      refreshedAt\\n      suggestionCount\\n    }\\n  }\"\n}"
+      }
+    },
+    {
+      "_id": "req_product_categories",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get Product Categories",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetProductCategories($filters: CategoryFilters, $first: Int) {\\n    productCategories(filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          name\\n          normalizedName\\n          displayNameLT\\n          displayNameEN\\n          description\\n          iconName\\n          colorHex\\n          level\\n          sortOrder\\n          keywords\\n          excludedKeywords\\n          productCount\\n          usageCount\\n          isActive\\n          parent {\\n            id\\n            name\\n            displayNameLT\\n          }\\n          children {\\n            id\\n            name\\n            displayNameLT\\n            productCount\\n          }\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 50,\n    \"filters\": {\n      \"isActive\": true,\n      \"level\": 1\n    }\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_product_masters",
+      "_type": "request",
+      "parentId": "folder_public",
+      "name": "Get Product Masters",
+      "url": "{{ _.graphql_endpoint }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"query\": \"query GetProductMasters($filters: ProductMasterFilters, $first: Int) {\\n    productMasters(filters: $filters, first: $first) {\\n      totalCount\\n      pageInfo {\\n        hasNextPage\\n        hasPreviousPage\\n        startCursor\\n        endCursor\\n      }\\n      edges {\\n        cursor\\n        node {\\n          id\\n          canonicalName\\n          normalizedName\\n          brand\\n          category\\n          subcategory\\n          standardUnitSize\\n          standardUnitType\\n          standardPackageSize\\n          standardWeight\\n          standardVolume\\n          matchingKeywords\\n          alternativeNames\\n          exclusionKeywords\\n          confidenceScore\\n          matchedProducts\\n          successfulMatches\\n          failedMatches\\n          matchSuccessRate\\n          status\\n          isVerified\\n          lastMatchedAt\\n          verifiedAt\\n          verifiedBy\\n          createdAt\\n          updatedAt\\n        }\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"first\": 50,\n    \"filters\": {\n      \"status\": [\"ACTIVE\"],\n      \"isVerified\": true,\n      \"minConfidence\": 0.8\n    }\n  }\n}"
+      }
+    }
+  ]
+}

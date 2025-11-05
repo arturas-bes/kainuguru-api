@@ -61,8 +61,8 @@ type ProductTag struct {
 	ColorHex      *string `bun:"color_hex" json:"color_hex"`
 
 	// Tag type and behavior
-	TagType      string `bun:"tag_type,default:'general'" json:"tag_type"`
-	IsSystemTag  bool   `bun:"is_system_tag,default:false" json:"is_system_tag"`
+	TagType     string `bun:"tag_type,default:'general'" json:"tag_type"`
+	IsSystemTag bool   `bun:"is_system_tag,default:false" json:"is_system_tag"`
 
 	// Usage statistics
 	UsageCount int `bun:"usage_count,default:0" json:"usage_count"`
@@ -78,14 +78,14 @@ type ProductTag struct {
 type ShoppingListCategory struct {
 	bun.BaseModel `bun:"table:shopping_list_categories,alias:slc"`
 
-	ID               int64     `bun:"id,pk,autoincrement" json:"id"`
-	ShoppingListID   int64     `bun:"shopping_list_id,notnull" json:"shopping_list_id"`
-	UserID           uuid.UUID `bun:"user_id,notnull" json:"user_id"`
-	Name             string    `bun:"name,notnull" json:"name"`
-	ColorHex         *string   `bun:"color_hex" json:"color_hex"`
-	IconName         *string   `bun:"icon_name" json:"icon_name"`
-	SortOrder        int       `bun:"sort_order,default:0" json:"sort_order"`
-	ItemCount        int       `bun:"item_count,default:0" json:"item_count"`
+	ID             int64     `bun:"id,pk,autoincrement" json:"id"`
+	ShoppingListID int64     `bun:"shopping_list_id,notnull" json:"shopping_list_id"`
+	UserID         uuid.UUID `bun:"user_id,notnull" json:"user_id"`
+	Name           string    `bun:"name,notnull" json:"name"`
+	ColorHex       *string   `bun:"color_hex" json:"color_hex"`
+	IconName       *string   `bun:"icon_name" json:"icon_name"`
+	SortOrder      int       `bun:"sort_order,default:0" json:"sort_order"`
+	ItemCount      int       `bun:"item_count,default:0" json:"item_count"`
 
 	CreatedAt time.Time `bun:"created_at,default:now()" json:"created_at"`
 
@@ -98,12 +98,12 @@ type ShoppingListCategory struct {
 type UserTag struct {
 	bun.BaseModel `bun:"table:user_tags,alias:ut"`
 
-	ID          int64     `bun:"id,pk,autoincrement" json:"id"`
-	UserID      uuid.UUID `bun:"user_id,notnull" json:"user_id"`
-	TagName     string    `bun:"tag_name,notnull" json:"tag_name"`
-	DisplayName *string   `bun:"display_name" json:"display_name"`
-	ColorHex    *string   `bun:"color_hex" json:"color_hex"`
-	UsageCount  int       `bun:"usage_count,default:0" json:"usage_count"`
+	ID          int64      `bun:"id,pk,autoincrement" json:"id"`
+	UserID      uuid.UUID  `bun:"user_id,notnull" json:"user_id"`
+	TagName     string     `bun:"tag_name,notnull" json:"tag_name"`
+	DisplayName *string    `bun:"display_name" json:"display_name"`
+	ColorHex    *string    `bun:"color_hex" json:"color_hex"`
+	UsageCount  int        `bun:"usage_count,default:0" json:"usage_count"`
 	LastUsedAt  *time.Time `bun:"last_used_at" json:"last_used_at"`
 
 	CreatedAt time.Time `bun:"created_at,default:now()" json:"created_at"`

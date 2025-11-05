@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uptrace/bun"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/uptrace/bun"
 )
 
 // Placeholder repository implementations for Phase 3 compilation

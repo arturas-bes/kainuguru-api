@@ -83,15 +83,15 @@ func (j *jwtService) ExtractClaims(token string) (*TokenClaims, error) {
 // generateToken generates a JWT token with specified claims
 func (j *jwtService) generateToken(userID, sessionID uuid.UUID, email, tokenType string, issuedAt, expiresAt time.Time) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":       userID.String(),
-		"sid":       sessionID.String(),
-		"email":     email,
-		"type":      tokenType,
-		"iat":       issuedAt.Unix(),
-		"exp":       expiresAt.Unix(),
-		"aud":       j.config.TokenAudience,
-		"iss":       j.config.TokenIssuer,
-		"jti":       uuid.New().String(), // JWT ID for uniqueness
+		"sub":   userID.String(),
+		"sid":   sessionID.String(),
+		"email": email,
+		"type":  tokenType,
+		"iat":   issuedAt.Unix(),
+		"exp":   expiresAt.Unix(),
+		"aud":   j.config.TokenAudience,
+		"iss":   j.config.TokenIssuer,
+		"jti":   uuid.New().String(), // JWT ID for uniqueness
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

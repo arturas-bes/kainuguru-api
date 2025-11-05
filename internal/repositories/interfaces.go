@@ -229,25 +229,25 @@ type ExtractionJobRepository interface {
 
 // Statistics structures
 type JobStatistics struct {
-	TotalJobs       int64     `json:"total_jobs"`
-	PendingJobs     int64     `json:"pending_jobs"`
-	ProcessingJobs  int64     `json:"processing_jobs"`
-	CompletedJobs   int64     `json:"completed_jobs"`
-	FailedJobs      int64     `json:"failed_jobs"`
-	CancelledJobs   int64     `json:"cancelled_jobs"`
-	ExpiredJobs     int64     `json:"expired_jobs"`
-	AverageProcessingTime time.Duration `json:"average_processing_time"`
-	SuccessRate     float64   `json:"success_rate"`
-	JobsByType      map[string]int64 `json:"jobs_by_type"`
+	TotalJobs             int64            `json:"total_jobs"`
+	PendingJobs           int64            `json:"pending_jobs"`
+	ProcessingJobs        int64            `json:"processing_jobs"`
+	CompletedJobs         int64            `json:"completed_jobs"`
+	FailedJobs            int64            `json:"failed_jobs"`
+	CancelledJobs         int64            `json:"cancelled_jobs"`
+	ExpiredJobs           int64            `json:"expired_jobs"`
+	AverageProcessingTime time.Duration    `json:"average_processing_time"`
+	SuccessRate           float64          `json:"success_rate"`
+	JobsByType            map[string]int64 `json:"jobs_by_type"`
 }
 
 type WorkerStatistics struct {
-	WorkerID        string    `json:"worker_id"`
-	TotalJobs       int64     `json:"total_jobs"`
-	CompletedJobs   int64     `json:"completed_jobs"`
-	FailedJobs      int64     `json:"failed_jobs"`
-	AverageProcessingTime time.Duration `json:"average_processing_time"`
-	SuccessRate     float64   `json:"success_rate"`
-	LastActive      *time.Time `json:"last_active"`
-	JobsByType      map[string]int64 `json:"jobs_by_type"`
+	WorkerID              string           `json:"worker_id"`
+	TotalJobs             int64            `json:"total_jobs"`
+	CompletedJobs         int64            `json:"completed_jobs"`
+	FailedJobs            int64            `json:"failed_jobs"`
+	AverageProcessingTime time.Duration    `json:"average_processing_time"`
+	SuccessRate           float64          `json:"success_rate"`
+	LastActive            *time.Time       `json:"last_active"`
+	JobsByType            map[string]int64 `json:"jobs_by_type"`
 }

@@ -14,11 +14,11 @@ import (
 
 // passwordResetService implements password reset functionality
 type passwordResetService struct {
-	db          *bun.DB
-	config      *AuthConfig
-	email       EmailService
-	password    PasswordService
-	session     SessionService
+	db       *bun.DB
+	config   *AuthConfig
+	email    EmailService
+	password PasswordService
+	session  SessionService
 }
 
 // NewPasswordResetService creates a new password reset service
@@ -347,9 +347,9 @@ func (p *passwordResetService) GetPasswordResetStats(ctx context.Context, userID
 		Scan(ctx)
 
 	stats := &PasswordResetStats{
-		UserID:            userID,
-		RecentResetCount:  recentResets,
-		CanRequestReset:   recentResets < 3, // Based on rate limit
+		UserID:           userID,
+		RecentResetCount: recentResets,
+		CanRequestReset:  recentResets < 3, // Based on rate limit
 	}
 
 	if err == nil {
@@ -364,19 +364,19 @@ func (p *passwordResetService) GetPasswordResetStats(ctx context.Context, userID
 
 // TokenVerificationResult represents the result of token verification
 type TokenVerificationResult struct {
-	Valid     bool       `json:"valid"`
-	UserEmail string     `json:"userEmail,omitempty"`
-	ExpiresAt time.Time  `json:"expiresAt,omitempty"`
-	Message   string     `json:"message"`
+	Valid     bool      `json:"valid"`
+	UserEmail string    `json:"userEmail,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt,omitempty"`
+	Message   string    `json:"message"`
 }
 
 // PasswordResetStats represents password reset statistics for a user
 type PasswordResetStats struct {
-	UserID               uuid.UUID  `json:"userId"`
-	RecentResetCount     int        `json:"recentResetCount"`
-	LastResetRequestAt   *time.Time `json:"lastResetRequestAt"`
-	LastSuccessfulReset  *time.Time `json:"lastSuccessfulReset"`
-	CanRequestReset      bool       `json:"canRequestReset"`
+	UserID              uuid.UUID  `json:"userId"`
+	RecentResetCount    int        `json:"recentResetCount"`
+	LastResetRequestAt  *time.Time `json:"lastResetRequestAt"`
+	LastSuccessfulReset *time.Time `json:"lastSuccessfulReset"`
+	CanRequestReset     bool       `json:"canRequestReset"`
 }
 
 // CleanupExpiredResetTokens removes expired password reset tokens

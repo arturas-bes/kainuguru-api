@@ -1,0 +1,221 @@
+-- Kainuguru Database Schema Initialization
+-- This file contains only the UP migrations for Docker initialization
+
+-- Create stores table
+CREATE TABLE stores (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL, -- 'iki', 'maxima', 'rimi', etc
+    name VARCHAR(100) NOT NULL,
+    logo_url TEXT,
+    website_url TEXT,
+    flyer_source_url TEXT,
+
+    -- Location data for future store-specific features
+    locations JSONB DEFAULT '[]', -- Array of {lat, lng, address, city}
+
+    -- Scraping configuration
+    scraper_config JSONB DEFAULT '{}',
+    scrape_schedule VARCHAR(50) DEFAULT 'weekly',
+    last_scraped_at TIMESTAMP WITH TIME ZONE,
+
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_stores_code ON stores(code);
+CREATE INDEX idx_stores_active ON stores(is_active);
+
+-- Insert initial Lithuanian grocery stores
+INSERT INTO stores (code, name, logo_url, website_url, flyer_source_url, is_active) VALUES
+('iki', 'IKI', 'https://www.iki.lt/themes/iki/logo.png', 'https://www.iki.lt', 'https://www.iki.lt/akcijos', true),
+('maxima', 'Maxima', 'https://www.maxima.lt/themes/maxima/logo.png', 'https://www.maxima.lt', 'https://www.maxima.lt/akcijos', true),
+('rimi', 'Rimi', 'https://www.rimi.lt/themes/rimi/logo.png', 'https://www.rimi.lt', 'https://www.rimi.lt/akcijos', true),
+('lidl', 'Lidl', 'https://www.lidl.lt/themes/lidl/logo.png', 'https://www.lidl.lt', 'https://www.lidl.lt/akcijos', true),
+('norfa', 'Norfa', 'https://www.norfa.lt/themes/norfa/logo.png', 'https://www.norfa.lt', 'https://www.norfa.lt/akcijos', true);
+
+-- Create flyers table
+CREATE TABLE flyers (
+    id SERIAL PRIMARY KEY,
+    store_id INTEGER NOT NULL REFERENCES stores(id),
+    title VARCHAR(255),
+    valid_from DATE NOT NULL,
+    valid_to DATE NOT NULL,
+    page_count INTEGER,
+    source_url TEXT,
+    -- Archival status from clarifications
+    is_archived BOOLEAN DEFAULT FALSE,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    -- Processing metadata
+    status VARCHAR(50) DEFAULT 'pending', -- pending, processing, completed, failed
+    extraction_started_at TIMESTAMP WITH TIME ZONE,
+    extraction_completed_at TIMESTAMP WITH TIME ZONE,
+    products_extracted INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT flyers_date_check CHECK (valid_to >= valid_from)
+);
+
+CREATE INDEX idx_flyers_store_id ON flyers(store_id);
+CREATE INDEX idx_flyers_dates ON flyers(valid_from, valid_to);
+CREATE INDEX idx_flyers_status ON flyers(status);
+CREATE INDEX idx_flyers_archived ON flyers(is_archived);
+
+-- Create flyer_pages table
+CREATE TABLE flyer_pages (
+    id SERIAL PRIMARY KEY,
+    flyer_id INTEGER NOT NULL REFERENCES flyers(id) ON DELETE CASCADE,
+    page_number INTEGER NOT NULL,
+    image_url TEXT,
+    image_width INTEGER,
+    image_height INTEGER,
+    -- Processing status
+    status VARCHAR(50) DEFAULT 'pending', -- pending, processing, completed, failed
+    extraction_started_at TIMESTAMP WITH TIME ZONE,
+    extraction_completed_at TIMESTAMP WITH TIME ZONE,
+    products_extracted INTEGER DEFAULT 0,
+    extraction_errors INTEGER DEFAULT 0,
+    last_extraction_error TEXT,
+    last_error_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(flyer_id, page_number)
+);
+
+CREATE INDEX idx_flyer_pages_flyer_id ON flyer_pages(flyer_id);
+CREATE INDEX idx_flyer_pages_status ON flyer_pages(status);
+
+-- Create users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    email_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token VARCHAR(255),
+    email_verification_expires_at TIMESTAMP WITH TIME ZONE,
+    password_reset_token VARCHAR(255),
+    password_reset_expires_at TIMESTAMP WITH TIME ZONE,
+    full_name VARCHAR(255),
+    preferred_language VARCHAR(10) DEFAULT 'lt',
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_active ON users(is_active);
+CREATE INDEX idx_users_email_verification_token ON users(email_verification_token);
+CREATE INDEX idx_users_password_reset_token ON users(password_reset_token);
+
+-- Create user_sessions table
+CREATE TABLE user_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_token VARCHAR(255) UNIQUE NOT NULL,
+    refresh_token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    refresh_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    user_agent TEXT,
+    ip_address INET,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_user_sessions_session_token ON user_sessions(session_token);
+CREATE INDEX idx_user_sessions_refresh_token ON user_sessions(refresh_token);
+CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+CREATE INDEX idx_user_sessions_active ON user_sessions(is_active);
+
+-- Create products table with partitioning support
+CREATE TABLE products (
+    id BIGSERIAL PRIMARY KEY,
+    store_id INTEGER NOT NULL REFERENCES stores(id),
+    flyer_id INTEGER NOT NULL REFERENCES flyers(id),
+    flyer_page_id INTEGER REFERENCES flyer_pages(id),
+
+    -- Basic product information
+    sku VARCHAR(100),
+    slug VARCHAR(200),
+    name VARCHAR(500) NOT NULL,
+    normalized_name VARCHAR(500),
+    brand VARCHAR(200),
+    description TEXT,
+    category VARCHAR(200),
+    subcategory VARCHAR(200),
+
+    -- Pricing
+    price DECIMAL(10,2) NOT NULL,
+    original_price DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    is_on_sale BOOLEAN DEFAULT FALSE,
+
+    -- Physical properties
+    unit_size VARCHAR(50),
+    unit_type VARCHAR(50),
+    unit_price VARCHAR(100),
+    package_size VARCHAR(50),
+    weight VARCHAR(50),
+    volume VARCHAR(50),
+
+    -- Visual and position data
+    image_url TEXT,
+    bounding_box JSONB, -- {x, y, width, height}
+    page_position JSONB, -- {row, column, zone}
+
+    -- Validity and business logic
+    valid_from DATE NOT NULL,
+    valid_to DATE NOT NULL,
+    sale_start_date DATE,
+    sale_end_date DATE,
+    is_available BOOLEAN DEFAULT TRUE,
+    stock_level VARCHAR(50),
+
+    -- Extraction metadata
+    extraction_confidence DECIMAL(3,2) DEFAULT 0.0,
+    extraction_method VARCHAR(100) DEFAULT 'manual',
+    requires_review BOOLEAN DEFAULT FALSE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    CONSTRAINT products_date_check CHECK (valid_to >= valid_from),
+    CONSTRAINT products_price_check CHECK (price >= 0),
+    CONSTRAINT products_original_price_check CHECK (original_price IS NULL OR original_price >= 0)
+);
+
+-- Create indexes for products
+CREATE INDEX idx_products_store_id ON products(store_id);
+CREATE INDEX idx_products_flyer_id ON products(flyer_id);
+CREATE INDEX idx_products_flyer_page_id ON products(flyer_page_id);
+CREATE INDEX idx_products_name_trgm ON products USING gin(name gin_trgm_ops);
+CREATE INDEX idx_products_brand ON products(brand);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_products_price ON products(price);
+CREATE INDEX idx_products_on_sale ON products(is_on_sale);
+CREATE INDEX idx_products_dates ON products(valid_from, valid_to);
+CREATE INDEX idx_products_available ON products(is_available);
+
+-- Enable trigram extension if not exists
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Install test data
+INSERT INTO flyers (store_id, title, valid_from, valid_to, page_count, source_url, status) VALUES
+(1, 'IKI Weekly Specials', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', 8, 'https://iki.lt/akcijos/weekly', 'completed'),
+(2, 'Maxima November Deals', CURRENT_DATE, CURRENT_DATE + INTERVAL '14 days', 12, 'https://maxima.lt/akcijos/november', 'completed'),
+(3, 'Rimi Black Friday Preview', CURRENT_DATE + INTERVAL '1 day', CURRENT_DATE + INTERVAL '8 days', 6, 'https://rimi.lt/akcijos/blackfriday', 'pending');
+
+INSERT INTO flyer_pages (flyer_id, page_number, image_url, image_width, image_height, status, products_extracted) VALUES
+(1, 1, 'https://iki.lt/akcijos/weekly/page1.jpg', 1200, 1600, 'completed', 15),
+(1, 2, 'https://iki.lt/akcijos/weekly/page2.jpg', 1200, 1600, 'completed', 18),
+(2, 1, 'https://maxima.lt/akcijos/november/page1.jpg', 1200, 1600, 'completed', 22),
+(2, 2, 'https://maxima.lt/akcijos/november/page2.jpg', 1200, 1600, 'completed', 19);
+
+INSERT INTO products (store_id, flyer_id, flyer_page_id, name, normalized_name, brand, category, price, original_price, currency, is_on_sale, unit_size, unit_type, valid_from, valid_to, extraction_confidence, is_available) VALUES
+(1, 1, 1, 'Pienas 3.2% riebumo', 'pienas 3.2% riebumo', 'Žemaitijos pienas', 'Dairy', 1.29, 1.49, 'EUR', true, '1L', 'liter', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', 0.95, true),
+(1, 1, 1, 'Duona ruginė', 'duona rugine', 'Fazer', 'Bakery', 1.85, NULL, 'EUR', false, '500g', 'gram', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', 0.98, true),
+(1, 1, 2, 'Kiaušiniai M dydžio', 'kiausiniai m dydzio', 'Balticovo', 'Dairy', 2.15, 2.45, 'EUR', true, '10vnt', 'piece', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', 0.92, true),
+(2, 2, 3, 'Jogurtas natūralus', 'jogurtas naturalus', 'Čilė', 'Dairy', 0.89, NULL, 'EUR', false, '200g', 'gram', CURRENT_DATE, CURRENT_DATE + INTERVAL '14 days', 0.97, true),
+(2, 2, 4, 'Bananas', 'bananas', '', 'Fruits', 1.99, 2.29, 'EUR', true, '1kg', 'kilogram', CURRENT_DATE, CURRENT_DATE + INTERVAL '14 days', 0.88, true);

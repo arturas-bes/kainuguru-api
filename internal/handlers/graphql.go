@@ -1,7 +1,14 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http/httptest"
+
+	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/gofiber/fiber/v2"
+	"github.com/kainuguru/kainuguru-api/internal/graphql/generated"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
@@ -10,20 +17,20 @@ import (
 
 // GraphQLConfig holds configuration for GraphQL handler
 type GraphQLConfig struct {
-	StoreService        services.StoreService
-	FlyerService        services.FlyerService
-	FlyerPageService    services.FlyerPageService
-	ProductService      services.ProductService
+	StoreService         services.StoreService
+	FlyerService         services.FlyerService
+	FlyerPageService     services.FlyerPageService
+	ProductService       services.ProductService
 	ProductMasterService services.ProductMasterService
 	ExtractionJobService services.ExtractionJobService
-	SearchService       search.Service
-	AuthService         auth.AuthService
+	SearchService        search.Service
+	AuthService          auth.AuthService
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
 func GraphQLHandler(config GraphQLConfig) fiber.Handler {
-	// Create resolver with services
-	resolver := resolvers.NewResolver(
+	// Create service resolver with services
+	serviceResolver := resolvers.NewServiceResolver(
 		config.StoreService,
 		config.FlyerService,
 		config.FlyerPageService,
@@ -33,6 +40,14 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.SearchService,
 		config.AuthService,
 	)
+
+	// Create GraphQL executable schema
+	schema := generated.NewExecutableSchema(generated.Config{
+		Resolvers: serviceResolver,
+	})
+
+	// Create GraphQL HTTP handler
+	gqlHandler := handler.NewDefaultServer(schema)
 
 	// Create DataLoaders for N+1 query prevention
 	dataLoaders := NewDataLoaders(
@@ -49,28 +64,49 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		ctx := DataLoaderMiddleware(dataLoaders)(c.Context())
 		c.SetUserContext(ctx)
 
-		// For now, return a configured response with resolver info
-		// TODO: Implement actual GraphQL server using gqlgen
-		return c.JSON(fiber.Map{
-			"message": "GraphQL endpoint - Phase 3 implementation with DataLoaders",
-			"status":  "configured",
-			"schema":  "Browse Weekly Grocery Flyers",
-			"resolver": fiber.Map{
-				"configured":  resolver != nil,
-				"dataLoaders": dataLoaders != nil,
-				"services": fiber.Map{
-					"store":         config.StoreService != nil,
-					"flyer":         config.FlyerService != nil,
-					"flyerPage":     config.FlyerPageService != nil,
-					"product":       config.ProductService != nil,
-					"productMaster": config.ProductMasterService != nil,
-					"extractionJob": config.ExtractionJobService != nil,
-					"search":        config.SearchService != nil,
-					"auth":          config.AuthService != nil,
-				},
-			},
-		})
+		// Convert Fiber request to GraphQL request body
+		req := &graphQLRequest{}
+		if err := c.BodyParser(req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid JSON"})
+		}
+
+		// Create HTTP request from Fiber context
+		body, _ := json.Marshal(req)
+		httpReq := httptest.NewRequest("POST", "/graphql", bytes.NewReader(body))
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq = httpReq.WithContext(ctx)
+
+		// Create HTTP response recorder
+		w := httptest.NewRecorder()
+
+		// Execute GraphQL query through the HTTP handler
+		gqlHandler.ServeHTTP(w, httpReq)
+
+		// Convert HTTP response back to Fiber response
+		responseBody, _ := io.ReadAll(w.Body)
+		var gqlResponse interface{}
+		json.Unmarshal(responseBody, &gqlResponse)
+
+		// Set the same status code
+		c.Status(w.Code)
+
+		// Copy headers
+		for key, values := range w.Header() {
+			for _, value := range values {
+				c.Set(key, value)
+			}
+		}
+
+		// Return the GraphQL response
+		return c.JSON(gqlResponse)
 	}
+}
+
+// graphQLRequest represents a GraphQL request body
+type graphQLRequest struct {
+	Query         string                 `json:"query"`
+	Variables     map[string]interface{} `json:"variables"`
+	OperationName string                 `json:"operationName"`
 }
 
 // GraphQLPlaceholder returns a placeholder GraphQL handler for backward compatibility

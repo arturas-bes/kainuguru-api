@@ -32,16 +32,16 @@ func NewEmailVerificationService(db *bun.DB, config *AuthConfig, emailService Em
 
 // EmailVerificationToken represents an email verification token
 type EmailVerificationToken struct {
-	ID        uuid.UUID `bun:"id,pk,type:uuid,default:gen_random_uuid()"`
-	UserID    uuid.UUID `bun:"user_id,notnull"`
-	Token     string    `bun:"token,unique,notnull"`
-	TokenHash string    `bun:"token_hash,unique,notnull"`
-	Purpose   string    `bun:"purpose,notnull"` // 'verification', 'password_reset'
-	ExpiresAt time.Time `bun:"expires_at,notnull"`
+	ID        uuid.UUID  `bun:"id,pk,type:uuid,default:gen_random_uuid()"`
+	UserID    uuid.UUID  `bun:"user_id,notnull"`
+	Token     string     `bun:"token,unique,notnull"`
+	TokenHash string     `bun:"token_hash,unique,notnull"`
+	Purpose   string     `bun:"purpose,notnull"` // 'verification', 'password_reset'
+	ExpiresAt time.Time  `bun:"expires_at,notnull"`
 	UsedAt    *time.Time `bun:"used_at"`
-	CreatedAt time.Time `bun:"created_at,default:now()"`
-	IPAddress string    `bun:"ip_address"`
-	UserAgent string    `bun:"user_agent"`
+	CreatedAt time.Time  `bun:"created_at,default:now()"`
+	IPAddress string     `bun:"ip_address"`
+	UserAgent string     `bun:"user_agent"`
 }
 
 // SendEmailVerification sends an email verification token to the user
@@ -248,10 +248,10 @@ func (e *emailVerificationService) GetUserVerificationStatus(ctx context.Context
 	}
 
 	status := &VerificationStatus{
-		UserID:        userID,
-		Email:         user.Email,
-		IsVerified:    user.EmailVerified,
-		VerifiedAt:    nil, // Would need to track this in production
+		UserID:     userID,
+		Email:      user.Email,
+		IsVerified: user.EmailVerified,
+		VerifiedAt: nil, // Would need to track this in production
 	}
 
 	// Check for pending verification tokens
@@ -270,11 +270,11 @@ func (e *emailVerificationService) GetUserVerificationStatus(ctx context.Context
 
 // VerificationStatus represents the verification status of a user
 type VerificationStatus struct {
-	UserID                  uuid.UUID  `json:"userId"`
-	Email                   string     `json:"email"`
-	IsVerified              bool       `json:"isVerified"`
-	VerifiedAt              *time.Time `json:"verifiedAt"`
-	HasPendingVerification  bool       `json:"hasPendingVerification"`
+	UserID                 uuid.UUID  `json:"userId"`
+	Email                  string     `json:"email"`
+	IsVerified             bool       `json:"isVerified"`
+	VerifiedAt             *time.Time `json:"verifiedAt"`
+	HasPendingVerification bool       `json:"hasPendingVerification"`
 }
 
 // mockEmailService provides a mock implementation for development

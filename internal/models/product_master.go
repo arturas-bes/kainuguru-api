@@ -11,66 +11,66 @@ import (
 type ProductMaster struct {
 	bun.BaseModel `bun:"table:product_masters,alias:pm"`
 
-	ID               int64    `bun:"id,pk,autoincrement" json:"id"`
-	Name             string   `bun:"name,notnull" json:"name"`
-	NormalizedName   string   `bun:"normalized_name,notnull" json:"normalized_name"`
-	Brand            *string  `bun:"brand" json:"brand"`
-	Description      *string  `bun:"description" json:"description"`
+	ID             int64   `bun:"id,pk,autoincrement" json:"id"`
+	Name           string  `bun:"name,notnull" json:"name"`
+	NormalizedName string  `bun:"normalized_name,notnull" json:"normalized_name"`
+	Brand          *string `bun:"brand" json:"brand"`
+	Description    *string `bun:"description" json:"description"`
 
 	// Categorization
-	Category         *string  `bun:"category" json:"category"`
-	Subcategory      *string  `bun:"subcategory" json:"subcategory"`
-	Tags             []string `bun:"tags,array" json:"tags"`
+	Category    *string  `bun:"category" json:"category"`
+	Subcategory *string  `bun:"subcategory" json:"subcategory"`
+	Tags        []string `bun:"tags,array" json:"tags"`
 
 	// Standard units and packaging
-	StandardUnit     *string  `bun:"standard_unit" json:"standard_unit"`
-	UnitType         *string  `bun:"unit_type" json:"unit_type"`
-	StandardSize     *float64 `bun:"standard_size" json:"standard_size"`
+	StandardUnit      *string  `bun:"standard_unit" json:"standard_unit"`
+	UnitType          *string  `bun:"unit_type" json:"unit_type"`
+	StandardSize      *float64 `bun:"standard_size" json:"standard_size"`
 	PackagingVariants []string `bun:"packaging_variants,array" json:"packaging_variants"`
 
 	// Product identifiers and matching
-	Barcode           *string  `bun:"barcode" json:"barcode"`
-	ManufacturerCode  *string  `bun:"manufacturer_code" json:"manufacturer_code"`
-	AlternativeNames  []string `bun:"alternative_names,array" json:"alternative_names"`
+	Barcode          *string  `bun:"barcode" json:"barcode"`
+	ManufacturerCode *string  `bun:"manufacturer_code" json:"manufacturer_code"`
+	AlternativeNames []string `bun:"alternative_names,array" json:"alternative_names"`
 
 	// Statistics and quality metrics
-	MatchCount        int      `bun:"match_count,default:0" json:"match_count"`
-	ConfidenceScore   float64  `bun:"confidence_score,default:0" json:"confidence_score"`
-	LastSeenDate      *time.Time `bun:"last_seen_date" json:"last_seen_date"`
+	MatchCount      int        `bun:"match_count,default:0" json:"match_count"`
+	ConfidenceScore float64    `bun:"confidence_score,default:0" json:"confidence_score"`
+	LastSeenDate    *time.Time `bun:"last_seen_date" json:"last_seen_date"`
 
 	// Price tracking
-	AvgPrice          *float64   `bun:"avg_price" json:"avg_price"`
-	MinPrice          *float64   `bun:"min_price" json:"min_price"`
-	MaxPrice          *float64   `bun:"max_price" json:"max_price"`
-	PriceTrend        ProductPriceTrend `bun:"price_trend,default:'stable'" json:"price_trend"`
-	LastPriceUpdate   *time.Time `bun:"last_price_update" json:"last_price_update"`
+	AvgPrice        *float64          `bun:"avg_price" json:"avg_price"`
+	MinPrice        *float64          `bun:"min_price" json:"min_price"`
+	MaxPrice        *float64          `bun:"max_price" json:"max_price"`
+	PriceTrend      ProductPriceTrend `bun:"price_trend,default:'stable'" json:"price_trend"`
+	LastPriceUpdate *time.Time        `bun:"last_price_update" json:"last_price_update"`
 
 	// Availability and popularity
-	AvailabilityScore float64 `bun:"availability_score,default:0" json:"availability_score"`
-	PopularityScore   float64 `bun:"popularity_score,default:0" json:"popularity_score"`
+	AvailabilityScore    float64         `bun:"availability_score,default:0" json:"availability_score"`
+	PopularityScore      float64         `bun:"popularity_score,default:0" json:"popularity_score"`
 	SeasonalAvailability json.RawMessage `bun:"seasonal_availability,type:jsonb" json:"seasonal_availability"`
 
 	// Quality and user preferences
-	UserRating        *float64 `bun:"user_rating" json:"user_rating"`
-	ReviewCount       int      `bun:"review_count,default:0" json:"review_count"`
-	NutritionalInfo   json.RawMessage `bun:"nutritional_info,type:jsonb" json:"nutritional_info"`
-	Allergens         []string `bun:"allergens,array" json:"allergens"`
+	UserRating      *float64        `bun:"user_rating" json:"user_rating"`
+	ReviewCount     int             `bun:"review_count,default:0" json:"review_count"`
+	NutritionalInfo json.RawMessage `bun:"nutritional_info,type:jsonb" json:"nutritional_info"`
+	Allergens       []string        `bun:"allergens,array" json:"allergens"`
 
 	// Search and matching
-	SearchVector      string   `bun:"search_vector" json:"-"`
-	MatchKeywords     []string `bun:"match_keywords,array" json:"match_keywords"`
+	SearchVector  string   `bun:"search_vector" json:"-"`
+	MatchKeywords []string `bun:"match_keywords,array" json:"match_keywords"`
 
 	// Status and lifecycle
-	Status            string   `bun:"status,default:'active'" json:"status"`
-	MergedIntoID      *int64   `bun:"merged_into_id" json:"merged_into_id"`
+	Status       string `bun:"status,default:'active'" json:"status"`
+	MergedIntoID *int64 `bun:"merged_into_id" json:"merged_into_id"`
 
 	// Timestamps
-	CreatedAt         time.Time `bun:"created_at,default:now()" json:"created_at"`
-	UpdatedAt         time.Time `bun:"updated_at,default:now()" json:"updated_at"`
+	CreatedAt time.Time `bun:"created_at,default:now()" json:"created_at"`
+	UpdatedAt time.Time `bun:"updated_at,default:now()" json:"updated_at"`
 
 	// Relations
-	Products          []*Product `bun:"rel:has-many,join:id=product_master_id" json:"products,omitempty"`
-	MergedInto        *ProductMaster `bun:"rel:belongs-to,join:merged_into_id=id" json:"merged_into,omitempty"`
+	Products          []*Product          `bun:"rel:has-many,join:id=product_master_id" json:"products,omitempty"`
+	MergedInto        *ProductMaster      `bun:"rel:belongs-to,join:merged_into_id=id" json:"merged_into,omitempty"`
 	ShoppingListItems []*ShoppingListItem `bun:"rel:has-many,join:id=product_master_id" json:"shopping_list_items,omitempty"`
 }
 
@@ -103,8 +103,8 @@ type MatchingKeywords struct {
 
 // AlternativeNames represents alternative names for the product
 type AlternativeNames struct {
-	Names     []string `json:"names"`
-	Aliases   []string `json:"aliases"`
+	Names         []string `json:"names"`
+	Aliases       []string `json:"aliases"`
 	Abbreviations []string `json:"abbreviations"`
 }
 

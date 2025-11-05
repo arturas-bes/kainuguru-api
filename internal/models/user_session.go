@@ -18,10 +18,10 @@ type UserSession struct {
 	IsActive bool      `bun:"is_active,default:true" json:"isActive"`
 
 	// Token information
-	TokenHash         string     `bun:"token_hash,unique,notnull" json:"-"` // Never expose token hashes
-	ExpiresAt         time.Time  `bun:"expires_at,notnull" json:"expiresAt"`
-	RefreshTokenHash  *string    `bun:"refresh_token_hash" json:"-"`
-	RefreshExpiresAt  *time.Time `bun:"refresh_expires_at" json:"refreshExpiresAt"`
+	TokenHash        string     `bun:"token_hash,unique,notnull" json:"-"` // Never expose token hashes
+	ExpiresAt        time.Time  `bun:"expires_at,notnull" json:"expiresAt"`
+	RefreshTokenHash *string    `bun:"refresh_token_hash" json:"-"`
+	RefreshExpiresAt *time.Time `bun:"refresh_expires_at" json:"refreshExpiresAt"`
 
 	// Request metadata
 	IPAddress  *net.IP `bun:"ip_address,type:inet" json:"ipAddress"`
@@ -222,29 +222,29 @@ func (us *UserSession) GetLocationDescription() string {
 
 // SessionCreateInput represents input for creating a new session
 type SessionCreateInput struct {
-	UserID           uuid.UUID    `json:"userId" validate:"required"`
-	TokenHash        string       `json:"-"` // Set internally, not from input
-	ExpiresAt        time.Time    `json:"expiresAt" validate:"required"`
-	RefreshTokenHash *string      `json:"-"` // Set internally, not from input
-	RefreshExpiresAt *time.Time   `json:"refreshExpiresAt"`
-	IPAddress        *net.IP      `json:"ipAddress"`
-	UserAgent        *string      `json:"userAgent"`
-	DeviceType       string       `json:"deviceType" validate:"omitempty,oneof=web mobile api unknown"`
-	BrowserInfo      *BrowserInfo `json:"browserInfo"`
+	UserID           uuid.UUID     `json:"userId" validate:"required"`
+	TokenHash        string        `json:"-"` // Set internally, not from input
+	ExpiresAt        time.Time     `json:"expiresAt" validate:"required"`
+	RefreshTokenHash *string       `json:"-"` // Set internally, not from input
+	RefreshExpiresAt *time.Time    `json:"refreshExpiresAt"`
+	IPAddress        *net.IP       `json:"ipAddress"`
+	UserAgent        *string       `json:"userAgent"`
+	DeviceType       string        `json:"deviceType" validate:"omitempty,oneof=web mobile api unknown"`
+	BrowserInfo      *BrowserInfo  `json:"browserInfo"`
 	LocationInfo     *LocationInfo `json:"locationInfo"`
 }
 
 // SessionFilters represents filters for querying sessions
 type SessionFilters struct {
-	UserID     *uuid.UUID `json:"userId"`
-	IsActive   *bool      `json:"isActive"`
-	DeviceType *string    `json:"deviceType"`
-	IsExpired  *bool      `json:"isExpired"`
-	IPAddress  *net.IP    `json:"ipAddress"`
+	UserID        *uuid.UUID `json:"userId"`
+	IsActive      *bool      `json:"isActive"`
+	DeviceType    *string    `json:"deviceType"`
+	IsExpired     *bool      `json:"isExpired"`
+	IPAddress     *net.IP    `json:"ipAddress"`
 	CreatedAfter  *time.Time `json:"createdAfter"`
 	CreatedBefore *time.Time `json:"createdBefore"`
-	Limit      int        `json:"limit"`
-	Offset     int        `json:"offset"`
-	OrderBy    string     `json:"orderBy"`
-	OrderDir   string     `json:"orderDir"`
+	Limit         int        `json:"limit"`
+	Offset        int        `json:"offset"`
+	OrderBy       string     `json:"orderBy"`
+	OrderDir      string     `json:"orderDir"`
 }

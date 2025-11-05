@@ -1,5 +1,5 @@
 # Development stage
-FROM golang:1.22-alpine AS development
+FROM golang:1.24-alpine AS development
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -20,7 +20,7 @@ COPY . .
 CMD ["go", "run", "cmd/api/main.go"]
 
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -40,17 +40,20 @@ COPY . .
 # Build API server
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api cmd/api/main.go
 
-# Build scraper worker
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o scraper cmd/scraper/main.go
-
-# Build migrator
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o migrator cmd/migrator/main.go
+# Build test utilities
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o test-scraper cmd/test-scraper/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o test-full-pipeline cmd/test-full-pipeline/main.go
 
 # Production stage
 FROM alpine:latest AS production
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata poppler-utils
+# Install runtime dependencies for PDF processing and image manipulation
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    poppler-utils \
+    imagemagick \
+    curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S kainuguru && \
@@ -59,8 +62,12 @@ RUN addgroup -g 1001 -S kainuguru && \
 # Set working directory
 WORKDIR /app
 
+# Create temp directories for PDF processing
+RUN mkdir -p /tmp/kainuguru/pdf && \
+    chown -R kainuguru:kainuguru /tmp/kainuguru
+
 # Copy binaries from builder stage
-COPY --from=builder /app/api /app/scraper /app/migrator ./
+COPY --from=builder /app/api /app/test-scraper /app/test-full-pipeline ./
 
 # Copy configuration files
 COPY --from=builder /app/configs ./configs

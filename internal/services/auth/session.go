@@ -349,11 +349,11 @@ func (s *sessionService) GetSessionStats(ctx context.Context, userID uuid.UUID) 
 
 // SessionStats represents session statistics
 type SessionStats struct {
-	ActiveSessions  int     `json:"activeSessions"`
-	TotalSessions   int     `json:"totalSessions"`
-	LastLoginAt     *time.Time `json:"lastLoginAt"`
-	LastIPAddress   *net.IP `json:"lastIpAddress"`
-	LastUserAgent   *string `json:"lastUserAgent"`
+	ActiveSessions int        `json:"activeSessions"`
+	TotalSessions  int        `json:"totalSessions"`
+	LastLoginAt    *time.Time `json:"lastLoginAt"`
+	LastIPAddress  *net.IP    `json:"lastIpAddress"`
+	LastUserAgent  *string    `json:"lastUserAgent"`
 }
 
 // ValidateSession checks if a session is valid and active
