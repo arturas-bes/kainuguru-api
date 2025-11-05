@@ -285,7 +285,7 @@ func (r *queryResolver) ProductsOnSale(ctx context.Context, storeIDs []int, filt
 
 // Product master resolvers
 func (r *queryResolver) ProductMaster(ctx context.Context, id int) (*model.ProductMaster, error) {
-	master, err := r.productMasterService.GetByID(ctx, id)
+	master, err := r.productMasterService.GetByID(ctx, int64(id))
 	if err != nil {
 		return nil, err
 	}

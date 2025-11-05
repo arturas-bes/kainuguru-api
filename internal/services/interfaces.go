@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 )
 
@@ -129,12 +130,12 @@ type ProductService interface {
 // ProductMasterService defines the interface for product master operations
 type ProductMasterService interface {
 	// Basic CRUD operations
-	GetByID(ctx context.Context, id int) (*models.ProductMaster, error)
-	GetByIDs(ctx context.Context, ids []int) ([]*models.ProductMaster, error)
+	GetByID(ctx context.Context, id int64) (*models.ProductMaster, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*models.ProductMaster, error)
 	GetAll(ctx context.Context, filters ProductMasterFilters) ([]*models.ProductMaster, error)
 	Create(ctx context.Context, master *models.ProductMaster) error
 	Update(ctx context.Context, master *models.ProductMaster) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 
 	// Product master operations
 	GetByCanonicalName(ctx context.Context, name string) (*models.ProductMaster, error)
@@ -144,16 +145,16 @@ type ProductMasterService interface {
 
 	// Matching operations
 	FindMatchingMasters(ctx context.Context, productName string, brand string, category string) ([]*models.ProductMaster, error)
-	MatchProduct(ctx context.Context, productID int, masterID int) error
+	MatchProduct(ctx context.Context, productID int, masterID int64) error
 	CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error)
 
 	// Verification operations
-	VerifyProductMaster(ctx context.Context, masterID int, verifierID string) error
-	DeactivateProductMaster(ctx context.Context, masterID int) error
-	MarkAsDuplicate(ctx context.Context, masterID int, duplicateOfID int) error
+	VerifyProductMaster(ctx context.Context, masterID int64, verifierID string) error
+	DeactivateProductMaster(ctx context.Context, masterID int64) error
+	MarkAsDuplicate(ctx context.Context, masterID int64, duplicateOfID int64) error
 
 	// Statistics
-	GetMatchingStatistics(ctx context.Context, masterID int) (*ProductMasterStats, error)
+	GetMatchingStatistics(ctx context.Context, masterID int64) (*ProductMasterStats, error)
 	GetOverallMatchingStats(ctx context.Context) (*OverallMatchingStats, error)
 }
 
@@ -294,4 +295,305 @@ type OverallMatchingStats struct {
 	VerifiedMasters      int     `json:"verified_masters"`
 	OverallMatchRate     float64 `json:"overall_match_rate"`
 	AverageConfidence    float64 `json:"average_confidence"`
+}
+
+// ShoppingListService defines the interface for shopping list operations
+type ShoppingListService interface {
+	// Basic CRUD operations
+	GetByID(ctx context.Context, id int64) (*models.ShoppingList, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingList, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID, filters ShoppingListFilters) ([]*models.ShoppingList, error)
+	GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error)
+	Create(ctx context.Context, list *models.ShoppingList) error
+	Update(ctx context.Context, list *models.ShoppingList) error
+	Delete(ctx context.Context, id int64) error
+
+	// Shopping list operations
+	GetUserDefaultList(ctx context.Context, userID uuid.UUID) (*models.ShoppingList, error)
+	SetDefaultList(ctx context.Context, userID uuid.UUID, listID int64) error
+	ArchiveList(ctx context.Context, listID int64) error
+	UnarchiveList(ctx context.Context, listID int64) error
+	GenerateShareCode(ctx context.Context, listID int64) (string, error)
+	DisableSharing(ctx context.Context, listID int64) error
+	GetSharedList(ctx context.Context, shareCode string) (*models.ShoppingList, error)
+
+	// List statistics
+	UpdateListStatistics(ctx context.Context, listID int64) error
+	GetListStatistics(ctx context.Context, listID int64) (*ShoppingListStats, error)
+
+	// List management
+	DuplicateList(ctx context.Context, sourceListID int64, newName string, userID uuid.UUID) (*models.ShoppingList, error)
+	MergeLists(ctx context.Context, targetListID, sourceListID int64) error
+	ClearCompletedItems(ctx context.Context, listID int64) (int, error)
+
+	// Validation
+	ValidateListAccess(ctx context.Context, listID int64, userID uuid.UUID) error
+	CanUserAccessList(ctx context.Context, listID int64, userID uuid.UUID) (bool, error)
+}
+
+// ShoppingListItemService defines the interface for shopping list item operations
+type ShoppingListItemService interface {
+	// Basic CRUD operations
+	GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error)
+	GetByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) ([]*models.ShoppingListItem, error)
+	Create(ctx context.Context, item *models.ShoppingListItem) error
+	Update(ctx context.Context, item *models.ShoppingListItem) error
+	Delete(ctx context.Context, id int64) error
+
+	// Item operations
+	CheckItem(ctx context.Context, itemID int64, userID uuid.UUID) error
+	UncheckItem(ctx context.Context, itemID int64) error
+	BulkCheck(ctx context.Context, itemIDs []int64, userID uuid.UUID) error
+	BulkUncheck(ctx context.Context, itemIDs []int64) error
+	BulkDelete(ctx context.Context, itemIDs []int64) error
+
+	// Item organization
+	ReorderItems(ctx context.Context, listID int64, itemOrders []ItemOrder) error
+	UpdateSortOrder(ctx context.Context, itemID int64, newOrder int) error
+	MoveToCategory(ctx context.Context, itemID int64, category string) error
+	AddTags(ctx context.Context, itemID int64, tags []string) error
+	RemoveTags(ctx context.Context, itemID int64, tags []string) error
+
+	// Item suggestions and matching
+	SuggestItems(ctx context.Context, query string, userID uuid.UUID, limit int) ([]*ItemSuggestion, error)
+	MatchToProduct(ctx context.Context, itemID int64, productID int64) error
+	MatchToProductMaster(ctx context.Context, itemID int64, productMasterID int64) error
+	FindSimilarItems(ctx context.Context, itemID int64, limit int) ([]*models.ShoppingListItem, error)
+
+	// Price operations
+	UpdateEstimatedPrice(ctx context.Context, itemID int64, price float64, source string) error
+	UpdateActualPrice(ctx context.Context, itemID int64, price float64) error
+	GetPriceHistory(ctx context.Context, itemID int64) ([]*ItemPriceHistory, error)
+
+	// Smart features
+	SuggestCategory(ctx context.Context, description string) (string, error)
+	GetFrequentlyBoughtTogether(ctx context.Context, itemID int64, limit int) ([]*models.ShoppingListItem, error)
+	GetPopularItemsForUser(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ShoppingListItem, error)
+
+	// Validation
+	ValidateItemAccess(ctx context.Context, itemID int64, userID uuid.UUID) error
+	CheckForDuplicates(ctx context.Context, listID int64, description string) (*models.ShoppingListItem, error)
+}
+
+// ProductMatchingService defines interface for matching shopping list items to products
+type ProductMatchingService interface {
+	// Product matching operations
+	FindMatchingProducts(ctx context.Context, description string, filters ProductMatchFilters) ([]*ProductMatch, error)
+	FindMatchingProductMasters(ctx context.Context, description string, filters ProductMasterMatchFilters) ([]*ProductMasterMatch, error)
+	GetProductSuggestions(ctx context.Context, query string, storeIDs []int, limit int) ([]*ProductSuggestion, error)
+	GetFlyerProducts(ctx context.Context, storeIDs []int, query string, limit int) ([]*models.Product, error)
+
+	// Auto-matching
+	AutoMatchItem(ctx context.Context, itemID int64) (*ProductMatch, error)
+	BatchAutoMatch(ctx context.Context, listID int64) ([]*AutoMatchResult, error)
+	CalculateMatchConfidence(ctx context.Context, itemDescription string, product *models.Product) (float64, error)
+
+	// Price tracking
+	UpdatePricesFromFlyers(ctx context.Context, listID int64) (int, error)
+	CheckProductAvailability(ctx context.Context, itemID int64) (*AvailabilityInfo, error)
+	GetBestPriceOptions(ctx context.Context, itemID int64, radiusKm float64) ([]*PriceOption, error)
+
+	// Smart suggestions
+	GetSmartSuggestions(ctx context.Context, userID uuid.UUID, listID int64, limit int) ([]*SmartSuggestion, error)
+	GetSeasonalSuggestions(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ProductMaster, error)
+	GetTrendingSuggestions(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ProductMaster, error)
+}
+
+// CategoryService defines interface for managing categories and tags
+type CategoryService interface {
+	// Category operations
+	GetCategories(ctx context.Context, filters CategoryFilters) ([]*models.ProductCategory, error)
+	GetCategoryByID(ctx context.Context, id int) (*models.ProductCategory, error)
+	GetCategoryHierarchy(ctx context.Context) ([]*models.ProductCategory, error)
+	CreateCategory(ctx context.Context, category *models.ProductCategory) error
+	UpdateCategory(ctx context.Context, category *models.ProductCategory) error
+	DeleteCategory(ctx context.Context, id int) error
+
+	// Tag operations
+	GetTags(ctx context.Context, filters TagFilters) ([]*models.ProductTag, error)
+	GetTagByID(ctx context.Context, id int) (*models.ProductTag, error)
+	CreateTag(ctx context.Context, tag *models.ProductTag) error
+	UpdateTag(ctx context.Context, tag *models.ProductTag) error
+	DeleteTag(ctx context.Context, id int) error
+
+	// User-specific operations
+	GetUserTags(ctx context.Context, userID uuid.UUID) ([]*models.UserTag, error)
+	GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
+	CreateUserCategory(ctx context.Context, category *models.ShoppingListCategory) error
+	UpdateUserCategory(ctx context.Context, category *models.ShoppingListCategory) error
+	DeleteUserCategory(ctx context.Context, id int64) error
+
+	// Suggestion operations
+	SuggestCategoryForItem(ctx context.Context, description string) (*models.ProductCategory, error)
+	SuggestTagsForItem(ctx context.Context, description string) ([]*models.ProductTag, error)
+	GetPopularTags(ctx context.Context, userID uuid.UUID, limit int) ([]*models.UserTag, error)
+}
+
+// Filter structures for shopping list operations
+type ShoppingListFilters struct {
+	IsDefault   *bool
+	IsArchived  *bool
+	IsPublic    *bool
+	HasItems    *bool
+	CreatedAfter  *time.Time
+	CreatedBefore *time.Time
+	UpdatedAfter  *time.Time
+	UpdatedBefore *time.Time
+	Limit       int
+	Offset      int
+	OrderBy     string
+	OrderDir    string
+}
+
+type ShoppingListItemFilters struct {
+	IsChecked     *bool
+	Categories    []string
+	Tags          []string
+	HasPrice      *bool
+	IsLinked      *bool
+	StoreIDs      []int
+	CreatedAfter  *time.Time
+	CreatedBefore *time.Time
+	Limit         int
+	Offset        int
+	OrderBy       string
+	OrderDir      string
+}
+
+type ProductMatchFilters struct {
+	StoreIDs        []int
+	Categories      []string
+	Brands          []string
+	MinConfidence   *float64
+	OnlyAvailable   bool
+	OnlyOnSale      bool
+	PriceRange      *PriceRange
+	Limit           int
+}
+
+type ProductMasterMatchFilters struct {
+	Categories      []string
+	Brands          []string
+	MinConfidence   *float64
+	MinPopularity   *float64
+	MinAvailability *float64
+	Limit           int
+}
+
+type CategoryFilters struct {
+	ParentID  *int
+	Level     *int
+	IsActive  *bool
+	Limit     int
+	Offset    int
+	OrderBy   string
+	OrderDir  string
+}
+
+type TagFilters struct {
+	TagType   []string
+	IsSystem  *bool
+	IsActive  *bool
+	Limit     int
+	Offset    int
+	OrderBy   string
+	OrderDir  string
+}
+
+// Helper structures
+type ItemOrder struct {
+	ItemID    int64 `json:"item_id"`
+	SortOrder int   `json:"sort_order"`
+}
+
+type ItemSuggestion struct {
+	Description      string                 `json:"description"`
+	Source          string                 `json:"source"`
+	ProductMaster   *models.ProductMaster  `json:"product_master,omitempty"`
+	Product         *models.Product        `json:"product,omitempty"`
+	EstimatedPrice  *float64               `json:"estimated_price,omitempty"`
+	Confidence      float64                `json:"confidence"`
+}
+
+type ProductMatch struct {
+	Product         *models.Product       `json:"product"`
+	ProductMaster   *models.ProductMaster `json:"product_master,omitempty"`
+	Confidence      float64               `json:"confidence"`
+	PriceMatch      bool                  `json:"price_match"`
+	BrandMatch      bool                  `json:"brand_match"`
+	SizeMatch       bool                  `json:"size_match"`
+}
+
+type ProductMasterMatch struct {
+	ProductMaster   *models.ProductMaster `json:"product_master"`
+	Confidence      float64               `json:"confidence"`
+	ReasonCodes     []string              `json:"reason_codes"`
+	AvgPrice        *float64              `json:"avg_price,omitempty"`
+	Availability    float64               `json:"availability"`
+}
+
+type ProductSuggestion struct {
+	Product         *models.Product       `json:"product"`
+	Store           *models.Store         `json:"store"`
+	Price           *float64              `json:"price"`
+	IsOnSale        bool                  `json:"is_on_sale"`
+	Confidence      float64               `json:"confidence"`
+}
+
+type AutoMatchResult struct {
+	ItemID          int64                 `json:"item_id"`
+	Item            *models.ShoppingListItem `json:"item"`
+	Match           *ProductMatch         `json:"match,omitempty"`
+	Success         bool                  `json:"success"`
+	Reason          string                `json:"reason"`
+}
+
+type AvailabilityInfo struct {
+	IsAvailable     bool                  `json:"is_available"`
+	Stores          []*models.Store       `json:"stores"`
+	LastChecked     time.Time             `json:"last_checked"`
+	Alternatives    []*models.Product     `json:"alternatives,omitempty"`
+}
+
+type PriceOption struct {
+	Product         *models.Product       `json:"product"`
+	Store           *models.Store         `json:"store"`
+	Price           float64               `json:"price"`
+	IsOnSale        bool                  `json:"is_on_sale"`
+	Distance        *float64              `json:"distance,omitempty"`
+	ValidUntil      *time.Time            `json:"valid_until,omitempty"`
+}
+
+type SmartSuggestion struct {
+	Type            string                `json:"type"` // "frequent", "seasonal", "trending", "complementary"
+	ProductMaster   *models.ProductMaster `json:"product_master"`
+	Reason          string                `json:"reason"`
+	Confidence      float64               `json:"confidence"`
+	EstimatedPrice  *float64              `json:"estimated_price,omitempty"`
+}
+
+type ItemPriceHistory struct {
+	Date            time.Time             `json:"date"`
+	Price           float64               `json:"price"`
+	Store           *models.Store         `json:"store"`
+	Source          string                `json:"source"`
+}
+
+type PriceRange struct {
+	Min *float64 `json:"min"`
+	Max *float64 `json:"max"`
+}
+
+type ShoppingListStats struct {
+	TotalItems          int       `json:"total_items"`
+	CompletedItems      int       `json:"completed_items"`
+	CompletionRate      float64   `json:"completion_rate"`
+	EstimatedTotal      *float64  `json:"estimated_total"`
+	CategoriesUsed      int       `json:"categories_used"`
+	TagsUsed            int       `json:"tags_used"`
+	LastUpdated         time.Time `json:"last_updated"`
+	AverageItemPrice    *float64  `json:"average_item_price"`
+	LinkedItemsCount    int       `json:"linked_items_count"`
+	UnlinkedItemsCount  int       `json:"unlinked_items_count"`
 }

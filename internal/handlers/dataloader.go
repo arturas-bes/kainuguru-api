@@ -22,7 +22,7 @@ type DataLoaders struct {
 	FlyerByID         *dataloader.Loader[int, *models.Flyer]
 	FlyerPageByID     *dataloader.Loader[int, *models.FlyerPage]
 	ProductByID       *dataloader.Loader[int, *models.Product]
-	ProductMasterByID *dataloader.Loader[int, *models.ProductMaster]
+	ProductMasterByID *dataloader.Loader[int64, *models.ProductMaster]
 
 	// Batch loaders for relations
 	FlyersByStoreID       *dataloader.Loader[int, []*models.Flyer]
@@ -360,9 +360,9 @@ func newProductsByFlyerPageIDLoader(productService services.ProductService) *dat
 }
 
 // ProductMaster Loaders
-func newProductMasterByIDLoader(productMasterService services.ProductMasterService) *dataloader.Loader[int, *models.ProductMaster] {
-	return dataloader.NewBatchedLoader[int, *models.ProductMaster](
-		func(ctx context.Context, keys []int) []*dataloader.Result[*models.ProductMaster] {
+func newProductMasterByIDLoader(productMasterService services.ProductMasterService) *dataloader.Loader[int64, *models.ProductMaster] {
+	return dataloader.NewBatchedLoader[int64, *models.ProductMaster](
+		func(ctx context.Context, keys []int64) []*dataloader.Result[*models.ProductMaster] {
 			results := make([]*dataloader.Result[*models.ProductMaster], len(keys))
 
 			masters, err := productMasterService.GetByIDs(ctx, keys)
@@ -373,7 +373,7 @@ func newProductMasterByIDLoader(productMasterService services.ProductMasterServi
 				return results
 			}
 
-			masterMap := make(map[int]*models.ProductMaster)
+			masterMap := make(map[int64]*models.ProductMaster)
 			for _, master := range masters {
 				masterMap[master.ID] = master
 			}
@@ -390,7 +390,7 @@ func newProductMasterByIDLoader(productMasterService services.ProductMasterServi
 
 			return results
 		},
-		dataloader.WithWait[int, *models.ProductMaster](time.Millisecond*10),
-		dataloader.WithBatchCapacity[int, *models.ProductMaster](100),
+		dataloader.WithWait[int64, *models.ProductMaster](time.Millisecond*10),
+		dataloader.WithBatchCapacity[int64, *models.ProductMaster](100),
 	)
 }

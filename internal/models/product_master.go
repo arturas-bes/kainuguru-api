@@ -11,58 +11,86 @@ import (
 type ProductMaster struct {
 	bun.BaseModel `bun:"table:product_masters,alias:pm"`
 
-	ID                  int    `bun:"id,pk,autoincrement" json:"id"`
-	CanonicalName       string `bun:"canonical_name,unique,notnull" json:"canonical_name"`
-	NormalizedName      string `bun:"normalized_name,notnull" json:"normalized_name"`
-	Brand               string `bun:"brand,notnull" json:"brand"`
-	Category            string `bun:"category,notnull" json:"category"`
-	Subcategory         *string `bun:"subcategory" json:"subcategory,omitempty"`
+	ID               int64    `bun:"id,pk,autoincrement" json:"id"`
+	Name             string   `bun:"name,notnull" json:"name"`
+	NormalizedName   string   `bun:"normalized_name,notnull" json:"normalized_name"`
+	Brand            *string  `bun:"brand" json:"brand"`
+	Description      *string  `bun:"description" json:"description"`
 
-	// Product specifications
-	StandardUnitSize    *string `bun:"standard_unit_size" json:"standard_unit_size,omitempty"`
-	StandardUnitType    *string `bun:"standard_unit_type" json:"standard_unit_type,omitempty"`
-	StandardPackageSize *string `bun:"standard_package_size" json:"standard_package_size,omitempty"`
-	StandardWeight      *string `bun:"standard_weight" json:"standard_weight,omitempty"`
-	StandardVolume      *string `bun:"standard_volume" json:"standard_volume,omitempty"`
+	// Categorization
+	Category         *string  `bun:"category" json:"category"`
+	Subcategory      *string  `bun:"subcategory" json:"subcategory"`
+	Tags             []string `bun:"tags,array" json:"tags"`
 
-	// Matching and validation
-	MatchingKeywords    json.RawMessage `bun:"matching_keywords,type:jsonb" json:"matching_keywords"`
-	AlternativeNames    json.RawMessage `bun:"alternative_names,type:jsonb" json:"alternative_names"`
-	ExclusionKeywords   json.RawMessage `bun:"exclusion_keywords,type:jsonb" json:"exclusion_keywords"`
+	// Standard units and packaging
+	StandardUnit     *string  `bun:"standard_unit" json:"standard_unit"`
+	UnitType         *string  `bun:"unit_type" json:"unit_type"`
+	StandardSize     *float64 `bun:"standard_size" json:"standard_size"`
+	PackagingVariants []string `bun:"packaging_variants,array" json:"packaging_variants"`
 
-	// Quality and confidence metrics
-	ConfidenceScore     float64 `bun:"confidence_score,default:0.0" json:"confidence_score"`
-	MatchedProducts     int     `bun:"matched_products,default:0" json:"matched_products"`
-	SuccessfulMatches   int     `bun:"successful_matches,default:0" json:"successful_matches"`
-	FailedMatches       int     `bun:"failed_matches,default:0" json:"failed_matches"`
+	// Product identifiers and matching
+	Barcode           *string  `bun:"barcode" json:"barcode"`
+	ManufacturerCode  *string  `bun:"manufacturer_code" json:"manufacturer_code"`
+	AlternativeNames  []string `bun:"alternative_names,array" json:"alternative_names"`
+
+	// Statistics and quality metrics
+	MatchCount        int      `bun:"match_count,default:0" json:"match_count"`
+	ConfidenceScore   float64  `bun:"confidence_score,default:0" json:"confidence_score"`
+	LastSeenDate      *time.Time `bun:"last_seen_date" json:"last_seen_date"`
+
+	// Price tracking
+	AvgPrice          *float64   `bun:"avg_price" json:"avg_price"`
+	MinPrice          *float64   `bun:"min_price" json:"min_price"`
+	MaxPrice          *float64   `bun:"max_price" json:"max_price"`
+	PriceTrend        string     `bun:"price_trend,default:'stable'" json:"price_trend"`
+	LastPriceUpdate   *time.Time `bun:"last_price_update" json:"last_price_update"`
+
+	// Availability and popularity
+	AvailabilityScore float64 `bun:"availability_score,default:0" json:"availability_score"`
+	PopularityScore   float64 `bun:"popularity_score,default:0" json:"popularity_score"`
+	SeasonalAvailability json.RawMessage `bun:"seasonal_availability,type:jsonb" json:"seasonal_availability"`
+
+	// Quality and user preferences
+	UserRating        *float64 `bun:"user_rating" json:"user_rating"`
+	ReviewCount       int      `bun:"review_count,default:0" json:"review_count"`
+	NutritionalInfo   json.RawMessage `bun:"nutritional_info,type:jsonb" json:"nutritional_info"`
+	Allergens         []string `bun:"allergens,array" json:"allergens"`
+
+	// Search and matching
+	SearchVector      string   `bun:"search_vector" json:"-"`
+	MatchKeywords     []string `bun:"match_keywords,array" json:"match_keywords"`
 
 	// Status and lifecycle
-	Status              string     `bun:"status,default:'active'" json:"status"`
-	IsVerified          bool       `bun:"is_verified,default:false" json:"is_verified"`
-	LastMatchedAt       *time.Time `bun:"last_matched_at" json:"last_matched_at,omitempty"`
-	VerifiedAt          *time.Time `bun:"verified_at" json:"verified_at,omitempty"`
-	VerifiedBy          *string    `bun:"verified_by" json:"verified_by,omitempty"`
-
-	// Search optimization
-	SearchVector        string `bun:"search_vector" json:"-"`
+	Status            string   `bun:"status,default:'active'" json:"status"`
+	MergedIntoID      *int64   `bun:"merged_into_id" json:"merged_into_id"`
 
 	// Timestamps
-	CreatedAt           time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt           time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
+	CreatedAt         time.Time `bun:"created_at,default:now()" json:"created_at"`
+	UpdatedAt         time.Time `bun:"updated_at,default:now()" json:"updated_at"`
 
 	// Relations
-	Products            []*Product `bun:"rel:has-many,join:id=product_master_id" json:"products,omitempty"`
+	Products          []*Product `bun:"rel:has-many,join:id=product_master_id" json:"products,omitempty"`
+	MergedInto        *ProductMaster `bun:"rel:belongs-to,join:merged_into_id=id" json:"merged_into,omitempty"`
+	ShoppingListItems []*ShoppingListItem `bun:"rel:has-many,join:id=product_master_id" json:"shopping_list_items,omitempty"`
 }
 
 // ProductMasterStatus represents possible product master statuses
 type ProductMasterStatus string
 
 const (
-	ProductMasterStatusActive     ProductMasterStatus = "active"
-	ProductMasterStatusInactive   ProductMasterStatus = "inactive"
-	ProductMasterStatusPending    ProductMasterStatus = "pending"
-	ProductMasterStatusDuplicate  ProductMasterStatus = "duplicate"
-	ProductMasterStatusDeprecated ProductMasterStatus = "deprecated"
+	ProductMasterStatusActive   ProductMasterStatus = "active"
+	ProductMasterStatusInactive ProductMasterStatus = "inactive"
+	ProductMasterStatusMerged   ProductMasterStatus = "merged"
+	ProductMasterStatusDeleted  ProductMasterStatus = "deleted"
+)
+
+// PriceTrend represents price trend directions
+type PriceTrend string
+
+const (
+	PriceTrendIncreasing PriceTrend = "increasing"
+	PriceTrendDecreasing PriceTrend = "decreasing"
+	PriceTrendStable     PriceTrend = "stable"
 )
 
 // MatchingKeywords represents keywords used for product matching
@@ -86,69 +114,29 @@ type ExclusionKeywords struct {
 	Conflicts  []string `json:"conflicts"`
 }
 
-// GetMatchingKeywords parses the matching_keywords JSON field
-func (pm *ProductMaster) GetMatchingKeywords() (MatchingKeywords, error) {
-	var keywords MatchingKeywords
-	if pm.MatchingKeywords != nil {
-		err := json.Unmarshal(pm.MatchingKeywords, &keywords)
-		return keywords, err
-	}
-	return keywords, nil
+// GetMatchingKeywords returns the match keywords as strings
+func (pm *ProductMaster) GetMatchingKeywords() []string {
+	return pm.MatchKeywords
 }
 
-// SetMatchingKeywords sets the matching_keywords JSON field
-func (pm *ProductMaster) SetMatchingKeywords(keywords MatchingKeywords) error {
-	data, err := json.Marshal(keywords)
-	if err != nil {
-		return err
-	}
-	pm.MatchingKeywords = data
-	return nil
+// SetMatchingKeywords sets the match keywords
+func (pm *ProductMaster) SetMatchingKeywords(keywords []string) {
+	pm.MatchKeywords = keywords
 }
 
-// GetAlternativeNames parses the alternative_names JSON field
-func (pm *ProductMaster) GetAlternativeNames() (AlternativeNames, error) {
-	var names AlternativeNames
-	if pm.AlternativeNames != nil {
-		err := json.Unmarshal(pm.AlternativeNames, &names)
-		return names, err
-	}
-	return names, nil
+// GetAlternativeNames returns the alternative names
+func (pm *ProductMaster) GetAlternativeNames() []string {
+	return pm.AlternativeNames
 }
 
-// SetAlternativeNames sets the alternative_names JSON field
-func (pm *ProductMaster) SetAlternativeNames(names AlternativeNames) error {
-	data, err := json.Marshal(names)
-	if err != nil {
-		return err
-	}
-	pm.AlternativeNames = data
-	return nil
+// SetAlternativeNames sets the alternative names
+func (pm *ProductMaster) SetAlternativeNames(names []string) {
+	pm.AlternativeNames = names
 }
 
-// GetExclusionKeywords parses the exclusion_keywords JSON field
-func (pm *ProductMaster) GetExclusionKeywords() (ExclusionKeywords, error) {
-	var exclusions ExclusionKeywords
-	if pm.ExclusionKeywords != nil {
-		err := json.Unmarshal(pm.ExclusionKeywords, &exclusions)
-		return exclusions, err
-	}
-	return exclusions, nil
-}
-
-// SetExclusionKeywords sets the exclusion_keywords JSON field
-func (pm *ProductMaster) SetExclusionKeywords(exclusions ExclusionKeywords) error {
-	data, err := json.Marshal(exclusions)
-	if err != nil {
-		return err
-	}
-	pm.ExclusionKeywords = data
-	return nil
-}
-
-// NormalizeName creates a normalized version of the canonical name
+// NormalizeName creates a normalized version of the name
 func (pm *ProductMaster) NormalizeName() {
-	normalized := strings.ToLower(pm.CanonicalName)
+	normalized := strings.ToLower(pm.Name)
 
 	// Lithuanian character normalization
 	normalized = strings.ReplaceAll(normalized, "ą", "a")
@@ -182,73 +170,21 @@ func (pm *ProductMaster) IsActive() bool {
 	return pm.Status == string(ProductMasterStatusActive)
 }
 
-// IsManuallyVerified checks if the product master has been manually verified
-func (pm *ProductMaster) IsManuallyVerified() bool {
-	return pm.IsVerified && pm.VerifiedAt != nil
-}
-
 // GetMatchSuccessRate returns the success rate of product matching
 func (pm *ProductMaster) GetMatchSuccessRate() float64 {
-	if pm.MatchedProducts == 0 {
+	if pm.MatchCount == 0 {
 		return 0.0
 	}
-	return float64(pm.SuccessfulMatches) / float64(pm.MatchedProducts) * 100.0
+	// For now, assume all matches are successful (can be enhanced later)
+	return 100.0
 }
 
-// IncrementSuccessfulMatch increments successful match counter
-func (pm *ProductMaster) IncrementSuccessfulMatch() {
-	pm.SuccessfulMatches++
-	pm.MatchedProducts++
-	pm.LastMatchedAt = &time.Time{}
-	*pm.LastMatchedAt = time.Now()
-	pm.UpdateMatchingConfidence()
+// IncrementMatchCount increments the match counter
+func (pm *ProductMaster) IncrementMatchCount() {
+	pm.MatchCount++
+	pm.LastSeenDate = &time.Time{}
+	*pm.LastSeenDate = time.Now()
 	pm.UpdatedAt = time.Now()
-}
-
-// IncrementFailedMatch increments failed match counter
-func (pm *ProductMaster) IncrementFailedMatch() {
-	pm.FailedMatches++
-	pm.MatchedProducts++
-	pm.UpdateMatchingConfidence()
-	pm.UpdatedAt = time.Now()
-}
-
-// UpdateMatchingConfidence recalculates confidence score based on match history
-func (pm *ProductMaster) UpdateMatchingConfidence() {
-	if pm.MatchedProducts == 0 {
-		pm.ConfidenceScore = 0.0
-		return
-	}
-
-	successRate := pm.GetMatchSuccessRate()
-
-	// Base confidence on success rate
-	baseConfidence := successRate / 100.0
-
-	// Adjust for verification status
-	if pm.IsVerified {
-		baseConfidence = (baseConfidence + 1.0) / 2.0 // Boost verified products
-	}
-
-	// Adjust for match volume (more matches = higher confidence)
-	volumeBoost := float64(pm.MatchedProducts) / (float64(pm.MatchedProducts) + 10.0)
-	pm.ConfidenceScore = (baseConfidence + volumeBoost) / 2.0
-
-	// Cap at 1.0
-	if pm.ConfidenceScore > 1.0 {
-		pm.ConfidenceScore = 1.0
-	}
-}
-
-// VerifyProduct marks the product master as manually verified
-func (pm *ProductMaster) VerifyProduct(verifierID string) {
-	now := time.Now()
-	pm.IsVerified = true
-	pm.VerifiedAt = &now
-	pm.VerifiedBy = &verifierID
-	pm.Status = string(ProductMasterStatusActive)
-	pm.UpdateMatchingConfidence()
-	pm.UpdatedAt = now
 }
 
 // Deactivate marks the product master as inactive
@@ -257,9 +193,10 @@ func (pm *ProductMaster) Deactivate() {
 	pm.UpdatedAt = time.Now()
 }
 
-// MarkAsDuplicate marks the product master as a duplicate
-func (pm *ProductMaster) MarkAsDuplicate() {
-	pm.Status = string(ProductMasterStatusDuplicate)
+// MarkAsMerged marks the product master as merged into another
+func (pm *ProductMaster) MarkAsMerged(targetID int64) {
+	pm.Status = string(ProductMasterStatusMerged)
+	pm.MergedIntoID = &targetID
 	pm.UpdatedAt = time.Now()
 }
 
@@ -268,76 +205,57 @@ func (pm *ProductMaster) CanBeMatched() bool {
 	return pm.IsActive() && pm.ConfidenceScore >= 0.3
 }
 
-// ShouldBeReviewed checks if the product master needs manual review
-func (pm *ProductMaster) ShouldBeReviewed() bool {
-	return !pm.IsVerified &&
-		   (pm.ConfidenceScore < 0.7 ||
-		    pm.GetMatchSuccessRate() < 70.0 ||
-		    pm.MatchedProducts > 50)
-}
-
 // AddMatchingKeyword adds a new keyword to the matching keywords
-func (pm *ProductMaster) AddMatchingKeyword(keyword string, keywordType string) error {
-	keywords, err := pm.GetMatchingKeywords()
-	if err != nil {
-		return err
+func (pm *ProductMaster) AddMatchingKeyword(keyword string) {
+	keyword = strings.ToLower(strings.TrimSpace(keyword))
+	if keyword == "" {
+		return
 	}
 
-	switch keywordType {
-	case "primary":
-		keywords.Primary = append(keywords.Primary, strings.ToLower(keyword))
-	case "secondary":
-		keywords.Secondary = append(keywords.Secondary, strings.ToLower(keyword))
-	case "brand":
-		keywords.Brand = append(keywords.Brand, strings.ToLower(keyword))
-	case "category":
-		keywords.Category = append(keywords.Category, strings.ToLower(keyword))
+	// Check if keyword already exists
+	for _, existing := range pm.MatchKeywords {
+		if existing == keyword {
+			return
+		}
 	}
 
-	return pm.SetMatchingKeywords(keywords)
+	pm.MatchKeywords = append(pm.MatchKeywords, keyword)
+	pm.UpdatedAt = time.Now()
 }
 
 // AddAlternativeName adds a new alternative name
-func (pm *ProductMaster) AddAlternativeName(name string, nameType string) error {
-	names, err := pm.GetAlternativeNames()
-	if err != nil {
-		return err
+func (pm *ProductMaster) AddAlternativeName(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
 	}
 
-	switch nameType {
-	case "name":
-		names.Names = append(names.Names, name)
-	case "alias":
-		names.Aliases = append(names.Aliases, name)
-	case "abbreviation":
-		names.Abbreviations = append(names.Abbreviations, name)
+	// Check if name already exists
+	for _, existing := range pm.AlternativeNames {
+		if existing == name {
+			return
+		}
 	}
 
-	return pm.SetAlternativeNames(names)
+	pm.AlternativeNames = append(pm.AlternativeNames, name)
+	pm.UpdatedAt = time.Now()
 }
 
 // GetAllMatchableTerms returns all terms that can be used for matching
 func (pm *ProductMaster) GetAllMatchableTerms() []string {
 	var terms []string
 
-	terms = append(terms, pm.CanonicalName)
+	terms = append(terms, pm.Name)
 	terms = append(terms, pm.NormalizedName)
-	terms = append(terms, pm.Brand)
+	if pm.Brand != nil {
+		terms = append(terms, *pm.Brand)
+	}
 
 	// Add keywords
-	if keywords, err := pm.GetMatchingKeywords(); err == nil {
-		terms = append(terms, keywords.Primary...)
-		terms = append(terms, keywords.Secondary...)
-		terms = append(terms, keywords.Brand...)
-		terms = append(terms, keywords.Category...)
-	}
+	terms = append(terms, pm.GetMatchingKeywords()...)
 
 	// Add alternative names
-	if names, err := pm.GetAlternativeNames(); err == nil {
-		terms = append(terms, names.Names...)
-		terms = append(terms, names.Aliases...)
-		terms = append(terms, names.Abbreviations...)
-	}
+	terms = append(terms, pm.GetAlternativeNames()...)
 
 	return terms
 }
