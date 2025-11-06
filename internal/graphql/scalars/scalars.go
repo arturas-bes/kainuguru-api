@@ -5,32 +5,12 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 )
 
-// MarshalDateTime marshals a time.Time to a GraphQL DateTime scalar
-func MarshalDateTime(t time.Time) graphql.Marshaler {
-	return graphql.WriterFunc(func(w io.Writer) {
-		_, _ = io.WriteString(w, strconv.Quote(t.Format(time.RFC3339)))
-	})
-}
-
-// UnmarshalDateTime unmarshals a GraphQL DateTime scalar to a time.Time
-func UnmarshalDateTime(v interface{}) (time.Time, error) {
-	switch v := v.(type) {
-	case string:
-		return time.Parse(time.RFC3339, v)
-	case int:
-		return time.Unix(int64(v), 0), nil
-	case int64:
-		return time.Unix(v, 0), nil
-	default:
-		return time.Time{}, fmt.Errorf("cannot unmarshal %T into time.Time", v)
-	}
-}
+// DateTime scalar implementation is in datetime.go
 
 // MarshalUUID marshals a uuid.UUID to a GraphQL UUID scalar
 func MarshalUUID(u uuid.UUID) graphql.Marshaler {

@@ -20,24 +20,138 @@ func NewFlyerPageService(db *bun.DB) FlyerPageService {
 }
 
 // Basic CRUD operations
+
+// GetByID retrieves a flyer page by its ID
 func (s *flyerPageService) GetByID(ctx context.Context, id int) (*models.FlyerPage, error) {
-	return nil, fmt.Errorf("flyerPageService.GetByID not implemented")
+	page := &models.FlyerPage{}
+	err := s.db.NewSelect().
+		Model(page).
+		Relation("Flyer").
+		Where("fp.id = ?", id).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get flyer page by ID %d: %w", id, err)
+	}
+
+	return page, nil
 }
 
+// GetByIDs retrieves multiple flyer pages by their IDs
 func (s *flyerPageService) GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
-	return nil, fmt.Errorf("flyerPageService.GetByIDs not implemented")
+	if len(ids) == 0 {
+		return []*models.FlyerPage{}, nil
+	}
+
+	var pages []*models.FlyerPage
+	err := s.db.NewSelect().
+		Model(&pages).
+		Relation("Flyer").
+		Where("fp.id IN (?)", bun.In(ids)).
+		Order("fp.page_number ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get flyer pages by IDs: %w", err)
+	}
+
+	return pages, nil
 }
 
+// GetPagesByFlyerIDs retrieves flyer pages for multiple flyer IDs (for DataLoader)
 func (s *flyerPageService) GetPagesByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.FlyerPage, error) {
-	return nil, fmt.Errorf("flyerPageService.GetPagesByFlyerIDs not implemented")
+	if len(flyerIDs) == 0 {
+		return []*models.FlyerPage{}, nil
+	}
+
+	var pages []*models.FlyerPage
+	err := s.db.NewSelect().
+		Model(&pages).
+		Relation("Flyer").
+		Where("fp.flyer_id IN (?)", bun.In(flyerIDs)).
+		Order("fp.flyer_id ASC, fp.page_number ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pages by flyer IDs: %w", err)
+	}
+
+	return pages, nil
 }
 
+// GetByFlyerID retrieves all pages for a specific flyer
 func (s *flyerPageService) GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error) {
-	return nil, fmt.Errorf("flyerPageService.GetByFlyerID not implemented")
+	var pages []*models.FlyerPage
+	err := s.db.NewSelect().
+		Model(&pages).
+		Relation("Flyer").
+		Where("fp.flyer_id = ?", flyerID).
+		Order("fp.page_number ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pages for flyer %d: %w", flyerID, err)
+	}
+
+	return pages, nil
 }
 
+// GetAll retrieves flyer pages with optional filtering
 func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters) ([]*models.FlyerPage, error) {
-	return nil, fmt.Errorf("flyerPageService.GetAll not implemented")
+	query := s.db.NewSelect().Model((*models.FlyerPage)(nil)).
+		Relation("Flyer")
+
+	// Apply filters
+	if len(filters.FlyerIDs) > 0 {
+		query = query.Where("fp.flyer_id IN (?)", bun.In(filters.FlyerIDs))
+	}
+
+	if len(filters.Status) > 0 {
+		query = query.Where("fp.extraction_status IN (?)", bun.In(filters.Status))
+	}
+
+	if filters.HasImage != nil {
+		if *filters.HasImage {
+			query = query.Where("fp.image_url IS NOT NULL AND fp.image_url != ''")
+		} else {
+			query = query.Where("fp.image_url IS NULL OR fp.image_url = ''")
+		}
+	}
+
+	if len(filters.PageNumbers) > 0 {
+		query = query.Where("fp.page_number IN (?)", bun.In(filters.PageNumbers))
+	}
+
+	// Apply pagination
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+
+	// Apply ordering
+	if filters.OrderBy != "" {
+		orderClause := fmt.Sprintf("fp.%s", filters.OrderBy)
+		if filters.OrderDir == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		// Default ordering by flyer and page number
+		query = query.Order("fp.flyer_id ASC").Order("fp.page_number ASC")
+	}
+
+	var pages []*models.FlyerPage
+	err := query.Scan(ctx, &pages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get flyer pages: %w", err)
+	}
+
+	return pages, nil
 }
 
 func (s *flyerPageService) Create(ctx context.Context, page *models.FlyerPage) error {

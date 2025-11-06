@@ -205,27 +205,27 @@ type ComplexityRoot struct {
 	}
 
 	PriceAlert struct {
-		AlertType     func(childComplexity int) int
-		CreatedAt     func(childComplexity int) int
-		DropPercent   func(childComplexity int) int
-		ExpiresAt     func(childComplexity int) int
-		ID            func(childComplexity int) int
-		IsActive      func(childComplexity int) int
-		IsActiveAlert func(childComplexity int) int
-		LastPrice     func(childComplexity int) int
-		LastTriggered func(childComplexity int) int
-		Notes         func(childComplexity int) int
-		NotifyEmail   func(childComplexity int) int
-		NotifyPush    func(childComplexity int) int
-		Product       func(childComplexity int) int
-		ProductID     func(childComplexity int) int
-		Store         func(childComplexity int) int
-		StoreID       func(childComplexity int) int
-		TargetPrice   func(childComplexity int) int
-		TriggerCount  func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
-		User          func(childComplexity int) int
-		UserID        func(childComplexity int) int
+		AlertType       func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		DropPercent     func(childComplexity int) int
+		ExpiresAt       func(childComplexity int) int
+		ID              func(childComplexity int) int
+		IsActive        func(childComplexity int) int
+		IsActiveAlert   func(childComplexity int) int
+		LastPrice       func(childComplexity int) int
+		LastTriggered   func(childComplexity int) int
+		Notes           func(childComplexity int) int
+		NotifyEmail     func(childComplexity int) int
+		NotifyPush      func(childComplexity int) int
+		ProductMaster   func(childComplexity int) int
+		ProductMasterID func(childComplexity int) int
+		Store           func(childComplexity int) int
+		StoreID         func(childComplexity int) int
+		TargetPrice     func(childComplexity int) int
+		TriggerCount    func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
+		User            func(childComplexity int) int
+		UserID          func(childComplexity int) int
 	}
 
 	PriceAlertConnection struct {
@@ -258,8 +258,8 @@ type ComplexityRoot struct {
 		Notes            func(childComplexity int) int
 		OriginalPrice    func(childComplexity int) int
 		Price            func(childComplexity int) int
-		Product          func(childComplexity int) int
-		ProductID        func(childComplexity int) int
+		ProductMaster    func(childComplexity int) int
+		ProductMasterID  func(childComplexity int) int
 		RecordedAt       func(childComplexity int) int
 		SaleEndDate      func(childComplexity int) int
 		SaleStartDate    func(childComplexity int) int
@@ -294,7 +294,6 @@ type ComplexityRoot struct {
 		Brand                func(childComplexity int) int
 		Category             func(childComplexity int) int
 		Description          func(childComplexity int) int
-		DiscountAmount       func(childComplexity int) int
 		ExtractionConfidence func(childComplexity int) int
 		ExtractionMethod     func(childComplexity int) int
 		Flyer                func(childComplexity int) int
@@ -416,15 +415,17 @@ type ComplexityRoot struct {
 
 	Query struct {
 		CurrentFlyers         func(childComplexity int, storeIDs []int, first *int, after *string) int
-		CurrentPrice          func(childComplexity int, productID int, storeID *int) int
+		CurrentPrice          func(childComplexity int, productMasterID int, storeID *int) int
 		Flyer                 func(childComplexity int, id int) int
+		FlyerPage             func(childComplexity int, id int) int
+		FlyerPages            func(childComplexity int, filters *model.FlyerPageFilters, first *int, after *string) int
 		Flyers                func(childComplexity int, filters *model.FlyerFilters, first *int, after *string) int
 		Me                    func(childComplexity int) int
 		MyDefaultShoppingList func(childComplexity int) int
 		MyPriceAlerts         func(childComplexity int) int
 		PriceAlert            func(childComplexity int, id string) int
 		PriceAlerts           func(childComplexity int, filters *model.PriceAlertFilters, first *int, after *string) int
-		PriceHistory          func(childComplexity int, productID int, storeID *int, filters *model.PriceHistoryFilters, first *int, after *string) int
+		PriceHistory          func(childComplexity int, productMasterID int, storeID *int, filters *model.PriceHistoryFilters, first *int, after *string) int
 		Product               func(childComplexity int, id int) int
 		ProductMaster         func(childComplexity int, id int) int
 		ProductMasters        func(childComplexity int, filters *model.ProductMasterFilters, first *int, after *string) int
@@ -675,6 +676,7 @@ type MutationResolver interface {
 }
 type PriceAlertResolver interface {
 	ID(ctx context.Context, obj *models.PriceAlert) (string, error)
+	UserID(ctx context.Context, obj *models.PriceAlert) (string, error)
 
 	AlertType(ctx context.Context, obj *models.PriceAlert) (model.AlertType, error)
 
@@ -710,8 +712,6 @@ type ProductResolver interface {
 	ValidTo(ctx context.Context, obj *models.Product) (string, error)
 	SaleStartDate(ctx context.Context, obj *models.Product) (*string, error)
 	SaleEndDate(ctx context.Context, obj *models.Product) (*string, error)
-
-	DiscountAmount(ctx context.Context, obj *models.Product) (float64, error)
 
 	ValidityPeriod(ctx context.Context, obj *models.Product) (string, error)
 
@@ -750,6 +750,8 @@ type QueryResolver interface {
 	Flyers(ctx context.Context, filters *model.FlyerFilters, first *int, after *string) (*model.FlyerConnection, error)
 	CurrentFlyers(ctx context.Context, storeIDs []int, first *int, after *string) (*model.FlyerConnection, error)
 	ValidFlyers(ctx context.Context, storeIDs []int, first *int, after *string) (*model.FlyerConnection, error)
+	FlyerPage(ctx context.Context, id int) (*models.FlyerPage, error)
+	FlyerPages(ctx context.Context, filters *model.FlyerPageFilters, first *int, after *string) (*model.FlyerPageConnection, error)
 	Product(ctx context.Context, id int) (*models.Product, error)
 	Products(ctx context.Context, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error)
 	ProductsOnSale(ctx context.Context, storeIDs []int, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error)
@@ -761,8 +763,8 @@ type QueryResolver interface {
 	ShoppingLists(ctx context.Context, filters *model.ShoppingListFilters, first *int, after *string) (*model.ShoppingListConnection, error)
 	MyDefaultShoppingList(ctx context.Context) (*models.ShoppingList, error)
 	SharedShoppingList(ctx context.Context, shareCode string) (*models.ShoppingList, error)
-	PriceHistory(ctx context.Context, productID int, storeID *int, filters *model.PriceHistoryFilters, first *int, after *string) (*model.PriceHistoryConnection, error)
-	CurrentPrice(ctx context.Context, productID int, storeID *int) (*models.PriceHistory, error)
+	PriceHistory(ctx context.Context, productMasterID int, storeID *int, filters *model.PriceHistoryFilters, first *int, after *string) (*model.PriceHistoryConnection, error)
+	CurrentPrice(ctx context.Context, productMasterID int, storeID *int) (*models.PriceHistory, error)
 	PriceAlert(ctx context.Context, id string) (*models.PriceAlert, error)
 	PriceAlerts(ctx context.Context, filters *model.PriceAlertFilters, first *int, after *string) (*model.PriceAlertConnection, error)
 	MyPriceAlerts(ctx context.Context) ([]*models.PriceAlert, error)
@@ -1624,18 +1626,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PriceAlert.NotifyPush(childComplexity), true
-	case "PriceAlert.product":
-		if e.complexity.PriceAlert.Product == nil {
+	case "PriceAlert.productMaster":
+		if e.complexity.PriceAlert.ProductMaster == nil {
 			break
 		}
 
-		return e.complexity.PriceAlert.Product(childComplexity), true
-	case "PriceAlert.productID":
-		if e.complexity.PriceAlert.ProductID == nil {
+		return e.complexity.PriceAlert.ProductMaster(childComplexity), true
+	case "PriceAlert.productMasterID":
+		if e.complexity.PriceAlert.ProductMasterID == nil {
 			break
 		}
 
-		return e.complexity.PriceAlert.ProductID(childComplexity), true
+		return e.complexity.PriceAlert.ProductMasterID(childComplexity), true
 	case "PriceAlert.store":
 		if e.complexity.PriceAlert.Store == nil {
 			break
@@ -1819,18 +1821,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PriceHistory.Price(childComplexity), true
-	case "PriceHistory.product":
-		if e.complexity.PriceHistory.Product == nil {
+	case "PriceHistory.productMaster":
+		if e.complexity.PriceHistory.ProductMaster == nil {
 			break
 		}
 
-		return e.complexity.PriceHistory.Product(childComplexity), true
-	case "PriceHistory.productID":
-		if e.complexity.PriceHistory.ProductID == nil {
+		return e.complexity.PriceHistory.ProductMaster(childComplexity), true
+	case "PriceHistory.productMasterID":
+		if e.complexity.PriceHistory.ProductMasterID == nil {
 			break
 		}
 
-		return e.complexity.PriceHistory.ProductID(childComplexity), true
+		return e.complexity.PriceHistory.ProductMasterID(childComplexity), true
 	case "PriceHistory.recordedAt":
 		if e.complexity.PriceHistory.RecordedAt == nil {
 			break
@@ -1967,12 +1969,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Product.Description(childComplexity), true
-	case "Product.discountAmount":
-		if e.complexity.Product.DiscountAmount == nil {
-			break
-		}
-
-		return e.complexity.Product.DiscountAmount(childComplexity), true
 	case "Product.extractionConfidence":
 		if e.complexity.Product.ExtractionConfidence == nil {
 			break
@@ -2549,7 +2545,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.CurrentPrice(childComplexity, args["productID"].(int), args["storeID"].(*int)), true
+		return e.complexity.Query.CurrentPrice(childComplexity, args["productMasterID"].(int), args["storeID"].(*int)), true
 	case "Query.flyer":
 		if e.complexity.Query.Flyer == nil {
 			break
@@ -2561,6 +2557,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Flyer(childComplexity, args["id"].(int)), true
+	case "Query.flyerPage":
+		if e.complexity.Query.FlyerPage == nil {
+			break
+		}
+
+		args, err := ec.field_Query_flyerPage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FlyerPage(childComplexity, args["id"].(int)), true
+	case "Query.flyerPages":
+		if e.complexity.Query.FlyerPages == nil {
+			break
+		}
+
+		args, err := ec.field_Query_flyerPages_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FlyerPages(childComplexity, args["filters"].(*model.FlyerPageFilters), args["first"].(*int), args["after"].(*string)), true
 	case "Query.flyers":
 		if e.complexity.Query.Flyers == nil {
 			break
@@ -2622,7 +2640,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.PriceHistory(childComplexity, args["productID"].(int), args["storeID"].(*int), args["filters"].(*model.PriceHistoryFilters), args["first"].(*int), args["after"].(*string)), true
+		return e.complexity.Query.PriceHistory(childComplexity, args["productMasterID"].(int), args["storeID"].(*int), args["filters"].(*model.PriceHistoryFilters), args["first"].(*int), args["after"].(*string)), true
 	case "Query.product":
 		if e.complexity.Query.Product == nil {
 			break
@@ -3753,7 +3771,6 @@ type Product {
 
   # Computed Fields (Hyena pattern)
   isCurrentlyOnSale: Boolean!
-  discountAmount: Float!
   isValid: Boolean!
   isExpired: Boolean!
   validityPeriod: String!
@@ -4036,29 +4053,29 @@ type ShoppingListCategory {
   user: User!
 }
 
-# Product Master System (Hyena's designer pattern)
+# Product Master System
 type ProductMaster {
   id: Int!
   canonicalName: String!
   normalizedName: String!
-  brand: String!
-  category: String!
+  brand: String
+  category: String
   subcategory: String
 
-  # Standardization
+  # Standardization (mapped to DB: standard_unit, unit_type, standard_size)
   standardUnitSize: String
   standardUnitType: String
   standardPackageSize: String
   standardWeight: String
   standardVolume: String
 
-  # Matching Logic
+  # Matching Logic (DB has arrays: match_keywords, alternative_names)
   matchingKeywords: String!
   alternativeNames: String!
   exclusionKeywords: String!
   confidenceScore: Float!
 
-  # Statistics
+  # Statistics (DB: match_count)
   matchedProducts: Int!
   successfulMatches: Int!
   failedMatches: Int!
@@ -4164,7 +4181,7 @@ type Pagination {
 # Price History & Analytics (Rich data structure)
 type PriceHistory {
   id: ID!
-  productID: Int!
+  productMasterID: Int!
   storeID: Int!
   flyerID: Int
   price: Float!
@@ -4196,15 +4213,15 @@ type PriceHistory {
   createdAt: String!
 
   # Relations
-  product: Product!
+  productMaster: ProductMaster!
   store: Store!
   flyer: Flyer
 }
 
 type PriceAlert {
   id: ID!
-  userID: Int!
-  productID: Int!
+  userID: String!
+  productMasterID: Int!
   storeID: Int
   alertType: AlertType!
   targetPrice: Float!
@@ -4227,7 +4244,7 @@ type PriceAlert {
 
   # Relations
   user: User!
-  product: Product!
+  productMaster: ProductMaster!
   store: Store
 }
 
@@ -4401,8 +4418,8 @@ input ProductFilters {
 
 input ProductMasterFilters {
   status: [ProductMasterStatus!]
-  isVerified: Boolean
-  isActive: Boolean
+  # Note: isVerified and isActive removed - these don't exist in DB
+  # Use status filter instead: status: [ACTIVE] for active records
   categories: [String!]
   brands: [String!]
   minMatches: Int
@@ -4432,7 +4449,7 @@ input ShoppingListItemFilters {
 }
 
 input PriceHistoryFilters {
-  productID: Int
+  productMasterID: Int
   storeID: Int
   startDate: String
   endDate: String
@@ -4443,7 +4460,7 @@ input PriceHistoryFilters {
 }
 
 input PriceAlertFilters {
-  productID: Int
+  productMasterID: Int
   storeID: Int
   alertType: AlertType
   isActive: Boolean
@@ -4507,6 +4524,10 @@ type Query {
   currentFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
   validFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
 
+  # Flyer Page Queries
+  flyerPage(id: Int!): FlyerPage
+  flyerPages(filters: FlyerPageFilters, first: Int, after: String): FlyerPageConnection!
+
   # Product Queries
   product(id: Int!): Product
   products(filters: ProductFilters, first: Int, after: String): ProductConnection!
@@ -4529,8 +4550,8 @@ type Query {
   sharedShoppingList(shareCode: String!): ShoppingList
 
   # Price Queries
-  priceHistory(productID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
-  currentPrice(productID: Int!, storeID: Int): PriceHistory
+  priceHistory(productMasterID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
+  currentPrice(productMasterID: Int!, storeID: Int): PriceHistory
 
   # Price Alert Queries (require auth)
   priceAlert(id: ID!): PriceAlert
@@ -4912,16 +4933,48 @@ func (ec *executionContext) field_Query_currentFlyers_args(ctx context.Context, 
 func (ec *executionContext) field_Query_currentPrice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productID", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productMasterID", ec.unmarshalNInt2int)
 	if err != nil {
 		return nil, err
 	}
-	args["productID"] = arg0
+	args["productMasterID"] = arg0
 	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "storeID", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
 	args["storeID"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_flyerPage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_flyerPages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOFlyerPageFilters2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerPageFilters)
+	if err != nil {
+		return nil, err
+	}
+	args["filters"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg2
 	return args, nil
 }
 
@@ -4992,11 +5045,11 @@ func (ec *executionContext) field_Query_priceAlerts_args(ctx context.Context, ra
 func (ec *executionContext) field_Query_priceHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productID", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productMasterID", ec.unmarshalNInt2int)
 	if err != nil {
 		return nil, err
 	}
-	args["productID"] = arg0
+	args["productMasterID"] = arg0
 	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "storeID", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
@@ -8860,8 +8913,8 @@ func (ec *executionContext) fieldContext_Mutation_createPriceAlert(ctx context.C
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -8894,8 +8947,8 @@ func (ec *executionContext) fieldContext_Mutation_createPriceAlert(ctx context.C
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -8945,8 +8998,8 @@ func (ec *executionContext) fieldContext_Mutation_updatePriceAlert(ctx context.C
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -8979,8 +9032,8 @@ func (ec *executionContext) fieldContext_Mutation_updatePriceAlert(ctx context.C
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -9071,8 +9124,8 @@ func (ec *executionContext) fieldContext_Mutation_activatePriceAlert(ctx context
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -9105,8 +9158,8 @@ func (ec *executionContext) fieldContext_Mutation_activatePriceAlert(ctx context
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -9156,8 +9209,8 @@ func (ec *executionContext) fieldContext_Mutation_deactivatePriceAlert(ctx conte
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -9190,8 +9243,8 @@ func (ec *executionContext) fieldContext_Mutation_deactivatePriceAlert(ctx conte
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -9480,10 +9533,10 @@ func (ec *executionContext) _PriceAlert_userID(ctx context.Context, field graphq
 		field,
 		ec.fieldContext_PriceAlert_userID,
 		func(ctx context.Context) (any, error) {
-			return obj.UserID, nil
+			return ec.resolvers.PriceAlert().UserID(ctx, obj)
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalNString2string,
 		true,
 		true,
 	)
@@ -9493,23 +9546,23 @@ func (ec *executionContext) fieldContext_PriceAlert_userID(_ context.Context, fi
 	fc = &graphql.FieldContext{
 		Object:     "PriceAlert",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _PriceAlert_productID(ctx context.Context, field graphql.CollectedField, obj *models.PriceAlert) (ret graphql.Marshaler) {
+func (ec *executionContext) _PriceAlert_productMasterID(ctx context.Context, field graphql.CollectedField, obj *models.PriceAlert) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_PriceAlert_productID,
+		ec.fieldContext_PriceAlert_productMasterID,
 		func(ctx context.Context) (any, error) {
-			return obj.ProductID, nil
+			return obj.ProductMasterID, nil
 		},
 		nil,
 		ec.marshalNInt2int,
@@ -9518,7 +9571,7 @@ func (ec *executionContext) _PriceAlert_productID(ctx context.Context, field gra
 	)
 }
 
-func (ec *executionContext) fieldContext_PriceAlert_productID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_PriceAlert_productMasterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PriceAlert",
 		Field:      field,
@@ -10019,23 +10072,23 @@ func (ec *executionContext) fieldContext_PriceAlert_user(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _PriceAlert_product(ctx context.Context, field graphql.CollectedField, obj *models.PriceAlert) (ret graphql.Marshaler) {
+func (ec *executionContext) _PriceAlert_productMaster(ctx context.Context, field graphql.CollectedField, obj *models.PriceAlert) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_PriceAlert_product,
+		ec.fieldContext_PriceAlert_productMaster,
 		func(ctx context.Context) (any, error) {
-			return obj.Product, nil
+			return obj.ProductMaster, nil
 		},
 		nil,
-		ec.marshalNProduct2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐProduct,
+		ec.marshalNProductMaster2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐProductMaster,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_PriceAlert_product(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_PriceAlert_productMaster(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PriceAlert",
 		Field:      field,
@@ -10044,85 +10097,61 @@ func (ec *executionContext) fieldContext_PriceAlert_product(_ context.Context, f
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "sku":
-				return ec.fieldContext_Product_sku(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "name":
-				return ec.fieldContext_Product_name(ctx, field)
+				return ec.fieldContext_ProductMaster_id(ctx, field)
+			case "canonicalName":
+				return ec.fieldContext_ProductMaster_canonicalName(ctx, field)
 			case "normalizedName":
-				return ec.fieldContext_Product_normalizedName(ctx, field)
+				return ec.fieldContext_ProductMaster_normalizedName(ctx, field)
 			case "brand":
-				return ec.fieldContext_Product_brand(ctx, field)
-			case "description":
-				return ec.fieldContext_Product_description(ctx, field)
+				return ec.fieldContext_ProductMaster_brand(ctx, field)
 			case "category":
-				return ec.fieldContext_Product_category(ctx, field)
+				return ec.fieldContext_ProductMaster_category(ctx, field)
 			case "subcategory":
-				return ec.fieldContext_Product_subcategory(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
-			case "isOnSale":
-				return ec.fieldContext_Product_isOnSale(ctx, field)
-			case "unitSize":
-				return ec.fieldContext_Product_unitSize(ctx, field)
-			case "unitType":
-				return ec.fieldContext_Product_unitType(ctx, field)
-			case "unitPrice":
-				return ec.fieldContext_Product_unitPrice(ctx, field)
-			case "packageSize":
-				return ec.fieldContext_Product_packageSize(ctx, field)
-			case "weight":
-				return ec.fieldContext_Product_weight(ctx, field)
-			case "volume":
-				return ec.fieldContext_Product_volume(ctx, field)
-			case "imageURL":
-				return ec.fieldContext_Product_imageURL(ctx, field)
-			case "boundingBox":
-				return ec.fieldContext_Product_boundingBox(ctx, field)
-			case "pagePosition":
-				return ec.fieldContext_Product_pagePosition(ctx, field)
-			case "store":
-				return ec.fieldContext_Product_store(ctx, field)
-			case "flyer":
-				return ec.fieldContext_Product_flyer(ctx, field)
-			case "flyerPage":
-				return ec.fieldContext_Product_flyerPage(ctx, field)
-			case "isAvailable":
-				return ec.fieldContext_Product_isAvailable(ctx, field)
-			case "stockLevel":
-				return ec.fieldContext_Product_stockLevel(ctx, field)
-			case "extractionConfidence":
-				return ec.fieldContext_Product_extractionConfidence(ctx, field)
-			case "extractionMethod":
-				return ec.fieldContext_Product_extractionMethod(ctx, field)
-			case "requiresReview":
-				return ec.fieldContext_Product_requiresReview(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_Product_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_Product_validTo(ctx, field)
-			case "saleStartDate":
-				return ec.fieldContext_Product_saleStartDate(ctx, field)
-			case "saleEndDate":
-				return ec.fieldContext_Product_saleEndDate(ctx, field)
-			case "isCurrentlyOnSale":
-				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
-			case "isValid":
-				return ec.fieldContext_Product_isValid(ctx, field)
-			case "isExpired":
-				return ec.fieldContext_Product_isExpired(ctx, field)
-			case "validityPeriod":
-				return ec.fieldContext_Product_validityPeriod(ctx, field)
-			case "productMaster":
-				return ec.fieldContext_Product_productMaster(ctx, field)
-			case "priceHistory":
-				return ec.fieldContext_Product_priceHistory(ctx, field)
+				return ec.fieldContext_ProductMaster_subcategory(ctx, field)
+			case "standardUnitSize":
+				return ec.fieldContext_ProductMaster_standardUnitSize(ctx, field)
+			case "standardUnitType":
+				return ec.fieldContext_ProductMaster_standardUnitType(ctx, field)
+			case "standardPackageSize":
+				return ec.fieldContext_ProductMaster_standardPackageSize(ctx, field)
+			case "standardWeight":
+				return ec.fieldContext_ProductMaster_standardWeight(ctx, field)
+			case "standardVolume":
+				return ec.fieldContext_ProductMaster_standardVolume(ctx, field)
+			case "matchingKeywords":
+				return ec.fieldContext_ProductMaster_matchingKeywords(ctx, field)
+			case "alternativeNames":
+				return ec.fieldContext_ProductMaster_alternativeNames(ctx, field)
+			case "exclusionKeywords":
+				return ec.fieldContext_ProductMaster_exclusionKeywords(ctx, field)
+			case "confidenceScore":
+				return ec.fieldContext_ProductMaster_confidenceScore(ctx, field)
+			case "matchedProducts":
+				return ec.fieldContext_ProductMaster_matchedProducts(ctx, field)
+			case "successfulMatches":
+				return ec.fieldContext_ProductMaster_successfulMatches(ctx, field)
+			case "failedMatches":
+				return ec.fieldContext_ProductMaster_failedMatches(ctx, field)
+			case "status":
+				return ec.fieldContext_ProductMaster_status(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_ProductMaster_isVerified(ctx, field)
+			case "lastMatchedAt":
+				return ec.fieldContext_ProductMaster_lastMatchedAt(ctx, field)
+			case "verifiedAt":
+				return ec.fieldContext_ProductMaster_verifiedAt(ctx, field)
+			case "verifiedBy":
+				return ec.fieldContext_ProductMaster_verifiedBy(ctx, field)
+			case "matchSuccessRate":
+				return ec.fieldContext_ProductMaster_matchSuccessRate(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProductMaster_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProductMaster_updatedAt(ctx, field)
+			case "products":
+				return ec.fieldContext_ProductMaster_products(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ProductMaster", field.Name)
 		},
 	}
 	return fc, nil
@@ -10320,8 +10349,8 @@ func (ec *executionContext) fieldContext_PriceAlertEdge_node(_ context.Context, 
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -10354,8 +10383,8 @@ func (ec *executionContext) fieldContext_PriceAlertEdge_node(_ context.Context, 
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -10423,14 +10452,14 @@ func (ec *executionContext) fieldContext_PriceHistory_id(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _PriceHistory_productID(ctx context.Context, field graphql.CollectedField, obj *models.PriceHistory) (ret graphql.Marshaler) {
+func (ec *executionContext) _PriceHistory_productMasterID(ctx context.Context, field graphql.CollectedField, obj *models.PriceHistory) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_PriceHistory_productID,
+		ec.fieldContext_PriceHistory_productMasterID,
 		func(ctx context.Context) (any, error) {
-			return obj.ProductID, nil
+			return obj.ProductMasterID, nil
 		},
 		nil,
 		ec.marshalNInt2int,
@@ -10439,7 +10468,7 @@ func (ec *executionContext) _PriceHistory_productID(ctx context.Context, field g
 	)
 }
 
-func (ec *executionContext) fieldContext_PriceHistory_productID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_PriceHistory_productMasterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PriceHistory",
 		Field:      field,
@@ -11177,23 +11206,23 @@ func (ec *executionContext) fieldContext_PriceHistory_createdAt(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _PriceHistory_product(ctx context.Context, field graphql.CollectedField, obj *models.PriceHistory) (ret graphql.Marshaler) {
+func (ec *executionContext) _PriceHistory_productMaster(ctx context.Context, field graphql.CollectedField, obj *models.PriceHistory) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_PriceHistory_product,
+		ec.fieldContext_PriceHistory_productMaster,
 		func(ctx context.Context) (any, error) {
-			return obj.Product, nil
+			return obj.ProductMaster, nil
 		},
 		nil,
-		ec.marshalNProduct2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐProduct,
+		ec.marshalNProductMaster2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐProductMaster,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_PriceHistory_product(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_PriceHistory_productMaster(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PriceHistory",
 		Field:      field,
@@ -11202,85 +11231,61 @@ func (ec *executionContext) fieldContext_PriceHistory_product(_ context.Context,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "sku":
-				return ec.fieldContext_Product_sku(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "name":
-				return ec.fieldContext_Product_name(ctx, field)
+				return ec.fieldContext_ProductMaster_id(ctx, field)
+			case "canonicalName":
+				return ec.fieldContext_ProductMaster_canonicalName(ctx, field)
 			case "normalizedName":
-				return ec.fieldContext_Product_normalizedName(ctx, field)
+				return ec.fieldContext_ProductMaster_normalizedName(ctx, field)
 			case "brand":
-				return ec.fieldContext_Product_brand(ctx, field)
-			case "description":
-				return ec.fieldContext_Product_description(ctx, field)
+				return ec.fieldContext_ProductMaster_brand(ctx, field)
 			case "category":
-				return ec.fieldContext_Product_category(ctx, field)
+				return ec.fieldContext_ProductMaster_category(ctx, field)
 			case "subcategory":
-				return ec.fieldContext_Product_subcategory(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
-			case "isOnSale":
-				return ec.fieldContext_Product_isOnSale(ctx, field)
-			case "unitSize":
-				return ec.fieldContext_Product_unitSize(ctx, field)
-			case "unitType":
-				return ec.fieldContext_Product_unitType(ctx, field)
-			case "unitPrice":
-				return ec.fieldContext_Product_unitPrice(ctx, field)
-			case "packageSize":
-				return ec.fieldContext_Product_packageSize(ctx, field)
-			case "weight":
-				return ec.fieldContext_Product_weight(ctx, field)
-			case "volume":
-				return ec.fieldContext_Product_volume(ctx, field)
-			case "imageURL":
-				return ec.fieldContext_Product_imageURL(ctx, field)
-			case "boundingBox":
-				return ec.fieldContext_Product_boundingBox(ctx, field)
-			case "pagePosition":
-				return ec.fieldContext_Product_pagePosition(ctx, field)
-			case "store":
-				return ec.fieldContext_Product_store(ctx, field)
-			case "flyer":
-				return ec.fieldContext_Product_flyer(ctx, field)
-			case "flyerPage":
-				return ec.fieldContext_Product_flyerPage(ctx, field)
-			case "isAvailable":
-				return ec.fieldContext_Product_isAvailable(ctx, field)
-			case "stockLevel":
-				return ec.fieldContext_Product_stockLevel(ctx, field)
-			case "extractionConfidence":
-				return ec.fieldContext_Product_extractionConfidence(ctx, field)
-			case "extractionMethod":
-				return ec.fieldContext_Product_extractionMethod(ctx, field)
-			case "requiresReview":
-				return ec.fieldContext_Product_requiresReview(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_Product_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_Product_validTo(ctx, field)
-			case "saleStartDate":
-				return ec.fieldContext_Product_saleStartDate(ctx, field)
-			case "saleEndDate":
-				return ec.fieldContext_Product_saleEndDate(ctx, field)
-			case "isCurrentlyOnSale":
-				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
-			case "isValid":
-				return ec.fieldContext_Product_isValid(ctx, field)
-			case "isExpired":
-				return ec.fieldContext_Product_isExpired(ctx, field)
-			case "validityPeriod":
-				return ec.fieldContext_Product_validityPeriod(ctx, field)
-			case "productMaster":
-				return ec.fieldContext_Product_productMaster(ctx, field)
-			case "priceHistory":
-				return ec.fieldContext_Product_priceHistory(ctx, field)
+				return ec.fieldContext_ProductMaster_subcategory(ctx, field)
+			case "standardUnitSize":
+				return ec.fieldContext_ProductMaster_standardUnitSize(ctx, field)
+			case "standardUnitType":
+				return ec.fieldContext_ProductMaster_standardUnitType(ctx, field)
+			case "standardPackageSize":
+				return ec.fieldContext_ProductMaster_standardPackageSize(ctx, field)
+			case "standardWeight":
+				return ec.fieldContext_ProductMaster_standardWeight(ctx, field)
+			case "standardVolume":
+				return ec.fieldContext_ProductMaster_standardVolume(ctx, field)
+			case "matchingKeywords":
+				return ec.fieldContext_ProductMaster_matchingKeywords(ctx, field)
+			case "alternativeNames":
+				return ec.fieldContext_ProductMaster_alternativeNames(ctx, field)
+			case "exclusionKeywords":
+				return ec.fieldContext_ProductMaster_exclusionKeywords(ctx, field)
+			case "confidenceScore":
+				return ec.fieldContext_ProductMaster_confidenceScore(ctx, field)
+			case "matchedProducts":
+				return ec.fieldContext_ProductMaster_matchedProducts(ctx, field)
+			case "successfulMatches":
+				return ec.fieldContext_ProductMaster_successfulMatches(ctx, field)
+			case "failedMatches":
+				return ec.fieldContext_ProductMaster_failedMatches(ctx, field)
+			case "status":
+				return ec.fieldContext_ProductMaster_status(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_ProductMaster_isVerified(ctx, field)
+			case "lastMatchedAt":
+				return ec.fieldContext_ProductMaster_lastMatchedAt(ctx, field)
+			case "verifiedAt":
+				return ec.fieldContext_ProductMaster_verifiedAt(ctx, field)
+			case "verifiedBy":
+				return ec.fieldContext_ProductMaster_verifiedBy(ctx, field)
+			case "matchSuccessRate":
+				return ec.fieldContext_ProductMaster_matchSuccessRate(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProductMaster_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProductMaster_updatedAt(ctx, field)
+			case "products":
+				return ec.fieldContext_ProductMaster_products(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ProductMaster", field.Name)
 		},
 	}
 	return fc, nil
@@ -11553,8 +11558,8 @@ func (ec *executionContext) fieldContext_PriceHistoryEdge_node(_ context.Context
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_PriceHistory_id(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceHistory_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceHistory_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceHistory_storeID(ctx, field)
 			case "flyerID":
@@ -11605,8 +11610,8 @@ func (ec *executionContext) fieldContext_PriceHistoryEdge_node(_ context.Context
 				return ec.fieldContext_PriceHistory_validityDuration(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PriceHistory_createdAt(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceHistory_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceHistory_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceHistory_store(ctx, field)
 			case "flyer":
@@ -12861,35 +12866,6 @@ func (ec *executionContext) fieldContext_Product_isCurrentlyOnSale(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _Product_discountAmount(ctx context.Context, field graphql.CollectedField, obj *models.Product) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Product_discountAmount,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Product().DiscountAmount(ctx, obj)
-		},
-		nil,
-		ec.marshalNFloat2float64,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Product_discountAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Product",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Float does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Product_isValid(ctx context.Context, field graphql.CollectedField, obj *models.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -13088,8 +13064,8 @@ func (ec *executionContext) fieldContext_Product_priceHistory(_ context.Context,
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_PriceHistory_id(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceHistory_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceHistory_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceHistory_storeID(ctx, field)
 			case "flyerID":
@@ -13140,8 +13116,8 @@ func (ec *executionContext) fieldContext_Product_priceHistory(_ context.Context,
 				return ec.fieldContext_PriceHistory_validityDuration(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PriceHistory_createdAt(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceHistory_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceHistory_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceHistory_store(ctx, field)
 			case "flyer":
@@ -13462,8 +13438,6 @@ func (ec *executionContext) fieldContext_ProductEdge_node(_ context.Context, fie
 				return ec.fieldContext_Product_saleEndDate(ctx, field)
 			case "isCurrentlyOnSale":
 				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
 			case "isValid":
 				return ec.fieldContext_Product_isValid(ctx, field)
 			case "isExpired":
@@ -13607,9 +13581,9 @@ func (ec *executionContext) _ProductMaster_brand(ctx context.Context, field grap
 			return obj.Brand, nil
 		},
 		nil,
-		ec.marshalNString2ᚖstring,
+		ec.marshalOString2ᚖstring,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -13636,9 +13610,9 @@ func (ec *executionContext) _ProductMaster_category(ctx context.Context, field g
 			return obj.Category, nil
 		},
 		nil,
-		ec.marshalNString2ᚖstring,
+		ec.marshalOString2ᚖstring,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -14910,8 +14884,6 @@ func (ec *executionContext) fieldContext_ProductSearchResult_product(_ context.C
 				return ec.fieldContext_Product_saleEndDate(ctx, field)
 			case "isCurrentlyOnSale":
 				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
 			case "isValid":
 				return ec.fieldContext_Product_isValid(ctx, field)
 			case "isExpired":
@@ -15476,6 +15448,140 @@ func (ec *executionContext) fieldContext_Query_validFlyers(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_flyerPage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_flyerPage,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().FlyerPage(ctx, fc.Args["id"].(int))
+		},
+		nil,
+		ec.marshalOFlyerPage2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐFlyerPage,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_flyerPage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FlyerPage_id(ctx, field)
+			case "flyerID":
+				return ec.fieldContext_FlyerPage_flyerID(ctx, field)
+			case "pageNumber":
+				return ec.fieldContext_FlyerPage_pageNumber(ctx, field)
+			case "imageURL":
+				return ec.fieldContext_FlyerPage_imageURL(ctx, field)
+			case "imageWidth":
+				return ec.fieldContext_FlyerPage_imageWidth(ctx, field)
+			case "imageHeight":
+				return ec.fieldContext_FlyerPage_imageHeight(ctx, field)
+			case "status":
+				return ec.fieldContext_FlyerPage_status(ctx, field)
+			case "extractionStartedAt":
+				return ec.fieldContext_FlyerPage_extractionStartedAt(ctx, field)
+			case "extractionCompletedAt":
+				return ec.fieldContext_FlyerPage_extractionCompletedAt(ctx, field)
+			case "productsExtracted":
+				return ec.fieldContext_FlyerPage_productsExtracted(ctx, field)
+			case "extractionErrors":
+				return ec.fieldContext_FlyerPage_extractionErrors(ctx, field)
+			case "lastExtractionError":
+				return ec.fieldContext_FlyerPage_lastExtractionError(ctx, field)
+			case "lastErrorAt":
+				return ec.fieldContext_FlyerPage_lastErrorAt(ctx, field)
+			case "hasImage":
+				return ec.fieldContext_FlyerPage_hasImage(ctx, field)
+			case "imageDimensions":
+				return ec.fieldContext_FlyerPage_imageDimensions(ctx, field)
+			case "processingDuration":
+				return ec.fieldContext_FlyerPage_processingDuration(ctx, field)
+			case "extractionEfficiency":
+				return ec.fieldContext_FlyerPage_extractionEfficiency(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_FlyerPage_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_FlyerPage_updatedAt(ctx, field)
+			case "flyer":
+				return ec.fieldContext_FlyerPage_flyer(ctx, field)
+			case "products":
+				return ec.fieldContext_FlyerPage_products(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FlyerPage", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_flyerPage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_flyerPages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_flyerPages,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().FlyerPages(ctx, fc.Args["filters"].(*model.FlyerPageFilters), fc.Args["first"].(*int), fc.Args["after"].(*string))
+		},
+		nil,
+		ec.marshalNFlyerPageConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerPageConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_flyerPages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_FlyerPageConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_FlyerPageConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_FlyerPageConnection_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FlyerPageConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_flyerPages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_product(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -15567,8 +15673,6 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_saleEndDate(ctx, field)
 			case "isCurrentlyOnSale":
 				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
 			case "isValid":
 				return ec.fieldContext_Product_isValid(ctx, field)
 			case "isExpired":
@@ -16245,7 +16349,7 @@ func (ec *executionContext) _Query_priceHistory(ctx context.Context, field graph
 		ec.fieldContext_Query_priceHistory,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().PriceHistory(ctx, fc.Args["productID"].(int), fc.Args["storeID"].(*int), fc.Args["filters"].(*model.PriceHistoryFilters), fc.Args["first"].(*int), fc.Args["after"].(*string))
+			return ec.resolvers.Query().PriceHistory(ctx, fc.Args["productMasterID"].(int), fc.Args["storeID"].(*int), fc.Args["filters"].(*model.PriceHistoryFilters), fc.Args["first"].(*int), fc.Args["after"].(*string))
 		},
 		nil,
 		ec.marshalNPriceHistoryConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceHistoryConnection,
@@ -16294,7 +16398,7 @@ func (ec *executionContext) _Query_currentPrice(ctx context.Context, field graph
 		ec.fieldContext_Query_currentPrice,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().CurrentPrice(ctx, fc.Args["productID"].(int), fc.Args["storeID"].(*int))
+			return ec.resolvers.Query().CurrentPrice(ctx, fc.Args["productMasterID"].(int), fc.Args["storeID"].(*int))
 		},
 		nil,
 		ec.marshalOPriceHistory2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐPriceHistory,
@@ -16313,8 +16417,8 @@ func (ec *executionContext) fieldContext_Query_currentPrice(ctx context.Context,
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_PriceHistory_id(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceHistory_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceHistory_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceHistory_storeID(ctx, field)
 			case "flyerID":
@@ -16365,8 +16469,8 @@ func (ec *executionContext) fieldContext_Query_currentPrice(ctx context.Context,
 				return ec.fieldContext_PriceHistory_validityDuration(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PriceHistory_createdAt(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceHistory_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceHistory_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceHistory_store(ctx, field)
 			case "flyer":
@@ -16418,8 +16522,8 @@ func (ec *executionContext) fieldContext_Query_priceAlert(ctx context.Context, f
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -16452,8 +16556,8 @@ func (ec *executionContext) fieldContext_Query_priceAlert(ctx context.Context, f
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -16551,8 +16655,8 @@ func (ec *executionContext) fieldContext_Query_myPriceAlerts(_ context.Context, 
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -16585,8 +16689,8 @@ func (ec *executionContext) fieldContext_Query_myPriceAlerts(_ context.Context, 
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -19613,8 +19717,6 @@ func (ec *executionContext) fieldContext_ShoppingListItem_linkedProduct(_ contex
 				return ec.fieldContext_Product_saleEndDate(ctx, field)
 			case "isCurrentlyOnSale":
 				return ec.fieldContext_Product_isCurrentlyOnSale(ctx, field)
-			case "discountAmount":
-				return ec.fieldContext_Product_discountAmount(ctx, field)
 			case "isValid":
 				return ec.fieldContext_Product_isValid(ctx, field)
 			case "isExpired":
@@ -21262,8 +21364,8 @@ func (ec *executionContext) fieldContext_User_priceAlerts(_ context.Context, fie
 				return ec.fieldContext_PriceAlert_id(ctx, field)
 			case "userID":
 				return ec.fieldContext_PriceAlert_userID(ctx, field)
-			case "productID":
-				return ec.fieldContext_PriceAlert_productID(ctx, field)
+			case "productMasterID":
+				return ec.fieldContext_PriceAlert_productMasterID(ctx, field)
 			case "storeID":
 				return ec.fieldContext_PriceAlert_storeID(ctx, field)
 			case "alertType":
@@ -21296,8 +21398,8 @@ func (ec *executionContext) fieldContext_User_priceAlerts(_ context.Context, fie
 				return ec.fieldContext_PriceAlert_updatedAt(ctx, field)
 			case "user":
 				return ec.fieldContext_PriceAlert_user(ctx, field)
-			case "product":
-				return ec.fieldContext_PriceAlert_product(ctx, field)
+			case "productMaster":
+				return ec.fieldContext_PriceAlert_productMaster(ctx, field)
 			case "store":
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
@@ -23171,20 +23273,20 @@ func (ec *executionContext) unmarshalInputPriceAlertFilters(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productID", "storeID", "alertType", "isActive"}
+	fieldsInOrder := [...]string{"productMasterID", "storeID", "alertType", "isActive"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "productID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productID"))
+		case "productMasterID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productMasterID"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ProductID = data
+			it.ProductMasterID = data
 		case "storeID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("storeID"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -23219,20 +23321,20 @@ func (ec *executionContext) unmarshalInputPriceHistoryFilters(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productID", "storeID", "startDate", "endDate", "isOnSale", "minPrice", "maxPrice", "source"}
+	fieldsInOrder := [...]string{"productMasterID", "storeID", "startDate", "endDate", "isOnSale", "minPrice", "maxPrice", "source"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "productID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productID"))
+		case "productMasterID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productMasterID"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ProductID = data
+			it.ProductMasterID = data
 		case "storeID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("storeID"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -23413,7 +23515,7 @@ func (ec *executionContext) unmarshalInputProductMasterFilters(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"status", "isVerified", "isActive", "categories", "brands", "minMatches", "minConfidence"}
+	fieldsInOrder := [...]string{"status", "categories", "brands", "minMatches", "minConfidence"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23427,20 +23529,6 @@ func (ec *executionContext) unmarshalInputProductMasterFilters(ctx context.Conte
 				return it, err
 			}
 			it.Status = data
-		case "isVerified":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVerified"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.IsVerified = data
-		case "isActive":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isActive"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.IsActive = data
 		case "categories":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categories"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
@@ -25926,12 +26014,43 @@ func (ec *executionContext) _PriceAlert(ctx context.Context, sel ast.SelectionSe
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "userID":
-			out.Values[i] = ec._PriceAlert_userID(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PriceAlert_userID(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
-		case "productID":
-			out.Values[i] = ec._PriceAlert_productID(ctx, field, obj)
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "productMasterID":
+			out.Values[i] = ec._PriceAlert_productMasterID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -26152,8 +26271,8 @@ func (ec *executionContext) _PriceAlert(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "product":
-			out.Values[i] = ec._PriceAlert_product(ctx, field, obj)
+		case "productMaster":
+			out.Values[i] = ec._PriceAlert_productMaster(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -26322,8 +26441,8 @@ func (ec *executionContext) _PriceHistory(ctx context.Context, sel ast.Selection
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "productID":
-			out.Values[i] = ec._PriceHistory_productID(ctx, field, obj)
+		case "productMasterID":
+			out.Values[i] = ec._PriceHistory_productMasterID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -26713,8 +26832,8 @@ func (ec *executionContext) _PriceHistory(ctx context.Context, sel ast.Selection
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "product":
-			out.Values[i] = ec._PriceHistory_product(ctx, field, obj)
+		case "productMaster":
+			out.Values[i] = ec._PriceHistory_productMaster(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -27232,42 +27351,6 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "discountAmount":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Product_discountAmount(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "isValid":
 			out.Values[i] = ec._Product_isValid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -27581,14 +27664,8 @@ func (ec *executionContext) _ProductMaster(ctx context.Context, sel ast.Selectio
 			}
 		case "brand":
 			out.Values[i] = ec._ProductMaster_brand(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "category":
 			out.Values[i] = ec._ProductMaster_category(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "subcategory":
 			out.Values[i] = ec._ProductMaster_subcategory(ctx, field, obj)
 		case "standardUnitSize":
@@ -28722,6 +28799,47 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_validFlyers(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "flyerPage":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_flyerPage(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "flyerPages":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_flyerPages(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -32810,28 +32928,6 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
-}
-
-func (ec *executionContext) unmarshalNString2ᚖstring(ctx context.Context, v any) (*string, error) {
-	res, err := graphql.UnmarshalString(v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNString2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	_ = sel
-	res := graphql.MarshalString(*v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
 }
 
 func (ec *executionContext) unmarshalNUpdatePriceAlertInput2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐUpdatePriceAlertInput(ctx context.Context, v any) (model.UpdatePriceAlertInput, error) {

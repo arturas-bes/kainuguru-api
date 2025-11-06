@@ -12,11 +12,10 @@ model:
   filename: internal/graphql/model/models_gen.go
   package: model
 
-# Where the GraphQL resolvers will be generated
+# Resolver configuration - we manually implement all resolvers
+# Setting filename_template to a dash (-) tells gqlgen to skip resolver generation
 resolver:
-  filename: internal/graphql/resolvers/generated.go
-  package: resolvers
-  type: Resolver
+  filename_template: "-"
 
 # Skip generating these types since we have custom implementations
 skip_mod_tidy: true
@@ -30,6 +29,11 @@ struct_tag: bun
 
 # Skip generating these types since we have custom implementations
 models:
+  # Custom scalars
+  DateTime:
+    model:
+      - time.Time
+
   # Authentication types
   User:
     model: github.com/kainuguru/kainuguru-api/internal/models.User

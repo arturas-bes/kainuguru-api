@@ -239,8 +239,8 @@ func (e *ProductExtractor) cleanJSONResponse(response string) string {
 
 	// Fix common JSON issues
 	response = strings.ReplaceAll(response, "'", "\"")     // Replace single quotes
-	response = strings.ReplaceAll(response, """, "\"")    // Replace smart quotes
-	response = strings.ReplaceAll(response, """, "\"")    // Replace smart quotes
+	response = strings.ReplaceAll(response, "\u201c", "\"")    // Replace smart quotes left
+	response = strings.ReplaceAll(response, "\u201d", "\"")    // Replace smart quotes right
 
 	return response
 }

@@ -20,24 +20,161 @@ func NewProductService(db *bun.DB) ProductService {
 }
 
 // Basic CRUD operations
+
+// GetByID retrieves a product by its ID
 func (s *productService) GetByID(ctx context.Context, id int) (*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetByID not implemented")
+	product := &models.Product{}
+	err := s.db.NewSelect().
+		Model(product).
+		Relation("Store").
+		Relation("Flyer").
+		Relation("FlyerPage").
+		Where("p.id = ?", id).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product by ID %d: %w", id, err)
+	}
+
+	return product, nil
 }
 
+// GetByIDs retrieves multiple products by their IDs
 func (s *productService) GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetByIDs not implemented")
+	if len(ids) == 0 {
+		return []*models.Product{}, nil
+	}
+
+	var products []*models.Product
+	err := s.db.NewSelect().
+		Model(&products).
+		Relation("Store").
+		Relation("Flyer").
+		Relation("FlyerPage").
+		Where("p.id IN (?)", bun.In(ids)).
+		Order("p.id ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products by IDs: %w", err)
+	}
+
+	return products, nil
 }
 
+// GetProductsByFlyerIDs retrieves products for multiple flyer IDs (for DataLoader)
 func (s *productService) GetProductsByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetProductsByFlyerIDs not implemented")
+	if len(flyerIDs) == 0 {
+		return []*models.Product{}, nil
+	}
+
+	var products []*models.Product
+	err := s.db.NewSelect().
+		Model(&products).
+		Relation("Store").
+		Relation("Flyer").
+		Relation("FlyerPage").
+		Where("p.flyer_id IN (?)", bun.In(flyerIDs)).
+		Order("p.flyer_id ASC, p.id ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products by flyer IDs: %w", err)
+	}
+
+	return products, nil
 }
 
+// GetProductsByFlyerPageIDs retrieves products for multiple flyer page IDs (for DataLoader)
 func (s *productService) GetProductsByFlyerPageIDs(ctx context.Context, flyerPageIDs []int) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetProductsByFlyerPageIDs not implemented")
+	if len(flyerPageIDs) == 0 {
+		return []*models.Product{}, nil
+	}
+
+	var products []*models.Product
+	err := s.db.NewSelect().
+		Model(&products).
+		Relation("Store").
+		Relation("Flyer").
+		Relation("FlyerPage").
+		Where("p.flyer_page_id IN (?)", bun.In(flyerPageIDs)).
+		Order("p.flyer_page_id ASC, p.id ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products by flyer page IDs: %w", err)
+	}
+
+	return products, nil
 }
 
+// GetAll retrieves products with optional filtering and pagination
 func (s *productService) GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetAll not implemented")
+	query := s.db.NewSelect().Model((*models.Product)(nil)).
+		Relation("Store").
+		Relation("Flyer").
+		Relation("FlyerPage")
+
+	// Apply filters
+	if len(filters.StoreIDs) > 0 {
+		query = query.Where("p.store_id IN (?)", bun.In(filters.StoreIDs))
+	}
+
+	if len(filters.FlyerIDs) > 0 {
+		query = query.Where("p.flyer_id IN (?)", bun.In(filters.FlyerIDs))
+	}
+
+	if len(filters.FlyerPageIDs) > 0 {
+		query = query.Where("p.flyer_page_id IN (?)", bun.In(filters.FlyerPageIDs))
+	}
+
+	if len(filters.Categories) > 0 {
+		query = query.Where("p.category IN (?)", bun.In(filters.Categories))
+	}
+
+	if len(filters.Brands) > 0 {
+		query = query.Where("p.brand IN (?)", bun.In(filters.Brands))
+	}
+
+	if filters.IsOnSale != nil {
+		query = query.Where("p.is_on_sale = ?", *filters.IsOnSale)
+	}
+
+	if filters.IsAvailable != nil {
+		query = query.Where("p.is_available = ?", *filters.IsAvailable)
+	}
+
+	if filters.MinPrice != nil {
+		query = query.Where("p.current_price >= ?", *filters.MinPrice)
+	}
+
+	if filters.MaxPrice != nil {
+		query = query.Where("p.current_price <= ?", *filters.MaxPrice)
+	}
+
+	if filters.RequiresReview != nil {
+		query = query.Where("p.requires_review = ?", *filters.RequiresReview)
+	}
+
+	// Apply pagination
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+
+	// Default ordering
+	query = query.Order("p.id DESC")
+
+	var products []*models.Product
+	err := query.Scan(ctx, &products)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products: %w", err)
+	}
+
+	return products, nil
 }
 
 func (s *productService) Create(ctx context.Context, product *models.Product) error {
@@ -57,24 +194,123 @@ func (s *productService) Delete(ctx context.Context, id int) error {
 }
 
 // Product-specific operations
+
+// GetByFlyer retrieves products for a specific flyer with filters
 func (s *productService) GetByFlyer(ctx context.Context, flyerID int, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetByFlyer not implemented")
+	filters.FlyerIDs = []int{flyerID}
+	return s.GetAll(ctx, filters)
 }
 
+// GetByStore retrieves products for a specific store with filters
 func (s *productService) GetByStore(ctx context.Context, storeID int, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetByStore not implemented")
+	filters.StoreIDs = []int{storeID}
+	return s.GetAll(ctx, filters)
 }
 
+// GetCurrentProducts retrieves products that are currently valid (within date range)
 func (s *productService) GetCurrentProducts(ctx context.Context, storeIDs []int, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetCurrentProducts not implemented")
+	query := s.db.NewSelect().Model((*models.Product)(nil))
+
+	if len(storeIDs) > 0 {
+		query = query.Where("p.store_id IN (?)", bun.In(storeIDs))
+	}
+
+	// Add current date filter
+	query = query.Where("p.valid_from <= CURRENT_TIMESTAMP AND p.valid_to >= CURRENT_TIMESTAMP")
+
+	// Apply additional filters
+	s.applyProductFilters(query, filters)
+
+	var products []*models.Product
+	err := query.Scan(ctx, &products)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current products: %w", err)
+	}
+
+	return products, nil
 }
 
+// GetValidProducts retrieves products that are valid (not expired)
 func (s *productService) GetValidProducts(ctx context.Context, storeIDs []int, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetValidProducts not implemented")
+	query := s.db.NewSelect().Model((*models.Product)(nil))
+
+	if len(storeIDs) > 0 {
+		query = query.Where("p.store_id IN (?)", bun.In(storeIDs))
+	}
+
+	// Add valid filter (not expired)
+	query = query.Where("p.valid_to >= CURRENT_TIMESTAMP")
+
+	// Apply additional filters
+	s.applyProductFilters(query, filters)
+
+	var products []*models.Product
+	err := query.Scan(ctx, &products)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get valid products: %w", err)
+	}
+
+	return products, nil
 }
 
+// GetProductsOnSale retrieves products that are currently on sale
 func (s *productService) GetProductsOnSale(ctx context.Context, storeIDs []int, filters ProductFilters) ([]*models.Product, error) {
-	return nil, fmt.Errorf("productService.GetProductsOnSale not implemented")
+	query := s.db.NewSelect().Model((*models.Product)(nil))
+
+	if len(storeIDs) > 0 {
+		query = query.Where("p.store_id IN (?)", bun.In(storeIDs))
+	}
+
+	// Products on sale
+	query = query.Where("p.is_on_sale = ?", true)
+
+	// Apply additional filters
+	s.applyProductFilters(query, filters)
+
+	var products []*models.Product
+	err := query.Scan(ctx, &products)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products on sale: %w", err)
+	}
+
+	return products, nil
+}
+
+// applyProductFilters is a helper to apply common filters to a query
+func (s *productService) applyProductFilters(query *bun.SelectQuery, filters ProductFilters) {
+	if len(filters.FlyerIDs) > 0 {
+		query.Where("p.flyer_id IN (?)", bun.In(filters.FlyerIDs))
+	}
+
+	if len(filters.Categories) > 0 {
+		query.Where("p.category IN (?)", bun.In(filters.Categories))
+	}
+
+	if len(filters.Brands) > 0 {
+		query.Where("p.brand IN (?)", bun.In(filters.Brands))
+	}
+
+	if filters.IsAvailable != nil {
+		query.Where("p.is_available = ?", *filters.IsAvailable)
+	}
+
+	if filters.MinPrice != nil {
+		query.Where("p.current_price >= ?", *filters.MinPrice)
+	}
+
+	if filters.MaxPrice != nil {
+		query.Where("p.current_price <= ?", *filters.MaxPrice)
+	}
+
+	if filters.Limit > 0 {
+		query.Limit(filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query.Offset(filters.Offset)
+	}
+
+	query.Order("p.id DESC")
 }
 
 // Search operations

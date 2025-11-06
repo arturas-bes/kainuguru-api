@@ -368,6 +368,7 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 			ValidFrom:            now,
 			ValidTo:              now.AddDate(0, 0, 7),
 			ExtractionConfidence: 0.95,
+			ExtractionMethod:     "manual",
 			IsAvailable:          true,
 		},
 		{
@@ -385,6 +386,7 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 			ValidFrom:            now,
 			ValidTo:              now.AddDate(0, 0, 7),
 			ExtractionConfidence: 0.98,
+			ExtractionMethod:     "manual",
 			IsAvailable:          true,
 		},
 		{
@@ -403,6 +405,7 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 			ValidFrom:            now,
 			ValidTo:              now.AddDate(0, 0, 7),
 			ExtractionConfidence: 0.92,
+			ExtractionMethod:     "manual",
 			IsAvailable:          true,
 		},
 		{
@@ -420,6 +423,7 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 			ValidFrom:            now,
 			ValidTo:              now.AddDate(0, 0, 14),
 			ExtractionConfidence: 0.97,
+			ExtractionMethod:     "manual",
 			IsAvailable:          true,
 		},
 		{
@@ -438,6 +442,7 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 			ValidFrom:            now,
 			ValidTo:              now.AddDate(0, 0, 14),
 			ExtractionConfidence: 0.88,
+			ExtractionMethod:     "manual",
 			IsAvailable:          true,
 		},
 	}

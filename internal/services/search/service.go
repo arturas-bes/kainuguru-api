@@ -53,7 +53,9 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 		FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
-	rows, err := s.db.QueryContext(ctx, query,
+	s.logger.Info("executing fuzzy search", "query", req.Query, "limit", req.Limit, "offset", req.Offset)
+
+	rows, err := s.db.DB.QueryContext(ctx, query,
 		req.Query,
 		0.3, // similarity_threshold
 		req.Limit,
@@ -69,7 +71,8 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	}
 	defer rows.Close()
 
-	var results []ProductSearchResult
+	var productIDs []int
+	var scoresMap = make(map[int]float64)
 	for rows.Next() {
 		var (
 			productID, storeID, flyerID                  int
@@ -84,30 +87,40 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 			continue
 		}
 
-		var brandPtr, categoryPtr *string
-		if brand != "" {
-			brandPtr = &brand
-		}
-		if category != "" {
-			categoryPtr = &category
-		}
+		s.logger.Info("found product from fuzzy search", "product_id", productID, "name", name, "combined_sim", combinedSim)
+		productIDs = append(productIDs, productID)
+		scoresMap[productID] = combinedSim
+	}
 
-		product := &models.Product{
-			ID:           productID,
-			Name:         name,
-			Brand:        brandPtr,
-			Category:     categoryPtr,
-			CurrentPrice: currentPrice,
-			StoreID:      storeID,
-			FlyerID:      flyerID,
+	// Load full products with relations
+	var products []*models.Product
+	if len(productIDs) > 0 {
+		s.logger.Info("loading products with relations", "product_ids", productIDs)
+		err = s.db.NewSelect().
+			Model(&products).
+			Where("p.id IN (?)", bun.In(productIDs)).
+			Relation("Store").
+			Relation("Flyer").
+			Relation("FlyerPage").
+			Scan(ctx)
+		if err != nil {
+			s.logger.Error("failed to load products with relations", "error", err)
+			return nil, fmt.Errorf("failed to load products with relations: %w", err)
 		}
+		s.logger.Info("loaded products", "count", len(products))
+	}
 
-		results = append(results, ProductSearchResult{
-			Product:     product,
-			SearchScore: combinedSim,
-			MatchType:   "fuzzy",
-			Similarity:  combinedSim,
-		})
+	// Build results with loaded products
+	var results []ProductSearchResult
+	for _, product := range products {
+		if score, ok := scoresMap[product.ID]; ok {
+			results = append(results, ProductSearchResult{
+				Product:     product,
+				SearchScore: score,
+				MatchType:   "fuzzy",
+				Similarity:  score,
+			})
+		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -119,7 +132,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	countQuery := `
 		SELECT COUNT(*) FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8)
 	`
-	err = s.db.QueryRowContext(ctx, countQuery, req.Query, 0.3, 1000000, 0,
+	err = s.db.DB.QueryRowContext(ctx, countQuery, req.Query, 0.3, 1000000, 0,
 		pq.Array(req.StoreIDs), req.Category, req.MinPrice, req.MaxPrice).Scan(&totalCount)
 	if err != nil {
 		s.logger.Warn("failed to get total count", "error", err)
@@ -160,7 +173,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 		FROM hybrid_search_products($1, $2, $3, $4, $5, $6, $7)
 	`
 
-	rows, err := s.db.QueryContext(ctx, query,
+	rows, err := s.db.DB.QueryContext(ctx, query,
 		req.Query,
 		req.Limit,
 		req.Offset,
@@ -175,7 +188,9 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	}
 	defer rows.Close()
 
-	var results []ProductSearchResult
+	var productIDs []int
+	var scoresMap = make(map[int]float64)
+	var matchTypeMap = make(map[int]string)
 	for rows.Next() {
 		var (
 			productID, storeID, flyerID int
@@ -190,25 +205,37 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 			continue
 		}
 
-		var brandPtr *string
-		if brand != "" {
-			brandPtr = &brand
-		}
+		productIDs = append(productIDs, productID)
+		scoresMap[productID] = searchScore
+		matchTypeMap[productID] = matchType
+	}
 
-		product := &models.Product{
-			ID:           productID,
-			Name:         name,
-			Brand:        brandPtr,
-			CurrentPrice: currentPrice,
-			StoreID:      storeID,
-			FlyerID:      flyerID,
+	// Load full products with relations
+	var products []*models.Product
+	if len(productIDs) > 0 {
+		err = s.db.NewSelect().
+			Model(&products).
+			Where("p.id IN (?)", bun.In(productIDs)).
+			Relation("Store").
+			Relation("Flyer").
+			Relation("FlyerPage").
+			Scan(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load products with relations: %w", err)
 		}
+	}
 
-		results = append(results, ProductSearchResult{
-			Product:     product,
-			SearchScore: searchScore,
-			MatchType:   matchType,
-		})
+	// Build results with loaded products
+	var results []ProductSearchResult
+	for _, product := range products {
+		if score, ok := scoresMap[product.ID]; ok {
+			matchType := matchTypeMap[product.ID]
+			results = append(results, ProductSearchResult{
+				Product:     product,
+				SearchScore: score,
+				MatchType:   matchType,
+			})
+		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -299,7 +326,8 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 	}
 	defer rows.Close()
 
-	var products []SimilarProduct
+	var productIDs []int
+	var similarityMap = make(map[int]float64)
 	for rows.Next() {
 		var (
 			productID, storeID            int
@@ -313,23 +341,34 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 			continue
 		}
 
-		var brandPtr *string
-		if brand != "" {
-			brandPtr = &brand
-		}
+		productIDs = append(productIDs, productID)
+		similarityMap[productID] = similarityScore
+	}
 
-		product := &models.Product{
-			ID:           productID,
-			Name:         name,
-			Brand:        brandPtr,
-			CurrentPrice: currentPrice,
-			StoreID:      storeID,
+	// Load full products with relations
+	var loadedProducts []*models.Product
+	if len(productIDs) > 0 {
+		err = s.db.NewSelect().
+			Model(&loadedProducts).
+			Where("p.id IN (?)", bun.In(productIDs)).
+			Relation("Store").
+			Relation("Flyer").
+			Relation("FlyerPage").
+			Scan(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load products with relations: %w", err)
 		}
+	}
 
-		products = append(products, SimilarProduct{
-			Product:         product,
-			SimilarityScore: similarityScore,
-		})
+	// Build results with loaded products
+	var products []SimilarProduct
+	for _, product := range loadedProducts {
+		if similarity, ok := similarityMap[product.ID]; ok {
+			products = append(products, SimilarProduct{
+				Product:         product,
+				SimilarityScore: similarity,
+			})
+		}
 	}
 
 	return &SimilarProductsResponse{

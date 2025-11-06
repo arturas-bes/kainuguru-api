@@ -1,0 +1,373 @@
+# DataLoader Performance Test Queries
+# Copy these queries into your GraphQL client or use with curl
+
+# =============================================================================
+# TEST 1: Product List with Nested Fields (20 products)
+# Expected: 4-6 queries instead of 60-100
+# =============================================================================
+
+query Test1_ProductsWithNesting {
+  products(first: 20) {
+    edges {
+      node {
+        id
+        name
+        normalizedName
+        brand
+        currentPrice
+        currency
+        isOnSale
+
+        # DataLoader should batch these
+        store {
+          id
+          name
+          code
+          logoURL
+        }
+
+        flyer {
+          id
+          title
+          validFrom
+          validTo
+          status
+        }
+
+        productMaster {
+          id
+          canonicalName
+          brand
+          category
+        }
+
+        # Computed fields
+        isCurrentlyOnSale
+        isValid
+        validityPeriod
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+  }
+}
+
+# =============================================================================
+# TEST 2: Shopping List Items with Users and Relations
+# Expected: 5-8 queries instead of 60-80
+# =============================================================================
+
+query Test2_ShoppingListWithUsers {
+  shoppingLists(first: 1) {
+    edges {
+      node {
+        id
+        name
+        description
+        itemCount
+
+        items(first: 20) {
+          edges {
+            node {
+              id
+              description
+              quantity
+              unit
+              estimatedPrice
+              isChecked
+
+              # DataLoader: UserLoader
+              user {
+                id
+                email
+                fullName
+              }
+
+              # DataLoader: UserLoader (if checked)
+              checkedByUser {
+                id
+                email
+                fullName
+              }
+
+              # DataLoader: ProductMasterLoader
+              productMaster {
+                id
+                canonicalName
+                brand
+              }
+
+              # DataLoader: StoreLoader
+              store {
+                id
+                name
+                code
+              }
+
+              # DataLoader: FlyerLoader
+              flyer {
+                id
+                title
+                validFrom
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# =============================================================================
+# TEST 3: Flyers with Store
+# Expected: 2 queries instead of 21
+# =============================================================================
+
+query Test3_FlyersWithStore {
+  flyers(first: 20, filters: { isCurrent: true }) {
+    edges {
+      node {
+        id
+        title
+        validFrom
+        validTo
+        status
+        pageCount
+        productsExtracted
+
+        # DataLoader: StoreLoader
+        store {
+          id
+          name
+          code
+          logoURL
+          websiteURL
+        }
+
+        # Computed fields
+        isValid
+        isCurrent
+        daysRemaining
+      }
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
+}
+
+# =============================================================================
+# TEST 4: Stores with Nested Flyers and Products (Complex)
+# Expected: 5-10 queries instead of 200+
+# This is a STRESS TEST
+# =============================================================================
+
+query Test4_ComplexNested {
+  stores(first: 5) {
+    edges {
+      node {
+        id
+        name
+        code
+
+        flyers(first: 3, filters: { isCurrent: true }) {
+          edges {
+            node {
+              id
+              title
+              validFrom
+              validTo
+
+              products(first: 10) {
+                edges {
+                  node {
+                    id
+                    name
+                    currentPrice
+                    isOnSale
+
+                    # Nested DataLoader
+                    productMaster {
+                      id
+                      canonicalName
+                      brand
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# =============================================================================
+# TEST 5: On-Sale Products Across Stores
+# Expected: 3-5 queries
+# =============================================================================
+
+query Test5_OnSaleProducts {
+  productsOnSale(first: 30) {
+    edges {
+      node {
+        id
+        name
+        currentPrice
+        originalPrice
+        discountAmount
+
+        store {
+          id
+          name
+        }
+
+        flyer {
+          id
+          title
+        }
+
+        productMaster {
+          id
+          canonicalName
+        }
+      }
+    }
+  }
+}
+
+# =============================================================================
+# TEST 6: Search Products (if search is implemented)
+# Expected: 4-6 queries
+# =============================================================================
+
+query Test6_SearchProducts {
+  searchProducts(input: { q: "milk", first: 20 }) {
+    products {
+      product {
+        id
+        name
+        currentPrice
+
+        store {
+          id
+          name
+        }
+
+        flyer {
+          id
+          title
+        }
+      }
+      searchScore
+      matchType
+    }
+    totalCount
+    hasMore
+  }
+}
+
+# =============================================================================
+# TEST 7: Price History (Multiple Products)
+# Expected: 2-4 queries
+# =============================================================================
+
+query Test7_PriceHistory {
+  priceHistory(
+    productMasterID: 1
+    first: 20
+  ) {
+    edges {
+      node {
+        id
+        price
+        originalPrice
+        isOnSale
+        recordedAt
+
+        # DataLoader: ProductMasterLoader
+        productMaster {
+          id
+          canonicalName
+        }
+
+        # DataLoader: StoreLoader
+        store {
+          id
+          name
+        }
+
+        # DataLoader: FlyerLoader (if exists)
+        flyer {
+          id
+          title
+        }
+      }
+    }
+    totalCount
+  }
+}
+
+# =============================================================================
+# TEST 8: Current User with Shopping Lists
+# Expected: 4-6 queries
+# Requires authentication
+# =============================================================================
+
+query Test8_MeWithShoppingLists {
+  me {
+    id
+    email
+    fullName
+
+    shoppingLists {
+      id
+      name
+      itemCount
+
+      items(first: 10) {
+        edges {
+          node {
+            id
+            description
+
+            productMaster {
+              id
+              canonicalName
+            }
+
+            store {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# =============================================================================
+# BASELINE TEST: Simple query without nesting
+# Use this to establish baseline query count
+# =============================================================================
+
+query Baseline_ProductsOnly {
+  products(first: 20) {
+    edges {
+      node {
+        id
+        name
+        currentPrice
+        isOnSale
+      }
+    }
+  }
+}
+
+# Expected: 1 query

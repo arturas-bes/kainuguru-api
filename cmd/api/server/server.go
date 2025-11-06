@@ -132,13 +132,17 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 
 	// Configure GraphQL handler with all services
 	graphqlConfig := handlers.GraphQLConfig{
-		StoreService:         serviceFactory.StoreService(),
-		FlyerService:         serviceFactory.FlyerService(),
-		FlyerPageService:     serviceFactory.FlyerPageService(),
-		ProductService:       serviceFactory.ProductService(),
-		ProductMasterService: serviceFactory.ProductMasterService(),
-		ExtractionJobService: serviceFactory.ExtractionJobService(),
-		SearchService:        serviceFactory.SearchService(),
+		StoreService:            serviceFactory.StoreService(),
+		FlyerService:            serviceFactory.FlyerService(),
+		FlyerPageService:        serviceFactory.FlyerPageService(),
+		ProductService:          serviceFactory.ProductService(),
+		ProductMasterService:    serviceFactory.ProductMasterService(),
+		ExtractionJobService:    serviceFactory.ExtractionJobService(),
+		SearchService:           serviceFactory.SearchService(),
+		AuthService:             serviceFactory.AuthService(),
+		ShoppingListService:     serviceFactory.ShoppingListService(),
+		ShoppingListItemService: serviceFactory.ShoppingListItemService(),
+		PriceHistoryService:     serviceFactory.PriceHistoryService(),
 	}
 
 	// GraphQL endpoint with full service integration

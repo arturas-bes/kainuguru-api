@@ -26,6 +26,7 @@ func (fs *flyerService) GetByID(ctx context.Context, id int) (*models.Flyer, err
 	flyer := &models.Flyer{}
 	err := fs.db.NewSelect().
 		Model(flyer).
+		Relation("Store").
 		Where("f.id = ?", id).
 		Scan(ctx)
 
@@ -45,7 +46,7 @@ func (fs *flyerService) GetByIDs(ctx context.Context, ids []int) ([]*models.Flye
 	var flyers []*models.Flyer
 	err := fs.db.NewSelect().
 		Model(&flyers).
-		Where("f.id IN (?)", bun.In(ids)).
+		Where("id IN (?)", bun.In(ids)).
 		Scan(ctx)
 
 	return flyers, err
@@ -60,8 +61,8 @@ func (fs *flyerService) GetFlyersByStoreIDs(ctx context.Context, storeIDs []int)
 	var flyers []*models.Flyer
 	err := fs.db.NewSelect().
 		Model(&flyers).
-		Where("f.store_id IN (?)", bun.In(storeIDs)).
-		Order("f.valid_from DESC").
+		Where("store_id IN (?)", bun.In(storeIDs)).
+		Order("valid_from DESC").
 		Scan(ctx)
 
 	return flyers, err
@@ -69,31 +70,32 @@ func (fs *flyerService) GetFlyersByStoreIDs(ctx context.Context, storeIDs []int)
 
 // GetAll retrieves flyers with optional filtering
 func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error) {
-	query := fs.db.NewSelect().Model((*models.Flyer)(nil))
+	query := fs.db.NewSelect().Model((*models.Flyer)(nil)).
+		Relation("Store")
 
 	// Apply filters
 	if len(filters.StoreIDs) > 0 {
-		query = query.Where("f.store_id IN (?)", bun.In(filters.StoreIDs))
+		query = query.Where("store_id IN (?)", bun.In(filters.StoreIDs))
 	}
 
 	if len(filters.StoreCodes) > 0 {
-		query = query.Where("f.store_id IN (SELECT id FROM stores WHERE code IN (?))", bun.In(filters.StoreCodes))
+		query = query.Where("store_id IN (SELECT id FROM stores WHERE code IN (?))", bun.In(filters.StoreCodes))
 	}
 
 	if len(filters.Status) > 0 {
-		query = query.Where("f.status IN (?)", bun.In(filters.Status))
+		query = query.Where("status IN (?)", bun.In(filters.Status))
 	}
 
 	if filters.IsArchived != nil {
-		query = query.Where("f.is_archived = ?", *filters.IsArchived)
+		query = query.Where("is_archived = ?", *filters.IsArchived)
 	}
 
 	if filters.ValidFrom != nil {
-		query = query.Where("f.valid_from >= ?", *filters.ValidFrom)
+		query = query.Where("valid_from >= ?", *filters.ValidFrom)
 	}
 
 	if filters.ValidTo != nil {
-		query = query.Where("f.valid_to <= ?", *filters.ValidTo)
+		query = query.Where("valid_to <= ?", *filters.ValidTo)
 	}
 
 	if filters.IsCurrent != nil && *filters.IsCurrent {
@@ -102,22 +104,22 @@ func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*mo
 		weekStart = time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, weekStart.Location())
 		weekEnd := weekStart.AddDate(0, 0, 7)
 
-		query = query.Where("f.is_archived = false").
-			Where("f.valid_from < ?", weekEnd).
-			Where("f.valid_to > ?", weekStart)
+		query = query.Where("is_archived = false").
+			Where("valid_from < ?", weekEnd).
+			Where("valid_to > ?", weekStart)
 	}
 
 	if filters.IsValid != nil && *filters.IsValid {
 		now := time.Now()
-		query = query.Where("f.is_archived = false").
-			Where("f.valid_from < ?", now.Add(24*time.Hour)).
-			Where("f.valid_to > ?", now)
+		query = query.Where("is_archived = false").
+			Where("valid_from < ?", now.Add(24*time.Hour)).
+			Where("valid_to > ?", now)
 	}
 
 	// Apply ordering
-	orderBy := "f.valid_from"
+	orderBy := "valid_from"
 	if filters.OrderBy != "" {
-		orderBy = fmt.Sprintf("f.%s", filters.OrderBy)
+		orderBy = fmt.Sprintf("%s", filters.OrderBy)
 	}
 
 	orderDir := "DESC"
@@ -209,14 +211,14 @@ func (fs *flyerService) GetProcessableFlyers(ctx context.Context) ([]*models.Fly
 
 	err := fs.db.NewSelect().
 		Model(&flyers).
-		Where("f.is_archived = false").
-		Where("f.valid_from < ?", time.Now().Add(24*time.Hour)).
-		Where("f.valid_to > ?", time.Now()).
-		Where("f.status NOT IN (?)", bun.In([]string{
+		Where("is_archived = false").
+		Where("valid_from < ?", time.Now().Add(24*time.Hour)).
+		Where("valid_to > ?", time.Now()).
+		Where("status NOT IN (?)", bun.In([]string{
 			string(models.FlyerStatusCompleted),
 			string(models.FlyerStatusProcessing),
 		})).
-		Order("f.valid_from DESC").
+		Order("valid_from DESC").
 		Scan(ctx)
 
 	return flyers, err
@@ -288,7 +290,7 @@ func (fs *flyerService) GetWithPages(ctx context.Context, flyerID int) (*models.
 	err := fs.db.NewSelect().
 		Model(flyer).
 		Relation("FlyerPages").
-		Where("f.id = ?", flyerID).
+		Where("id = ?", flyerID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -304,7 +306,7 @@ func (fs *flyerService) GetWithProducts(ctx context.Context, flyerID int) (*mode
 	err := fs.db.NewSelect().
 		Model(flyer).
 		Relation("Products").
-		Where("f.id = ?", flyerID).
+		Where("id = ?", flyerID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -320,7 +322,7 @@ func (fs *flyerService) GetWithStore(ctx context.Context, flyerID int) (*models.
 	err := fs.db.NewSelect().
 		Model(flyer).
 		Relation("Store").
-		Where("f.id = ?", flyerID).
+		Where("id = ?", flyerID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
