@@ -57,7 +57,6 @@ type Product {
 
   # Computed Fields (Hyena pattern)
   isCurrentlyOnSale: Boolean!
-  discountAmount: Float!
   isValid: Boolean!
   isExpired: Boolean!
   validityPeriod: String!
@@ -340,29 +339,29 @@ type ShoppingListCategory {
   user: User!
 }
 
-# Product Master System (Hyena's designer pattern)
+# Product Master System
 type ProductMaster {
   id: Int!
   canonicalName: String!
   normalizedName: String!
-  brand: String!
-  category: String!
+  brand: String
+  category: String
   subcategory: String
 
-  # Standardization
+  # Standardization (mapped to DB: standard_unit, unit_type, standard_size)
   standardUnitSize: String
   standardUnitType: String
   standardPackageSize: String
   standardWeight: String
   standardVolume: String
 
-  # Matching Logic
+  # Matching Logic (DB has arrays: match_keywords, alternative_names)
   matchingKeywords: String!
   alternativeNames: String!
   exclusionKeywords: String!
   confidenceScore: Float!
 
-  # Statistics
+  # Statistics (DB: match_count)
   matchedProducts: Int!
   successfulMatches: Int!
   failedMatches: Int!
@@ -468,7 +467,7 @@ type Pagination {
 # Price History & Analytics (Rich data structure)
 type PriceHistory {
   id: ID!
-  productID: Int!
+  productMasterID: Int!
   storeID: Int!
   flyerID: Int
   price: Float!
@@ -500,15 +499,15 @@ type PriceHistory {
   createdAt: String!
 
   # Relations
-  product: Product!
+  productMaster: ProductMaster!
   store: Store!
   flyer: Flyer
 }
 
 type PriceAlert {
   id: ID!
-  userID: Int!
-  productID: Int!
+  userID: String!
+  productMasterID: Int!
   storeID: Int
   alertType: AlertType!
   targetPrice: Float!
@@ -531,7 +530,7 @@ type PriceAlert {
 
   # Relations
   user: User!
-  product: Product!
+  productMaster: ProductMaster!
   store: Store
 }
 
@@ -705,8 +704,8 @@ input ProductFilters {
 
 input ProductMasterFilters {
   status: [ProductMasterStatus!]
-  isVerified: Boolean
-  isActive: Boolean
+  # Note: isVerified and isActive removed - these don't exist in DB
+  # Use status filter instead: status: [ACTIVE] for active records
   categories: [String!]
   brands: [String!]
   minMatches: Int
@@ -736,7 +735,7 @@ input ShoppingListItemFilters {
 }
 
 input PriceHistoryFilters {
-  productID: Int
+  productMasterID: Int
   storeID: Int
   startDate: String
   endDate: String
@@ -747,7 +746,7 @@ input PriceHistoryFilters {
 }
 
 input PriceAlertFilters {
-  productID: Int
+  productMasterID: Int
   storeID: Int
   alertType: AlertType
   isActive: Boolean
@@ -811,6 +810,10 @@ type Query {
   currentFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
   validFlyers(storeIDs: [Int!], first: Int, after: String): FlyerConnection!
 
+  # Flyer Page Queries
+  flyerPage(id: Int!): FlyerPage
+  flyerPages(filters: FlyerPageFilters, first: Int, after: String): FlyerPageConnection!
+
   # Product Queries
   product(id: Int!): Product
   products(filters: ProductFilters, first: Int, after: String): ProductConnection!
@@ -833,8 +836,8 @@ type Query {
   sharedShoppingList(shareCode: String!): ShoppingList
 
   # Price Queries
-  priceHistory(productID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
-  currentPrice(productID: Int!, storeID: Int): PriceHistory
+  priceHistory(productMasterID: Int!, storeID: Int, filters: PriceHistoryFilters, first: Int, after: String): PriceHistoryConnection!
+  currentPrice(productMasterID: Int!, storeID: Int): PriceHistory
 
   # Price Alert Queries (require auth)
   priceAlert(id: ID!): PriceAlert

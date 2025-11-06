@@ -26,7 +26,7 @@ func (s *storeService) GetByID(ctx context.Context, id int) (*models.Store, erro
 	store := &models.Store{}
 	err := s.db.NewSelect().
 		Model(store).
-		Where("s.id = ?", id).
+		Where("id = ?", id).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -45,7 +45,7 @@ func (s *storeService) GetByIDs(ctx context.Context, ids []int) ([]*models.Store
 	var stores []*models.Store
 	err := s.db.NewSelect().
 		Model(&stores).
-		Where("s.id IN (?)", bun.In(ids)).
+		Where("id IN (?)", bun.In(ids)).
 		Scan(ctx)
 
 	return stores, err
@@ -56,7 +56,7 @@ func (s *storeService) GetByCode(ctx context.Context, code string) (*models.Stor
 	store := &models.Store{}
 	err := s.db.NewSelect().
 		Model(store).
-		Where("s.code = ?", code).
+		Where("code = ?", code).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -72,23 +72,23 @@ func (s *storeService) GetAll(ctx context.Context, filters StoreFilters) ([]*mod
 
 	// Apply filters
 	if filters.IsActive != nil {
-		query = query.Where("s.is_active = ?", *filters.IsActive)
+		query = query.Where("is_active = ?", *filters.IsActive)
 	}
 
 	if len(filters.Codes) > 0 {
-		query = query.Where("s.code IN (?)", bun.In(filters.Codes))
+		query = query.Where("code IN (?)", bun.In(filters.Codes))
 	}
 
 	if filters.HasFlyers != nil && *filters.HasFlyers {
-		query = query.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
+		query = query.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = stores.id)")
 	} else if filters.HasFlyers != nil && !*filters.HasFlyers {
-		query = query.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
+		query = query.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = stores.id)")
 	}
 
 	// Apply ordering
-	orderBy := "s.created_at"
+	orderBy := "created_at"
 	if filters.OrderBy != "" {
-		orderBy = fmt.Sprintf("s.%s", filters.OrderBy)
+		orderBy = filters.OrderBy
 	}
 
 	orderDir := "ASC"
@@ -162,9 +162,9 @@ func (s *storeService) GetStoresByPriority(ctx context.Context) ([]*models.Store
 
 	err := s.db.NewSelect().
 		Model(&stores).
-		Where("s.is_active = ?", true).
-		Order("(s.scraper_config->>'priority')::int ASC").
-		Order("s.name ASC").
+		Where("is_active = ?", true).
+		Order("(scraper_config->>'priority')::int ASC").
+		Order("name ASC").
 		Scan(ctx)
 
 	return stores, err
@@ -176,10 +176,10 @@ func (s *storeService) GetScrapingEnabledStores(ctx context.Context) ([]*models.
 
 	err := s.db.NewSelect().
 		Model(&stores).
-		Where("s.is_active = ?", true).
-		Where("(s.scraper_config->>'flyer_selector' IS NOT NULL AND s.scraper_config->>'flyer_selector' != '') OR " +
-			"(s.scraper_config->>'api_endpoint' IS NOT NULL AND s.scraper_config->>'api_endpoint' != '')").
-		Order("(s.scraper_config->>'priority')::int ASC").
+		Where("is_active = ?", true).
+		Where("(scraper_config->>'flyer_selector' IS NOT NULL AND scraper_config->>'flyer_selector' != '') OR " +
+			"(scraper_config->>'api_endpoint' IS NOT NULL AND scraper_config->>'api_endpoint' != '')").
+		Order("(scraper_config->>'priority')::int ASC").
 		Scan(ctx)
 
 	return stores, err

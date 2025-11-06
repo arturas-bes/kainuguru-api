@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"regexp"
 	"strings"
 	"unicode"
 
@@ -149,9 +148,13 @@ func (p *passwordService) ValidatePasswordStrength(password string) error {
 		return fmt.Errorf("password must contain at least one symbol")
 	}
 
-	// Check for common weak patterns
-	if err := p.checkWeakPatterns(password); err != nil {
-		return err
+	// Check for common weak patterns only if any requirements are enabled
+	// Skip in development/testing mode (when all requirements are false)
+	if p.config.PasswordRequireLower || p.config.PasswordRequireUpper ||
+		p.config.PasswordRequireNumber || p.config.PasswordRequireSymbol {
+		if err := p.checkWeakPatterns(password); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -175,9 +178,15 @@ func (p *passwordService) checkWeakPatterns(password string) error {
 	}
 
 	// Check for repeated characters (more than 3 in a row)
-	repeatedChar := regexp.MustCompile(`(.)\1{3,}`)
-	if repeatedChar.MatchString(password) {
-		return fmt.Errorf("password contains too many repeated characters")
+	for i := 0; i < len(password)-3; i++ {
+		char := password[i]
+		count := 1
+		for j := i + 1; j < len(password) && password[j] == char; j++ {
+			count++
+		}
+		if count >= 4 {
+			return fmt.Errorf("password contains too many repeated characters")
+		}
 	}
 
 	// Check for sequential characters

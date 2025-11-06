@@ -21,15 +21,84 @@ func NewProductMasterService(db *bun.DB) ProductMasterService {
 
 // Basic CRUD operations
 func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.ProductMaster, error) {
-	return nil, fmt.Errorf("productMasterService.GetByID not implemented")
+	master := &models.ProductMaster{}
+	err := s.db.NewSelect().
+		Model(master).
+		Where("pm.id = ?", id).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product master by ID %d: %w", id, err)
+	}
+
+	return master, nil
 }
 
 func (s *productMasterService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ProductMaster, error) {
-	return nil, fmt.Errorf("productMasterService.GetByIDs not implemented")
+	if len(ids) == 0 {
+		return []*models.ProductMaster{}, nil
+	}
+
+	var masters []*models.ProductMaster
+	err := s.db.NewSelect().
+		Model(&masters).
+		Where("pm.id IN (?)", bun.In(ids)).
+		Order("pm.id ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product masters by IDs: %w", err)
+	}
+
+	return masters, nil
 }
 
 func (s *productMasterService) GetAll(ctx context.Context, filters ProductMasterFilters) ([]*models.ProductMaster, error) {
-	return nil, fmt.Errorf("productMasterService.GetAll not implemented")
+	query := s.db.NewSelect().Model((*models.ProductMaster)(nil))
+
+	// Apply filters
+	if len(filters.Status) > 0 {
+		query = query.Where("pm.status IN (?)", bun.In(filters.Status))
+	}
+
+	if len(filters.Categories) > 0 {
+		query = query.Where("pm.category IN (?)", bun.In(filters.Categories))
+	}
+
+	if len(filters.Brands) > 0 {
+		query = query.Where("pm.brand IN (?)", bun.In(filters.Brands))
+	}
+
+	// Note: isVerified and isActive filters removed - these columns don't exist in DB
+	// The schema uses "status" field instead
+
+	if filters.MinConfidence != nil {
+		query = query.Where("pm.confidence_score >= ?", *filters.MinConfidence)
+	}
+
+	if filters.MinMatches != nil {
+		query = query.Where("pm.match_count >= ?", *filters.MinMatches)
+	}
+
+	// Apply pagination
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+
+	// Default ordering
+	query = query.Order("pm.id DESC")
+
+	var masters []*models.ProductMaster
+	err := query.Scan(ctx, &masters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product masters: %w", err)
+	}
+
+	return masters, nil
 }
 
 func (s *productMasterService) Create(ctx context.Context, master *models.ProductMaster) error {

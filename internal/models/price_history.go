@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
 
@@ -10,10 +11,10 @@ import (
 type PriceHistory struct {
 	bun.BaseModel `bun:"table:price_history,alias:ph"`
 
-	ID        int64 `bun:"id,pk,autoincrement" json:"id"`
-	ProductID int   `bun:"product_id,notnull" json:"product_id"`
-	StoreID   int   `bun:"store_id,notnull" json:"store_id"`
-	FlyerID   *int  `bun:"flyer_id" json:"flyer_id,omitempty"`
+	ID              int64 `bun:"id,pk,autoincrement" json:"id"`
+	ProductMasterID int   `bun:"product_master_id,notnull" json:"product_master_id"`
+	StoreID         int   `bun:"store_id,notnull" json:"store_id"`
+	FlyerID         *int  `bun:"flyer_id" json:"flyer_id,omitempty"`
 
 	// Price information
 	Price         float64  `bun:"price,notnull" json:"price"`
@@ -43,18 +44,18 @@ type PriceHistory struct {
 	CreatedAt time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
 
 	// Relations
-	Product *Product `bun:"rel:belongs-to,join:product_id=id" json:"product,omitempty"`
-	Store   *Store   `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
-	Flyer   *Flyer   `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
+	ProductMaster *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
+	Store         *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	Flyer         *Flyer         `bun:"rel:belongs-to,join:flyer_id=id" json:"flyer,omitempty"`
 }
 
 // PriceTrend represents price trend analysis data
 type PriceTrend struct {
 	bun.BaseModel `bun:"table:price_trends,alias:pt"`
 
-	ID        int64 `bun:"id,pk,autoincrement" json:"id"`
-	ProductID int   `bun:"product_id,notnull" json:"product_id"`
-	StoreID   *int  `bun:"store_id" json:"store_id,omitempty"`
+	ID              int64 `bun:"id,pk,autoincrement" json:"id"`
+	ProductMasterID int   `bun:"product_master_id,notnull" json:"product_master_id"`
+	StoreID         *int  `bun:"store_id" json:"store_id,omitempty"`
 
 	// Period information
 	Period       string    `bun:"period,notnull" json:"period"` // '7d', '30d', '90d', '1y'
@@ -94,18 +95,18 @@ type PriceTrend struct {
 	UpdatedAt time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"`
 
 	// Relations
-	Product *Product `bun:"rel:belongs-to,join:product_id=id" json:"product,omitempty"`
-	Store   *Store   `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	ProductMaster *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
+	Store         *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
 }
 
 // PriceAlert represents user-configured price alerts
 type PriceAlert struct {
 	bun.BaseModel `bun:"table:price_alerts,alias:pa"`
 
-	ID        int64 `bun:"id,pk,autoincrement" json:"id"`
-	UserID    int   `bun:"user_id,notnull" json:"user_id"`
-	ProductID int   `bun:"product_id,notnull" json:"product_id"`
-	StoreID   *int  `bun:"store_id" json:"store_id,omitempty"`
+	ID              int64     `bun:"id,pk,autoincrement" json:"id"`
+	UserID          uuid.UUID `bun:"user_id,notnull" json:"user_id"`
+	ProductMasterID int       `bun:"product_master_id,notnull" json:"product_master_id"`
+	StoreID         *int      `bun:"store_id" json:"store_id,omitempty"`
 
 	// Alert configuration
 	AlertType   string   `bun:"alert_type,notnull" json:"alert_type"` // 'PRICE_DROP', 'TARGET_PRICE', 'PERCENTAGE_DROP'
@@ -127,9 +128,9 @@ type PriceAlert struct {
 	ExpiresAt *time.Time `bun:"expires_at" json:"expires_at,omitempty"`
 
 	// Relations
-	User    *User    `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
-	Product *Product `bun:"rel:belongs-to,join:product_id=id" json:"product,omitempty"`
-	Store   *Store   `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
+	User          *User          `bun:"rel:belongs-to,join:user_id=id" json:"user,omitempty"`
+	ProductMaster *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"product_master,omitempty"`
+	Store         *Store         `bun:"rel:belongs-to,join:store_id=id" json:"store,omitempty"`
 }
 
 // Methods for PriceHistory

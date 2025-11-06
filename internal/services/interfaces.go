@@ -303,6 +303,7 @@ type ShoppingListService interface {
 	GetByID(ctx context.Context, id int64) (*models.ShoppingList, error)
 	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingList, error)
 	GetByUserID(ctx context.Context, userID uuid.UUID, filters ShoppingListFilters) ([]*models.ShoppingList, error)
+	CountByUserID(ctx context.Context, userID uuid.UUID, filters ShoppingListFilters) (int, error)
 	GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error)
 	Create(ctx context.Context, list *models.ShoppingList) error
 	Update(ctx context.Context, list *models.ShoppingList) error
@@ -337,6 +338,7 @@ type ShoppingListItemService interface {
 	GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error)
 	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error)
 	GetByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) ([]*models.ShoppingListItem, error)
+	CountByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) (int, error)
 	Create(ctx context.Context, item *models.ShoppingListItem) error
 	Update(ctx context.Context, item *models.ShoppingListItem) error
 	Delete(ctx context.Context, id int64) error
@@ -596,4 +598,34 @@ type ShoppingListStats struct {
 	AverageItemPrice   *float64  `json:"average_item_price"`
 	LinkedItemsCount   int       `json:"linked_items_count"`
 	UnlinkedItemsCount int       `json:"unlinked_items_count"`
+}
+
+// PriceHistoryService defines the interface for price history operations
+type PriceHistoryService interface {
+	// Basic CRUD operations
+	GetByID(ctx context.Context, id int64) (*models.PriceHistory, error)
+	Create(ctx context.Context, priceHistory *models.PriceHistory) error
+	Update(ctx context.Context, priceHistory *models.PriceHistory) error
+	Delete(ctx context.Context, id int64) error
+
+	// Query operations
+	GetByProductMasterID(ctx context.Context, productMasterID int, storeID *int, filters PriceHistoryFilters) ([]*models.PriceHistory, error)
+	GetCurrentPrice(ctx context.Context, productMasterID int, storeID *int) (*models.PriceHistory, error)
+	GetPriceHistoryCount(ctx context.Context, productMasterID int, storeID *int, filters PriceHistoryFilters) (int, error)
+}
+
+// PriceHistoryFilters defines filters for price history queries
+type PriceHistoryFilters struct {
+	IsOnSale    *bool
+	IsAvailable *bool
+	IsActive    *bool
+	MinPrice    *float64
+	MaxPrice    *float64
+	Source      *string
+	DateFrom    *time.Time
+	DateTo      *time.Time
+	Limit       int
+	Offset      int
+	OrderBy     string
+	OrderDir    string
 }
