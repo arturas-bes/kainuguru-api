@@ -12,24 +12,25 @@ SET pg_trgm.similarity_threshold = 0.3;
 -- Create specialized trigram indexes for different search patterns
 
 -- Main trigram index for product names (most important for fuzzy search)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_name_trigram
+-- Note: CONCURRENTLY cannot be used inside a transaction, so it's removed
+CREATE INDEX IF NOT EXISTS idx_products_name_trigram
 ON products USING gin(name gin_trgm_ops);
 
 -- Trigram index for normalized names (handles diacritics)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_normalized_trigram
+CREATE INDEX IF NOT EXISTS idx_products_normalized_trigram
 ON products USING gin(normalized_name gin_trgm_ops);
 
 -- Trigram index for brand search with fuzzy matching
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_brand_trigram
+CREATE INDEX IF NOT EXISTS idx_products_brand_trigram
 ON products USING gin(brand gin_trgm_ops)
 WHERE brand IS NOT NULL AND brand != '';
 
 -- Composite trigram index for name + brand combined search
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_name_brand_trigram
+CREATE INDEX IF NOT EXISTS idx_products_name_brand_trigram
 ON products USING gin((name || ' ' || COALESCE(brand, '')) gin_trgm_ops);
 
 -- Trigram index for category search
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_category_trigram
+CREATE INDEX IF NOT EXISTS idx_products_category_trigram
 ON products USING gin(category gin_trgm_ops)
 WHERE category IS NOT NULL AND category != '';
 
@@ -323,11 +324,11 @@ DROP FUNCTION IF EXISTS hybrid_search_products(TEXT, INTEGER, INTEGER, INTEGER[]
 DROP FUNCTION IF EXISTS fuzzy_search_products(TEXT, FLOAT, INTEGER, INTEGER, INTEGER[], TEXT, DECIMAL, DECIMAL);
 
 -- Drop trigram indexes
-DROP INDEX CONCURRENTLY IF EXISTS idx_products_name_trigram;
-DROP INDEX CONCURRENTLY IF EXISTS idx_products_normalized_trigram;
-DROP INDEX CONCURRENTLY IF EXISTS idx_products_brand_trigram;
-DROP INDEX CONCURRENTLY IF EXISTS idx_products_name_brand_trigram;
-DROP INDEX CONCURRENTLY IF EXISTS idx_products_category_trigram;
+DROP INDEX IF EXISTS idx_products_name_trigram;
+DROP INDEX IF EXISTS idx_products_normalized_trigram;
+DROP INDEX IF EXISTS idx_products_brand_trigram;
+DROP INDEX IF EXISTS idx_products_name_brand_trigram;
+DROP INDEX IF EXISTS idx_products_category_trigram;
 
 -- Reset similarity threshold to default
 RESET pg_trgm.similarity_threshold;

@@ -19,6 +19,7 @@ type Product {
   description: String
   category: String
   subcategory: String
+  tags: [String!]
 
   # Pricing (Complex structure like Hyena)
   price: ProductPrice!
@@ -759,6 +760,7 @@ input SearchInput {
   maxPrice: Float
   onSaleOnly: Boolean = false
   category: String
+  tags: [String!]
   first: Int = 50
   after: String
   preferFuzzy: Boolean = false

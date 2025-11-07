@@ -41,7 +41,7 @@ install:
 
 seed-data:
 	@echo "📦 Loading test fixtures into database..."
-	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_price_fixtures.go
+	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_complete_fixtures.go
 	@echo "✅ Test fixtures loaded successfully!"
 
 db-reset:

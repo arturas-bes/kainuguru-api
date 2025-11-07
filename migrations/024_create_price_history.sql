@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 -- Migration: Create price_history, price_trends, and price_alerts tables
 -- Description: Price tracking system for historical pricing, trend analysis, and user alerts
 
@@ -206,3 +208,15 @@ COMMENT ON COLUMN price_trends.period IS 'Time period for analysis: 7d, 30d, 90d
 COMMENT ON COLUMN price_trends.volatility_score IS 'Standard deviation-based volatility measure';
 
 COMMENT ON COLUMN price_alerts.alert_type IS 'Type of alert: PRICE_DROP (any decrease), TARGET_PRICE (reaches target), PERCENTAGE_DROP (% decrease)';
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TRIGGER IF EXISTS update_price_alerts_updated_at ON price_alerts;
+DROP TRIGGER IF EXISTS update_price_trends_updated_at ON price_trends;
+DROP TRIGGER IF EXISTS update_price_history_updated_at ON price_history;
+DROP FUNCTION IF EXISTS update_price_history_timestamp();
+DROP TABLE IF EXISTS price_alerts;
+DROP TABLE IF EXISTS price_trends;
+DROP TABLE IF EXISTS price_history;
+-- +goose StatementEnd

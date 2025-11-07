@@ -26,12 +26,13 @@ type Product struct {
 	Category       *string `bun:"category" json:"category,omitempty"`
 	Subcategory    *string `bun:"subcategory" json:"subcategory,omitempty"`
 	Description    *string `bun:"description" json:"description,omitempty"`
+	Tags           []string `bun:"tags,array" json:"tags,omitempty"`
 
 	// Pricing information
 	CurrentPrice    float64  `bun:"current_price,notnull" json:"current_price"`
 	OriginalPrice   *float64 `bun:"original_price" json:"original_price,omitempty"`
 	DiscountPercent *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
-	Currency        string   `bun:"currency,default:'EUR'" json:"currency"`
+	Currency        string   `bun:"-" json:"currency"` // Not stored in DB, always EUR
 
 	// Product specifications
 	UnitSize    *string `bun:"unit_size" json:"unit_size,omitempty"`

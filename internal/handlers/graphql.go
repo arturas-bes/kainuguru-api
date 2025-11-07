@@ -17,6 +17,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
+	"github.com/uptrace/bun"
 )
 
 // GraphQLConfig holds configuration for GraphQL handler
@@ -32,6 +33,7 @@ type GraphQLConfig struct {
 	ShoppingListService      services.ShoppingListService
 	ShoppingListItemService  services.ShoppingListItemService
 	PriceHistoryService      services.PriceHistoryService
+	DB                       *bun.DB
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
@@ -49,6 +51,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ShoppingListService,
 		config.ShoppingListItemService,
 		config.PriceHistoryService,
+		config.DB,
 	)
 
 	// Create GraphQL executable schema
