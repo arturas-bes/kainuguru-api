@@ -98,6 +98,14 @@ func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*mo
 		query = query.Where("valid_to <= ?", *filters.ValidTo)
 	}
 
+	if filters.ValidOn != nil {
+		validDate, err := time.Parse("2006-01-02", *filters.ValidOn)
+		if err == nil {
+			query = query.Where("valid_from <= ?", validDate).
+				Where("valid_to >= ?", validDate)
+		}
+	}
+
 	if filters.IsCurrent != nil && *filters.IsCurrent {
 		now := time.Now()
 		weekStart := now.AddDate(0, 0, -int(now.Weekday()-time.Monday))

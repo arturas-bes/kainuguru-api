@@ -14,25 +14,27 @@ import (
 
 // ProcessorConfig holds configuration for PDF processing
 type ProcessorConfig struct {
-	TempDir     string        `json:"temp_dir"`
-	DPI         int           `json:"dpi"`
-	Format      string        `json:"format"`  // jpeg, png, ppm
-	Quality     int           `json:"quality"` // 1-100 for jpeg
-	Timeout     time.Duration `json:"timeout"`
-	Cleanup     bool          `json:"cleanup"`
-	MaxFileSize int64         `json:"max_file_size"` // bytes
+	TempDir       string        `json:"temp_dir"`
+	DPI           int           `json:"dpi"`
+	Format        string        `json:"format"`        // jpeg, png, ppm
+	Quality       int           `json:"quality"`       // 1-100 for jpeg
+	Timeout       time.Duration `json:"timeout"`
+	Cleanup       bool          `json:"cleanup"`
+	DeleteSource  bool          `json:"delete_source"` // Delete source PDF after successful conversion
+	MaxFileSize   int64         `json:"max_file_size"` // bytes
 }
 
 // DefaultProcessorConfig returns sensible defaults
 func DefaultProcessorConfig() ProcessorConfig {
 	return ProcessorConfig{
-		TempDir:     "/tmp/kainuguru/pdf",
-		DPI:         200,
-		Format:      "jpeg",
-		Quality:     85,
-		Timeout:     30 * time.Second,
-		Cleanup:     true,
-		MaxFileSize: 50 * 1024 * 1024, // 50MB
+		TempDir:      "/tmp/kainuguru/pdf",
+		DPI:          200,
+		Format:       "jpeg",
+		Quality:      85,
+		Timeout:      30 * time.Second,
+		Cleanup:      true,
+		DeleteSource: false, // Default to false for safety
+		MaxFileSize:  50 * 1024 * 1024, // 50MB
 	}
 }
 
@@ -105,6 +107,14 @@ func (p *Processor) ProcessPDF(ctx context.Context, pdfPath string) (*Processing
 
 	result.OutputFiles = outputFiles
 	result.Success = true
+
+	// Delete source PDF if configured and conversion was successful
+	if p.config.DeleteSource {
+		if err := os.Remove(pdfPath); err != nil {
+			// Log warning but don't fail - conversion was successful
+			fmt.Fprintf(os.Stderr, "Warning: failed to delete source PDF %s: %v\n", pdfPath, err)
+		}
+	}
 
 	return result, nil
 }
@@ -204,6 +214,12 @@ func (p *Processor) convertToImages(ctx context.Context, pdfPath string, pageCou
 	baseName := filepath.Base(pdfPath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 	outputPrefix := filepath.Join(p.config.TempDir, nameWithoutExt)
+	
+	// Clean up any existing output files with the same prefix
+	if err := p.cleanupOldFiles(outputPrefix); err != nil {
+		// Log but don't fail - this is a best-effort cleanup
+		fmt.Fprintf(os.Stderr, "Warning: failed to cleanup old files: %v\n", err)
+	}
 
 	// Build pdftoppm command
 	args := []string{
@@ -239,11 +255,17 @@ func (p *Processor) convertToImages(ctx context.Context, pdfPath string, pageCou
 // findOutputFiles locates the generated image files
 func (p *Processor) findOutputFiles(outputPrefix string, expectedCount int) ([]string, error) {
 	var outputFiles []string
+	
+	// Get file extension based on format
+	ext := p.config.Format
+	if ext == "jpeg" {
+		ext = "jpg" // pdftoppm uses .jpg for jpeg format
+	}
 
 	// pdftoppm generates files with different patterns based on page count
-	// Try 2-digit numbering first: prefix-01.format, prefix-02.format, etc.
+	// Try 2-digit numbering first: prefix-01.jpg, prefix-02.jpg, etc.
 	for i := 1; i <= expectedCount; i++ {
-		filename := fmt.Sprintf("%s-%02d.%s", outputPrefix, i, p.config.Format)
+		filename := fmt.Sprintf("%s-%02d.%s", outputPrefix, i, ext)
 		if _, err := os.Stat(filename); err == nil {
 			outputFiles = append(outputFiles, filename)
 		}
@@ -252,7 +274,7 @@ func (p *Processor) findOutputFiles(outputPrefix string, expectedCount int) ([]s
 	// If 2-digit numbering didn't work, try 3-digit numbering
 	if len(outputFiles) == 0 {
 		for i := 1; i <= expectedCount; i++ {
-			filename := fmt.Sprintf("%s-%03d.%s", outputPrefix, i, p.config.Format)
+			filename := fmt.Sprintf("%s-%03d.%s", outputPrefix, i, ext)
 			if _, err := os.Stat(filename); err == nil {
 				outputFiles = append(outputFiles, filename)
 			}
@@ -261,7 +283,7 @@ func (p *Processor) findOutputFiles(outputPrefix string, expectedCount int) ([]s
 
 	// If no numbered files found, check for single page output
 	if len(outputFiles) == 0 {
-		singleFile := fmt.Sprintf("%s.%s", outputPrefix, p.config.Format)
+		singleFile := fmt.Sprintf("%s.%s", outputPrefix, ext)
 		if _, err := os.Stat(singleFile); err == nil {
 			outputFiles = append(outputFiles, singleFile)
 		}
@@ -297,12 +319,41 @@ func (p *Processor) ProcessFromReader(ctx context.Context, reader io.Reader, fil
 	// Process the temporary file
 	result, err := p.ProcessPDF(ctx, tempFile)
 
-	// Clean up temp file if configured
-	if p.config.Cleanup {
+	// Clean up temp file if configured (note: DeleteSource in ProcessPDF might have already deleted it)
+	if p.config.Cleanup && !p.config.DeleteSource {
 		os.Remove(tempFile)
 	}
 
 	return result, err
+}
+
+// cleanupOldFiles removes old output files that might conflict
+func (p *Processor) cleanupOldFiles(outputPrefix string) error {
+	dir := filepath.Dir(outputPrefix)
+	base := filepath.Base(outputPrefix)
+	
+	// Get file extension
+	ext := p.config.Format
+	if ext == "jpeg" {
+		ext = "jpg"
+	}
+	
+	// Remove any existing files matching the pattern
+	pattern := fmt.Sprintf("%s-*.%s", base, ext)
+	matches, err := filepath.Glob(filepath.Join(dir, pattern))
+	if err != nil {
+		return err
+	}
+	
+	for _, match := range matches {
+		os.Remove(match) // Best effort, ignore errors
+	}
+	
+	// Also remove single file if exists
+	singleFile := fmt.Sprintf("%s.%s", outputPrefix, ext)
+	os.Remove(singleFile)
+	
+	return nil
 }
 
 // Cleanup removes generated image files

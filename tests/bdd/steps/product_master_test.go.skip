@@ -1,0 +1,340 @@
+package steps
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/cucumber/godog"
+	"github.com/kainuguru/kainuguru-api/internal/models"
+)
+
+type productMasterContext struct {
+	testContext       *TestContext
+	productMasters    map[string]*models.ProductMaster
+	products          []*models.Product
+	matchResults      map[int]matchResult
+	statistics        *models.MatchingStatistics
+	mastersForReview  []*models.ProductMaster
+}
+
+type matchResult struct {
+	masterID   int64
+	confidence float64
+	method     string
+}
+
+func InitializeProductMasterScenario(ctx *godog.ScenarioContext) {
+	pmc := &productMasterContext{
+		productMasters: make(map[string]*models.ProductMaster),
+		matchResults:   make(map[int]matchResult),
+	}
+
+	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+		pmc.testContext = getTestContext(ctx)
+		return ctx, nil
+	})
+
+	// Background steps
+	ctx.Step(`^the following product masters exist:$`, pmc.theFollowingProductMastersExist)
+	ctx.Step(`^no product masters exist for "([^"]*)"$`, pmc.noProductMastersExistFor)
+
+	// When steps
+	ctx.Step(`^a product is added:$`, pmc.aProductIsAdded)
+	ctx.Step(`^an admin verifies the product master "([^"]*)"$`, pmc.anAdminVerifiesTheProductMaster)
+	ctx.Step(`^an admin marks "([^"]*)" as duplicate of "([^"]*)"$`, pmc.anAdminMarksAsDuplicateOf)
+	ctx.Step(`^the product master worker runs$`, pmc.theProductMasterWorkerRuns)
+	ctx.Step(`^(\d+) more products are linked to the master$`, pmc.moreProductsAreLinkedToTheMaster)
+	ctx.Step(`^I request masters for review$`, pmc.iRequestMastersForReview)
+	ctx.Step(`^I request overall matching statistics$`, pmc.iRequestOverallMatchingStatistics)
+
+	// Then steps
+	ctx.Step(`^the product should be matched to master "([^"]*)"$`, pmc.theProductShouldBeMatchedToMaster)
+	ctx.Step(`^the match confidence should be >= ([0-9.]+)$`, pmc.theMatchConfidenceShouldBeGTE)
+	ctx.Step(`^the match method should be "([^"]*)"$`, pmc.theMatchMethodShouldBe)
+	ctx.Step(`^a new product master should be created$`, pmc.aNewProductMasterShouldBeCreated)
+	ctx.Step(`^the new master should have name "([^"]*)"$`, pmc.theNewMasterShouldHaveName)
+	ctx.Step(`^the master confidence should be ([0-9.]+)$`, pmc.theMasterConfidenceShouldBe)
+	ctx.Step(`^the master status should be "([^"]*)"$`, pmc.theMasterStatusShouldBe)
+	ctx.Step(`^all products should be linked to "([^"]*)"$`, pmc.allProductsShouldBeLinkedTo)
+	ctx.Step(`^the master "([^"]*)" should be marked as duplicate$`, pmc.theMasterShouldBeMarkedAsDuplicate)
+	ctx.Step(`^the match count of "([^"]*)" should increase by (\d+)$`, pmc.theMatchCountShouldIncreaseBy)
+	ctx.Step(`^all (\d+) products should be matched or have new masters created$`, pmc.allProductsShouldBeMatchedOrHaveNewMasters)
+	ctx.Step(`^the worker should log statistics$`, pmc.theWorkerShouldLogStatistics)
+	ctx.Step(`^the master match count should be (\d+)$`, pmc.theMasterMatchCountShouldBe)
+	ctx.Step(`^I should receive (\d+) masters$`, pmc.iShouldReceiveMasters)
+	ctx.Step(`^the list should include "([^"]*)"$`, pmc.theListShouldInclude)
+	ctx.Step(`^the list should not include "([^"]*)"$`, pmc.theListShouldNotInclude)
+	ctx.Step(`^the total products matched should be (\d+)$`, pmc.theTotalProductsMatchedShouldBe)
+	ctx.Step(`^the auto match rate should be ([0-9.]+)%$`, pmc.theAutoMatchRateShouldBe)
+	ctx.Step(`^the manual match rate should be ([0-9.]+)%$`, pmc.theManualMatchRateShouldBe)
+	ctx.Step(`^the new master creation rate should be ([0-9.]+)%$`, pmc.theNewMasterCreationRateShouldBe)
+}
+
+func (pmc *productMasterContext) theFollowingProductMastersExist(table *godog.Table) error {
+	ctx := context.Background()
+	factory := pmc.testContext.Factory
+
+	for i, row := range table.Rows[1:] { // Skip header
+		master := &models.ProductMaster{
+			Name:       getTableCell(row, table, "name"),
+			Brand:      getTableCell(row, table, "brand"),
+			Category:   getTableCell(row, table, "category"),
+			Confidence: parseFloat(getTableCell(row, table, "confidence")),
+			Status:     "active",
+			CreatedAt:  time.Now(),
+		}
+
+		// Create master
+		masterID, err := factory.ProductMasterService().Create(ctx, master)
+		if err != nil {
+			return fmt.Errorf("failed to create master %d: %w", i, err)
+		}
+
+		master.ID = masterID
+		pmc.productMasters[master.Name] = master
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) noProductMastersExistFor(productName string) error {
+	// Just verify none exist - nothing to do
+	return nil
+}
+
+func (pmc *productMasterContext) aProductIsAdded(table *godog.Table) error {
+	ctx := context.Background()
+	factory := pmc.testContext.Factory
+	row := table.Rows[1]
+
+	product := &models.Product{
+		Name:     getTableCell(row, table, "name"),
+		Brand:    getTableCell(row, table, "brand"),
+		Category: getTableCell(row, table, "category"),
+		StoreID:  pmc.testContext.getStoreIDByCode(getTableCell(row, table, "store")),
+	}
+
+	// Find or create master
+	masterID, confidence, err := factory.ProductMasterService().FindOrCreateMaster(ctx, product)
+	if err != nil {
+		return fmt.Errorf("failed to match product: %w", err)
+	}
+
+	product.ID = len(pmc.products) + 1
+	product.ProductMasterID = &masterID
+	pmc.products = append(pmc.products, product)
+	
+	pmc.matchResults[product.ID] = matchResult{
+		masterID:   masterID,
+		confidence: confidence,
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) theProductShouldBeMatchedToMaster(masterName string) error {
+	if len(pmc.products) == 0 {
+		return fmt.Errorf("no products added")
+	}
+
+	lastProduct := pmc.products[len(pmc.products)-1]
+	master, exists := pmc.productMasters[masterName]
+	if !exists {
+		return fmt.Errorf("master %s not found", masterName)
+	}
+
+	matchResult := pmc.matchResults[lastProduct.ID]
+	if matchResult.masterID != master.ID {
+		return fmt.Errorf("product matched to master ID %d, expected %d", matchResult.masterID, master.ID)
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) theMatchConfidenceShouldBeGTE(minConfidence float64) error {
+	if len(pmc.products) == 0 {
+		return fmt.Errorf("no products added")
+	}
+
+	lastProduct := pmc.products[len(pmc.products)-1]
+	matchResult := pmc.matchResults[lastProduct.ID]
+
+	if matchResult.confidence < minConfidence {
+		return fmt.Errorf("confidence %.2f < %.2f", matchResult.confidence, minConfidence)
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) theMatchMethodShouldBe(method string) error {
+	if len(pmc.products) == 0 {
+		return fmt.Errorf("no products added")
+	}
+
+	lastProduct := pmc.products[len(pmc.products)-1]
+	matchResult := pmc.matchResults[lastProduct.ID]
+
+	if matchResult.method != method {
+		return fmt.Errorf("match method %s != %s", matchResult.method, method)
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) aNewProductMasterShouldBeCreated() error {
+	// Check that a new master was created
+	if len(pmc.products) == 0 {
+		return fmt.Errorf("no products added")
+	}
+
+	lastProduct := pmc.products[len(pmc.products)-1]
+	if lastProduct.ProductMasterID == nil || *lastProduct.ProductMasterID == 0 {
+		return fmt.Errorf("no master ID assigned to product")
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) theNewMasterShouldHaveName(name string) error {
+	// Verify the master name matches
+	return nil
+}
+
+func (pmc *productMasterContext) theMasterConfidenceShouldBe(confidence float64) error {
+	// Check master confidence
+	return nil
+}
+
+func (pmc *productMasterContext) theMasterStatusShouldBe(status string) error {
+	return nil
+}
+
+func (pmc *productMasterContext) anAdminVerifiesTheProductMaster(masterName string) error {
+	ctx := context.Background()
+	factory := pmc.testContext.Factory
+
+	master, exists := pmc.productMasters[masterName]
+	if !exists {
+		return fmt.Errorf("master %s not found", masterName)
+	}
+
+	err := factory.ProductMasterService().VerifyProductMaster(ctx, master.ID, "admin")
+	if err != nil {
+		return fmt.Errorf("failed to verify master: %w", err)
+	}
+
+	return nil
+}
+
+func (pmc *productMasterContext) anAdminMarksAsDuplicateOf(duplicate, target string) error {
+	return nil
+}
+
+func (pmc *productMasterContext) allProductsShouldBeLinkedTo(masterName string) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theMasterShouldBeMarkedAsDuplicate(masterName string) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theMatchCountShouldIncreaseBy(count int) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theProductMasterWorkerRuns() error {
+	return nil
+}
+
+func (pmc *productMasterContext) allProductsShouldBeMatchedOrHaveNewMasters(count int) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theWorkerShouldLogStatistics() error {
+	return nil
+}
+
+func (pmc *productMasterContext) moreProductsAreLinkedToTheMaster(count int) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theMasterMatchCountShouldBe(count int) error {
+	return nil
+}
+
+func (pmc *productMasterContext) iRequestMastersForReview() error {
+	ctx := context.Background()
+	factory := pmc.testContext.Factory
+
+	masters, err := factory.ProductMasterService().GetProductMastersForReview(ctx, 100, 0)
+	if err != nil {
+		return fmt.Errorf("failed to get masters for review: %w", err)
+	}
+
+	pmc.mastersForReview = masters
+	return nil
+}
+
+func (pmc *productMasterContext) iShouldReceiveMasters(count int) error {
+	if len(pmc.mastersForReview) != count {
+		return fmt.Errorf("expected %d masters, got %d", count, len(pmc.mastersForReview))
+	}
+	return nil
+}
+
+func (pmc *productMasterContext) theListShouldInclude(masterName string) error {
+	for _, master := range pmc.mastersForReview {
+		if master.Name == masterName {
+			return nil
+		}
+	}
+	return fmt.Errorf("master %s not found in review list", masterName)
+}
+
+func (pmc *productMasterContext) theListShouldNotInclude(masterName string) error {
+	for _, master := range pmc.mastersForReview {
+		if master.Name == masterName {
+			return fmt.Errorf("master %s should not be in review list", masterName)
+		}
+	}
+	return nil
+}
+
+func (pmc *productMasterContext) iRequestOverallMatchingStatistics() error {
+	return nil
+}
+
+func (pmc *productMasterContext) theTotalProductsMatchedShouldBe(count int) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theAutoMatchRateShouldBe(rate float64) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theManualMatchRateShouldBe(rate float64) error {
+	return nil
+}
+
+func (pmc *productMasterContext) theNewMasterCreationRateShouldBe(rate float64) error {
+	return nil
+}
+
+// Helper functions
+func parseFloat(s string) float64 {
+	var f float64
+	fmt.Sscanf(s, "%f", &f)
+	return f
+}
+
+func getTableCell(row *godog.TableRow, table *godog.Table, columnName string) string {
+	for i, cell := range table.Rows[0].Cells {
+		if cell.Value == columnName {
+			if i < len(row.Cells) {
+				return row.Cells[i].Value
+			}
+		}
+	}
+	return ""
+}

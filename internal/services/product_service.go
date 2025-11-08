@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/uptrace/bun"
@@ -182,7 +183,61 @@ func (s *productService) Create(ctx context.Context, product *models.Product) er
 }
 
 func (s *productService) CreateBatch(ctx context.Context, products []*models.Product) error {
-	return fmt.Errorf("productService.CreateBatch not implemented")
+	if len(products) == 0 {
+		return nil
+	}
+
+	// Validate and enrich products
+	now := time.Now()
+	for _, p := range products {
+		// Validate required fields
+		if err := ValidateProduct(p.Name, p.CurrentPrice); err != nil {
+			return fmt.Errorf("invalid product: %w", err)
+		}
+
+		// Normalize name
+		if p.NormalizedName == "" {
+			p.NormalizedName = NormalizeProductText(p.Name)
+		}
+
+		// Generate search vector
+		p.SearchVector = GenerateSearchVector(p.NormalizedName)
+
+		// Set timestamps
+		if p.CreatedAt.IsZero() {
+			p.CreatedAt = now
+		}
+		if p.UpdatedAt.IsZero() {
+			p.UpdatedAt = now
+		}
+
+		// Calculate discount if not set
+		if p.OriginalPrice != nil && *p.OriginalPrice > 0 && p.DiscountPercent == nil {
+			discount := CalculateDiscount(*p.OriginalPrice, p.CurrentPrice)
+			p.DiscountPercent = &discount
+			if discount > 0 {
+				p.IsOnSale = true
+			}
+		}
+
+		// Standardize unit
+		if p.UnitSize != nil {
+			standardized := StandardizeUnit(*p.UnitSize)
+			p.UnitSize = &standardized
+		}
+	}
+
+	// Batch insert with ON CONFLICT handling
+	_, err := s.db.NewInsert().
+		Model(&products).
+		On("CONFLICT (flyer_id, normalized_name, valid_from) DO NOTHING").
+		Exec(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert products batch: %w", err)
+	}
+
+	return nil
 }
 
 func (s *productService) Update(ctx context.Context, product *models.Product) error {

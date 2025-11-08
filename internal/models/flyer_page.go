@@ -90,3 +90,8 @@ func (fp *FlyerPage) ResetForRetry() {
 	fp.ExtractionStatus = string(FlyerPageStatusPending)
 	fp.UpdatedAt = time.Now()
 }
+
+// IsFirstPage checks if this is page 1 (used for preview)
+func (fp *FlyerPage) IsFirstPage() bool {
+	return fp.PageNumber == 1
+}

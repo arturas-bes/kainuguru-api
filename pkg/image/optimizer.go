@@ -1,7 +1,6 @@
 package image
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -290,7 +289,7 @@ func (o *Optimizer) optimizeWithGo(inputPath, outputPath string) error {
 	defer inputFile.Close()
 
 	// Decode image
-	img, format, err := image.Decode(inputFile)
+	img, _, err := image.Decode(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to decode image: %v", err)
 	}

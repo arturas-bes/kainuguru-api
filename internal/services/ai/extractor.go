@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/pkg/openai"
 )
 
@@ -38,15 +38,17 @@ func DefaultExtractorConfig(apiKey string) ExtractorConfig {
 
 // ExtractedProduct represents a product extracted from a flyer page
 type ExtractedProduct struct {
-	Name          string  `json:"name"`
-	Price         string  `json:"price"`
-	Unit          string  `json:"unit"`
-	OriginalPrice string  `json:"original_price,omitempty"`
-	Discount      string  `json:"discount,omitempty"`
-	Brand         string  `json:"brand,omitempty"`
-	Category      string  `json:"category,omitempty"`
-	Confidence    float64 `json:"confidence,omitempty"`
-	Position      string  `json:"position,omitempty"`
+	Name          string                      `json:"name"`
+	Price         string                      `json:"price"`
+	Unit          string                      `json:"unit"`
+	OriginalPrice string                      `json:"original_price,omitempty"`
+	Discount      string                      `json:"discount,omitempty"`
+	Brand         string                      `json:"brand,omitempty"`
+	Category      string                      `json:"category,omitempty"`
+	Confidence    float64                     `json:"confidence,omitempty"`
+	Position      string                      `json:"position,omitempty"`
+	BoundingBox   *models.ProductBoundingBox `json:"bounding_box,omitempty"`
+	PagePosition  *models.ProductPosition     `json:"page_position,omitempty"`
 }
 
 // ExtractionResult represents the result of product extraction

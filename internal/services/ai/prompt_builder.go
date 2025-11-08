@@ -47,8 +47,12 @@ Ištrauk visus aiškiai matomus produktus su kainomis. Kiekvienam produktui nuro
 2. Kaina (su valiuta, pvz., "2,99 €")
 3. Mato vienetas/kiekis (pvz., "1 kg", "500 g", "1 l", "vnt.")
 4. Nuolaidos informacija (jei yra)
-5. Prekės ženklas (jei matomas)
-6. Kategorija (iš šių: %s)
+5. Nuolaidos tipas ("percentage", "absolute", "bundle", "loyalty")
+6. Prekės ženklas (jei matomas)
+7. Kategorija (iš šių: %s)
+8. Pasitikėjimo lygis (0.0-1.0)
+9. Bounding box koordinatės (x, y, width, height normalizuotos nuo 0 iki 1)
+10. Pozicija puslapyje (eilutė, stulpelis, zona)
 
 FORMATAS:
 Grąžink JSON masyvą su objektais:
@@ -60,18 +64,42 @@ Grąžink JSON masyvą su objektais:
       "unit": "mato vienetas",
       "original_price": "pradinė kaina jei yra nuolaida",
       "discount": "nuolaidos aprašymas",
+      "discount_type": "percentage",
       "brand": "prekės ženklas",
-      "category": "kategorija"
+      "category": "kategorija",
+      "confidence": 0.95,
+      "bounding_box": {
+        "x": 0.1,
+        "y": 0.2,
+        "width": 0.2,
+        "height": 0.15
+      },
+      "page_position": {
+        "row": 1,
+        "column": 2,
+        "zone": "main"
+      }
     }
   ]
 }
+
+KOORDINATĖS:
+- x, y: viršutinio kairiojo kampo koordinatės (0-1)
+- width, height: elemento plotis ir aukštis (0-1)
+- Koordinatės normalizuotos: 0 = kairė/viršus, 1 = dešinė/apačia
+
+POZICIJA:
+- row: eilutė puslapyje (1, 2, 3...)
+- column: stulpelis (1, 2, 3...)
+- zone: "header", "main", "footer", "sidebar"
 
 SVARBU:
 - Ištrauk tik produktus su aiškiai matomais kainomis
 - Išlaikyk originalų lietuvišką tekstą
 - Jei kaina neaiški, neįtraukk produkto
 - Už vienetus naudok standartines santrumpas (kg, g, l, ml, vnt.)
-- Tiksliai nuraidyk kainų formatus (pvz., "1,99 €", "2.50 €")`,
+- Tiksliai nuraidyk kainų formatus (pvz., "1,99 €", "2.50 €")
+- Nurodyk tikslias bounding box koordinates kiekvienam produktui`,
 		strings.ToUpper(storeCode), pageNumber, storeContext, strings.Join(pb.categories, ", "))
 
 	return prompt
