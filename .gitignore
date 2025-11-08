@@ -130,3 +130,4 @@ sessions/
 *.tmp
 *.temp
 test_output/*
+/vendor/
