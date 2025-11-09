@@ -12,69 +12,116 @@ import (
 	"github.com/kainuguru/kainuguru-api/pkg/openai"
 )
 
-// ExtractorConfig holds configuration for the product extractor
+// ExtractorConfig holds configuration for the product extractor.
 type ExtractorConfig struct {
-	OpenAIAPIKey    string        `json:"openai_api_key"`
-	MaxRetries      int           `json:"max_retries"`
-	RetryDelay      time.Duration `json:"retry_delay"`
-	Timeout         time.Duration `json:"timeout"`
-	EnableCaching   bool          `json:"enable_caching"`
-	CacheExpiry     time.Duration `json:"cache_expiry"`
-	BatchSize       int           `json:"batch_size"`
+	OpenAIAPIKey  string        `json:"openai_api_key"`
+	Model         string        `json:"model"`
+	MaxTokens     int           `json:"max_tokens"`
+	Temperature   float64       `json:"temperature"`
+	MaxRetries    int           `json:"max_retries"`
+	RetryDelay    time.Duration `json:"retry_delay"`
+	Timeout       time.Duration `json:"timeout"`
+	EnableCaching bool          `json:"enable_caching"`
+	CacheExpiry   time.Duration `json:"cache_expiry"`
+	BatchSize     int           `json:"batch_size"`
 }
 
-// DefaultExtractorConfig returns sensible defaults
+// DefaultExtractorConfig returns sensible defaults.
 func DefaultExtractorConfig(apiKey string) ExtractorConfig {
 	return ExtractorConfig{
 		OpenAIAPIKey:  apiKey,
+		Model:         "gpt-4o",
+		MaxTokens:     4000,
+		Temperature:   0.1,
 		MaxRetries:    3,
 		RetryDelay:    2 * time.Second,
-		Timeout:       60 * time.Second,
+		Timeout:       120 * time.Second,
 		EnableCaching: true,
 		CacheExpiry:   24 * time.Hour,
 		BatchSize:     5,
 	}
 }
 
-// ExtractedProduct represents a product extracted from a flyer page
+// Legacy product record (for backward compatibility with callers expecting products).
 type ExtractedProduct struct {
-	Name          string                      `json:"name"`
-	Price         string                      `json:"price"`
-	Unit          string                      `json:"unit"`
-	OriginalPrice string                      `json:"original_price,omitempty"`
-	Discount      string                      `json:"discount,omitempty"`
-	Brand         string                      `json:"brand,omitempty"`
-	Category      string                      `json:"category,omitempty"`
-	Confidence    float64                     `json:"confidence,omitempty"`
-	Position      string                      `json:"position,omitempty"`
-	BoundingBox   *models.ProductBoundingBox `json:"bounding_box,omitempty"`
-	PagePosition  *models.ProductPosition     `json:"page_position,omitempty"`
+	Name            string                     `json:"name"`
+	Price           string                     `json:"price"`
+	Unit            string                     `json:"unit"`
+	OriginalPrice   string                     `json:"original_price,omitempty"`
+	Discount        string                     `json:"discount,omitempty"`
+	DiscountType    string                     `json:"discount_type,omitempty"` // percentage | absolute | bundle | loyalty
+	SpecialDiscount string                     `json:"special_discount,omitempty"`
+	Brand           string                     `json:"brand,omitempty"`
+	Category        string                     `json:"category,omitempty"`
+	Confidence      float64                    `json:"confidence,omitempty"`
+	Position        string                     `json:"position,omitempty"`
+	BoundingBox     *models.ProductBoundingBox `json:"bounding_box,omitempty"`
+	PagePosition    *models.ProductPosition    `json:"page_position,omitempty"`
 }
 
-// ExtractionResult represents the result of product extraction
+// Unified schema record (supports price-only, percent-only, bundles, loyalty).
+type Promotion struct {
+	PromotionType    string                     `json:"promotion_type"`
+	NameLT           string                     `json:"name_lt"`
+	Brand            string                     `json:"brand,omitempty"`
+	CategoryGuessLT  string                     `json:"category_guess_lt,omitempty"`
+	Unit             string                     `json:"unit,omitempty"`
+	UnitSize         string                     `json:"unit_size,omitempty"`
+	PriceEUR         *string                    `json:"price_eur,omitempty"`
+	OriginalPriceEUR *string                    `json:"original_price_eur,omitempty"`
+	PricePerUnitEUR  *string                    `json:"price_per_unit_eur,omitempty"`
+	DiscountPct      *int                       `json:"discount_pct,omitempty"`
+	DiscountText     string                     `json:"discount_text,omitempty"`
+	DiscountType     string                     `json:"discount_type,omitempty"` // percentage | absolute | bundle | loyalty
+	SpecialTags      []string                   `json:"special_tags,omitempty"`
+	LoyaltyRequired  bool                       `json:"loyalty_required"`
+	BundleDetails    string                     `json:"bundle_details,omitempty"`
+	BoundingBox      *models.ProductBoundingBox `json:"bounding_box,omitempty"`
+	Confidence       float64                    `json:"confidence,omitempty"`
+}
+
+type PageMeta struct {
+	StoreCode          string  `json:"store_code"`
+	Currency           string  `json:"currency"`
+	Locale             string  `json:"locale"`
+	ValidFrom          *string `json:"valid_from,omitempty"`
+	ValidTo            *string `json:"valid_to,omitempty"`
+	PageNumber         int     `json:"page_number"`
+	DetectedTextSample string  `json:"detected_text_sample,omitempty"`
+}
+
+// ExtractionResult represents the result of product/promotion extraction.
 type ExtractionResult struct {
-	Products      []ExtractedProduct `json:"products"`
-	TotalProducts int                `json:"total_products"`
-	PageNumber    int                `json:"page_number"`
-	StoreCode     string             `json:"store_code"`
-	ExtractedAt   time.Time          `json:"extracted_at"`
-	ProcessingTime time.Duration     `json:"processing_time"`
-	TokensUsed    int                `json:"tokens_used"`
-	Success       bool               `json:"success"`
-	Error         string             `json:"error,omitempty"`
-	RawResponse   string             `json:"raw_response,omitempty"`
+	// Back-compat: tangible products with a price.
+	Products []ExtractedProduct `json:"products"`
+
+	// New: full set of promotions (includes percent-only, loyalty, bundles).
+	Promotions []Promotion `json:"promotions"`
+	PageMeta   *PageMeta   `json:"page_meta,omitempty"`
+
+	TotalProducts  int           `json:"total_products"`
+	PageNumber     int           `json:"page_number"`
+	StoreCode      string        `json:"store_code"`
+	ExtractedAt    time.Time     `json:"extracted_at"`
+	ProcessingTime time.Duration `json:"processing_time"`
+	TokensUsed     int           `json:"tokens_used"`
+	Success        bool          `json:"success"`
+	Error          string        `json:"error,omitempty"`
+	RawResponse    string        `json:"raw_response,omitempty"`
 }
 
-// ProductExtractor handles AI-powered product extraction from flyer images
+// ProductExtractor handles AI-powered promotion extraction from flyer images.
 type ProductExtractor struct {
 	config        ExtractorConfig
 	openaiClient  *openai.Client
 	promptBuilder *PromptBuilder
 }
 
-// NewProductExtractor creates a new product extractor
 func NewProductExtractor(config ExtractorConfig) *ProductExtractor {
 	openaiConfig := openai.DefaultClientConfig(config.OpenAIAPIKey)
+	openaiConfig.Model = config.Model
+	openaiConfig.MaxTokens = config.MaxTokens
+	openaiConfig.Temperature = config.Temperature
 	openaiConfig.Timeout = config.Timeout
 	openaiConfig.MaxRetries = config.MaxRetries
 	openaiConfig.RetryDelay = config.RetryDelay
@@ -86,104 +133,186 @@ func NewProductExtractor(config ExtractorConfig) *ProductExtractor {
 	}
 }
 
-// ExtractProducts extracts products from a flyer page image
+// -------------------- Public entrypoints ------------------------------------
+
+// ExtractProducts extracts promotions with a two-pass flow and maps priceful ones to Products.
 func (e *ProductExtractor) ExtractProducts(ctx context.Context, imageURL, storeCode string, pageNumber int) (*ExtractionResult, error) {
-	startTime := time.Now()
-
-	result := &ExtractionResult{
+	start := time.Now()
+	res := &ExtractionResult{
 		PageNumber:  pageNumber,
 		StoreCode:   storeCode,
-		ExtractedAt: startTime,
+		ExtractedAt: start,
 		Success:     false,
 	}
+	defer func() { res.ProcessingTime = time.Since(start) }()
 
-	defer func() {
-		result.ProcessingTime = time.Since(startTime)
-	}()
-
-	// Build extraction prompt
-	prompt := e.promptBuilder.ProductExtractionPrompt(storeCode, pageNumber)
-
-	// Analyze image with OpenAI
-	response, err := e.openaiClient.AnalyzeImage(ctx, imageURL, prompt)
+	// ---- PASS 1: detect modules
+	pass1Prompt := e.promptBuilder.DetectionPrompt(storeCode, pageNumber)
+	p1, err := e.openaiClient.AnalyzeImage(ctx, imageURL, pass1Prompt)
 	if err != nil {
-		result.Error = fmt.Sprintf("OpenAI analysis failed: %v", err)
-		return result, err
+		res.Error = fmt.Sprintf("OpenAI pass-1 failed: %v", err)
+		return res, err
+	}
+	res.TokensUsed += p1.GetTokenUsage()
+
+	meta1, promos1, err := e.parseSchemaResponse(p1.GetContent())
+	if err != nil {
+		// Fallback to single-pass unified prompt if detection JSON fails
+		soloPrompt := e.promptBuilder.ProductExtractionPrompt(storeCode, pageNumber)
+		psolo, err2 := e.openaiClient.AnalyzeImage(ctx, imageURL, soloPrompt)
+		if err2 != nil {
+			res.Error = fmt.Sprintf("OpenAI unified failed: %v ; pass-1 parse error: %v", err2, err)
+			return res, err2
+		}
+		res.TokensUsed += psolo.GetTokenUsage()
+		res.RawResponse = psolo.GetContent()
+
+		meta2, promos2, err3 := e.parseSchemaResponse(psolo.GetContent())
+		if err3 != nil {
+			res.Error = fmt.Sprintf("Failed to parse unified JSON: %v", err3)
+			return res, err3
+		}
+		clean := e.validateAndCleanPromotions(promos2, storeCode)
+		res.Promotions = clean
+		if meta2.PageNumber == 0 {
+			meta2.PageNumber = pageNumber
+		}
+		res.PageMeta = &meta2
+		// Map to legacy products
+		res.Products = e.promotionsToProducts(clean)
+		res.TotalProducts = len(res.Products)
+		res.Success = true
+		return res, nil
 	}
 
-	result.TokensUsed = response.GetTokenUsage()
-	result.RawResponse = response.GetContent()
+	// ---- PASS 2: fill details for detected boxes
+	detectedBoxes := struct {
+		PageMeta   PageMeta    `json:"page_meta"`
+		Promotions []Promotion `json:"promotions"`
+	}{PageMeta: meta1, Promotions: promos1}
+	boxesJSON, _ := json.MarshalIndent(detectedBoxes, "", "  ")
 
-	// Parse the response
-	products, err := e.parseProductResponse(response.GetContent())
+	pass2Prompt := e.promptBuilder.FillDetailsPrompt(storeCode, pageNumber) +
+		"\n\nPROMOTION_BOXES:\n" + string(boxesJSON)
+	p2, err := e.openaiClient.AnalyzeImage(ctx, imageURL, pass2Prompt)
 	if err != nil {
-		result.Error = fmt.Sprintf("Failed to parse response: %v", err)
-		return result, err
+		res.Error = fmt.Sprintf("OpenAI pass-2 failed: %v", err)
+		return res, err
+	}
+	res.TokensUsed += p2.GetTokenUsage()
+	res.RawResponse = p2.GetContent()
+
+	meta2, promos2, err := e.parseSchemaResponse(p2.GetContent())
+	if err != nil {
+		res.Error = fmt.Sprintf("Failed to parse pass-2 JSON: %v", err)
+		return res, err
 	}
 
-	// Post-process and validate products
-	validatedProducts := e.validateAndCleanProducts(products, storeCode)
+	// Clean & validate
+	clean := e.validateAndCleanPromotions(promos2, storeCode)
+	res.Promotions = clean
+	if meta2.PageNumber == 0 {
+		meta2.PageNumber = pageNumber
+	}
+	res.PageMeta = &meta2
 
-	result.Products = validatedProducts
-	result.TotalProducts = len(validatedProducts)
-	result.Success = true
-
-	return result, nil
+	// Map to legacy products (only those with price)
+	res.Products = e.promotionsToProducts(clean)
+	res.TotalProducts = len(res.Products)
+	res.Success = true
+	return res, nil
 }
 
-// ExtractProductsFromBase64 extracts products from a base64 encoded image
+// ExtractProductsFromBase64 mirrors ExtractProducts for base64 images.
 func (e *ProductExtractor) ExtractProductsFromBase64(ctx context.Context, base64Image, storeCode string, pageNumber int) (*ExtractionResult, error) {
-	startTime := time.Now()
-
-	result := &ExtractionResult{
+	start := time.Now()
+	res := &ExtractionResult{
 		PageNumber:  pageNumber,
 		StoreCode:   storeCode,
-		ExtractedAt: startTime,
+		ExtractedAt: start,
 		Success:     false,
 	}
+	defer func() { res.ProcessingTime = time.Since(start) }()
 
-	defer func() {
-		result.ProcessingTime = time.Since(startTime)
-	}()
-
-	// Build extraction prompt
-	prompt := e.promptBuilder.ProductExtractionPrompt(storeCode, pageNumber)
-
-	// Analyze image with OpenAI
-	response, err := e.openaiClient.AnalyzeImageWithBase64(ctx, base64Image, prompt)
+	// PASS 1
+	pass1Prompt := e.promptBuilder.DetectionPrompt(storeCode, pageNumber)
+	p1, err := e.openaiClient.AnalyzeImageWithBase64(ctx, base64Image, pass1Prompt)
 	if err != nil {
-		result.Error = fmt.Sprintf("OpenAI analysis failed: %v", err)
-		return result, err
+		res.Error = fmt.Sprintf("OpenAI pass-1 failed: %v", err)
+		return res, err
+	}
+	res.TokensUsed += p1.GetTokenUsage()
+
+	meta1, promos1, err := e.parseSchemaResponse(p1.GetContent())
+	if err != nil {
+		soloPrompt := e.promptBuilder.ProductExtractionPrompt(storeCode, pageNumber)
+		psolo, err2 := e.openaiClient.AnalyzeImageWithBase64(ctx, base64Image, soloPrompt)
+		if err2 != nil {
+			res.Error = fmt.Sprintf("OpenAI unified failed: %v ; pass-1 parse error: %v", err2, err)
+			return res, err2
+		}
+		res.TokensUsed += psolo.GetTokenUsage()
+		res.RawResponse = psolo.GetContent()
+
+		meta2, promos2, err3 := e.parseSchemaResponse(psolo.GetContent())
+		if err3 != nil {
+			res.Error = fmt.Sprintf("Failed to parse unified JSON: %v", err3)
+			return res, err3
+		}
+		clean := e.validateAndCleanPromotions(promos2, storeCode)
+		res.Promotions = clean
+		if meta2.PageNumber == 0 {
+			meta2.PageNumber = pageNumber
+		}
+		res.PageMeta = &meta2
+		res.Products = e.promotionsToProducts(clean)
+		res.TotalProducts = len(res.Products)
+		res.Success = true
+		return res, nil
 	}
 
-	result.TokensUsed = response.GetTokenUsage()
-	result.RawResponse = response.GetContent()
+	// PASS 2
+	detectedBoxes := struct {
+		PageMeta   PageMeta    `json:"page_meta"`
+		Promotions []Promotion `json:"promotions"`
+	}{PageMeta: meta1, Promotions: promos1}
+	boxesJSON, _ := json.MarshalIndent(detectedBoxes, "", "  ")
 
-	// Parse the response
-	products, err := e.parseProductResponse(response.GetContent())
+	pass2Prompt := e.promptBuilder.FillDetailsPrompt(storeCode, pageNumber) +
+		"\n\nPROMOTION_BOXES:\n" + string(boxesJSON)
+
+	p2, err := e.openaiClient.AnalyzeImageWithBase64(ctx, base64Image, pass2Prompt)
 	if err != nil {
-		result.Error = fmt.Sprintf("Failed to parse response: %v", err)
-		return result, err
+		res.Error = fmt.Sprintf("OpenAI pass-2 failed: %v", err)
+		return res, err
 	}
+	res.TokensUsed += p2.GetTokenUsage()
+	res.RawResponse = p2.GetContent()
 
-	// Post-process and validate products
-	validatedProducts := e.validateAndCleanProducts(products, storeCode)
-
-	result.Products = validatedProducts
-	result.TotalProducts = len(validatedProducts)
-	result.Success = true
-
-	return result, nil
+	meta2, promos2, err := e.parseSchemaResponse(p2.GetContent())
+	if err != nil {
+		res.Error = fmt.Sprintf("Failed to parse pass-2 JSON: %v", err)
+		return res, err
+	}
+	clean := e.validateAndCleanPromotions(promos2, storeCode)
+	res.Promotions = clean
+	if meta2.PageNumber == 0 {
+		meta2.PageNumber = pageNumber
+	}
+	res.PageMeta = &meta2
+	res.Products = e.promotionsToProducts(clean)
+	res.TotalProducts = len(res.Products)
+	res.Success = true
+	return res, nil
 }
 
-// BatchExtractProducts extracts products from multiple flyer pages
+// BatchExtractProducts – unchanged semantics; uses ExtractProducts for each URL.
 func (e *ProductExtractor) BatchExtractProducts(ctx context.Context, imageURLs []string, storeCode string) ([]*ExtractionResult, error) {
 	results := make([]*ExtractionResult, len(imageURLs))
-
 	for i, imageURL := range imageURLs {
-		result, err := e.ExtractProducts(ctx, imageURL, storeCode, i+1)
+		r, err := e.ExtractProducts(ctx, imageURL, storeCode, i+1)
 		if err != nil {
-			result = &ExtractionResult{
+			r = &ExtractionResult{
 				PageNumber:  i + 1,
 				StoreCode:   storeCode,
 				ExtractedAt: time.Now(),
@@ -191,9 +320,7 @@ func (e *ProductExtractor) BatchExtractProducts(ctx context.Context, imageURLs [
 				Error:       err.Error(),
 			}
 		}
-		results[i] = result
-
-		// Add delay between requests to respect rate limits
+		results[i] = r
 		if i < len(imageURLs)-1 {
 			select {
 			case <-ctx.Done():
@@ -202,282 +329,290 @@ func (e *ProductExtractor) BatchExtractProducts(ctx context.Context, imageURLs [
 			}
 		}
 	}
-
 	return results, nil
 }
 
-// parseProductResponse parses the JSON response from OpenAI
-func (e *ProductExtractor) parseProductResponse(response string) ([]ExtractedProduct, error) {
-	// Clean up the response - sometimes OpenAI adds extra formatting
-	cleanedResponse := e.cleanJSONResponse(response)
+// -------------------- Parsing / Cleaning ------------------------------------
 
-	// Try to parse as JSON
-	var result struct {
-		Products []ExtractedProduct `json:"products"`
+func (e *ProductExtractor) parseSchemaResponse(response string) (PageMeta, []Promotion, error) {
+	clean := e.cleanJSONResponse(response)
+	type root struct {
+		PageMeta   PageMeta    `json:"page_meta"`
+		Promotions []Promotion `json:"promotions"`
 	}
-
-	if err := json.Unmarshal([]byte(cleanedResponse), &result); err != nil {
-		// If direct parsing fails, try to extract JSON from the response
-		jsonStr := e.extractJSONFromText(cleanedResponse)
-		if jsonStr != "" {
-			if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
-				return result.Products, nil
-			}
+	var r root
+	if err := json.Unmarshal([]byte(clean), &r); err != nil {
+		jsonStr := e.extractJSONFromText(clean)
+		if jsonStr == "" {
+			return PageMeta{}, nil, fmt.Errorf("failed to parse JSON: %v", err)
 		}
-		return nil, fmt.Errorf("failed to parse JSON response: %v", err)
+		if err2 := json.Unmarshal([]byte(jsonStr), &r); err2 != nil {
+			return PageMeta{}, nil, fmt.Errorf("failed to parse JSON: %v / %v", err, err2)
+		}
 	}
-
-	return result.Products, nil
+	return r.PageMeta, r.Promotions, nil
 }
 
-// cleanJSONResponse cleans up the JSON response from potential formatting issues
 func (e *ProductExtractor) cleanJSONResponse(response string) string {
-	// Remove markdown code blocks
-	response = regexp.MustCompile("```json\n?").ReplaceAllString(response, "")
-	response = regexp.MustCompile("```\n?").ReplaceAllString(response, "")
-
-	// Remove leading/trailing whitespace
+	response = regexp.MustCompile("```json\\n?").ReplaceAllString(response, "")
+	response = regexp.MustCompile("```\\n?").ReplaceAllString(response, "")
 	response = strings.TrimSpace(response)
-
-	// Fix common JSON issues
-	response = strings.ReplaceAll(response, "'", "\"")     // Replace single quotes
-	response = strings.ReplaceAll(response, "\u201c", "\"")    // Replace smart quotes left
-	response = strings.ReplaceAll(response, "\u201d", "\"")    // Replace smart quotes right
-
+	// Smart quotes -> straight
+	response = strings.ReplaceAll(response, "\u201c", "\"")
+	response = strings.ReplaceAll(response, "\u201d", "\"")
+	response = strings.ReplaceAll(response, "\u2018", "'")
+	response = strings.ReplaceAll(response, "\u2019", "'")
 	return response
 }
 
-// extractJSONFromText attempts to extract JSON from mixed text
 func (e *ProductExtractor) extractJSONFromText(text string) string {
-	// Look for JSON object starting with { and ending with }
 	start := strings.Index(text, "{")
 	if start == -1 {
 		return ""
 	}
-
-	// Find the matching closing brace
-	braceCount := 0
-	end := -1
+	brace := 0
 	for i := start; i < len(text); i++ {
-		if text[i] == '{' {
-			braceCount++
-		} else if text[i] == '}' {
-			braceCount--
-			if braceCount == 0 {
-				end = i + 1
-				break
+		switch text[i] {
+		case '{':
+			brace++
+		case '}':
+			brace--
+			if brace == 0 {
+				return text[start : i+1]
 			}
 		}
 	}
-
-	if end == -1 {
-		return ""
-	}
-
-	return text[start:end]
+	return ""
 }
 
-// validateAndCleanProducts validates and cleans extracted products
-func (e *ProductExtractor) validateAndCleanProducts(products []ExtractedProduct, storeCode string) []ExtractedProduct {
-	var validProducts []ExtractedProduct
+// -------------------- Validation / Normalization ----------------------------
 
-	for _, product := range products {
-		// Clean and validate the product
-		cleaned := e.cleanProduct(product)
-
-		// Check if product is valid
-		if e.isValidProduct(cleaned) {
-			// Set confidence score
-			cleaned.Confidence = e.calculateConfidence(cleaned)
-			validProducts = append(validProducts, cleaned)
+func (e *ProductExtractor) validateAndCleanPromotions(items []Promotion, storeCode string) []Promotion {
+	out := make([]Promotion, 0, len(items))
+	for _, it := range items {
+		cleaned := e.cleanPromotion(it)
+		if e.isValidPromotion(cleaned) {
+			cleaned.Confidence = e.calculatePromotionConfidence(cleaned)
+			out = append(out, cleaned)
 		}
 	}
-
-	return validProducts
+	return out
 }
 
-// cleanProduct cleans and normalizes a product
-func (e *ProductExtractor) cleanProduct(product ExtractedProduct) ExtractedProduct {
-	// Clean name
-	product.Name = strings.TrimSpace(product.Name)
-	product.Name = regexp.MustCompile(`\s+`).ReplaceAllString(product.Name, " ")
+func (e *ProductExtractor) cleanPromotion(p Promotion) Promotion {
+	// Normalize text
+	p.NameLT = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(p.NameLT, " "))
+	p.Brand = strings.TrimSpace(p.Brand)
+	p.CategoryGuessLT = e.normalizeCategory(p.CategoryGuessLT)
+	p.Unit = e.normalizeUnit(p.Unit)
+	p.UnitSize = strings.TrimSpace(p.UnitSize)
 
-	// Clean price
-	product.Price = e.normalizePrice(product.Price)
+	// Normalize prices & percents
+	if p.PriceEUR != nil {
+		v := e.normalizePrice(*p.PriceEUR)
+		p.PriceEUR = strPtrOrNil(v)
+	}
+	if p.OriginalPriceEUR != nil {
+		v := e.normalizePrice(*p.OriginalPriceEUR)
+		p.OriginalPriceEUR = strPtrOrNil(v)
+	}
+	if p.PricePerUnitEUR != nil {
+		v := e.normalizePrice(*p.PricePerUnitEUR)
+		p.PricePerUnitEUR = strPtrOrNil(v)
+	}
+	// Discount text cleanup
+	p.DiscountText = strings.TrimSpace(p.DiscountText)
 
-	// Clean unit
-	product.Unit = e.normalizeUnit(product.Unit)
-
-	// Clean brand
-	product.Brand = strings.TrimSpace(product.Brand)
-
-	// Clean category
-	product.Category = e.normalizeCategory(product.Category)
-
-	return product
+	// Special tags de-dup
+	if len(p.SpecialTags) > 1 {
+		seen := map[string]struct{}{}
+		out := make([]string, 0, len(p.SpecialTags))
+		for _, t := range p.SpecialTags {
+			t = strings.TrimSpace(t)
+			if t == "" {
+				continue
+			}
+			if _, ok := seen[strings.ToLower(t)]; ok {
+				continue
+			}
+			seen[strings.ToLower(t)] = struct{}{}
+			out = append(out, t)
+		}
+		p.SpecialTags = out
+	}
+	return p
 }
 
-// normalizePrice normalizes price format
 func (e *ProductExtractor) normalizePrice(price string) string {
-	// Remove extra whitespace
 	price = strings.TrimSpace(price)
-
-	// Normalize common price patterns
+	// Convert "0 99 €" -> "0,99 €"
+	reSpaced := regexp.MustCompile(`^(\d+)\s(\d{2})\s*€?$`)
+	if reSpaced.MatchString(price) {
+		price = reSpaced.ReplaceAllString(price, "$1,$2 €")
+	}
+	// Standardize "X.XX €" or "€ X.XX"
 	price = regexp.MustCompile(`(\d+)[,.](\d{2})\s*€`).ReplaceAllString(price, "$1,$2 €")
 	price = regexp.MustCompile(`€\s*(\d+)[,.](\d{2})`).ReplaceAllString(price, "$1,$2 €")
-
+	// Add € if missing but formatted
+	price = regexp.MustCompile(`^(\d+)[,.](\d{2})$`).ReplaceAllString(price, "$1,$2 €")
 	return price
 }
 
-// normalizeUnit normalizes unit format
 func (e *ProductExtractor) normalizeUnit(unit string) string {
-	unit = strings.TrimSpace(strings.ToLower(unit))
-
-	// Normalize common units
-	unitMap := map[string]string{
-		"kilogramas": "kg",
-		"gramas":     "g",
-		"litras":     "l",
-		"mililitras": "ml",
-		"vienetų":    "vnt.",
-		"vienetai":   "vnt.",
-		"vienetas":   "vnt.",
-		"pakuotė":    "pak.",
-		"dėžė":       "dėž.",
+	u := strings.TrimSpace(strings.ToLower(unit))
+	m := map[string]string{
+		"kilogramas": "kg", "kg": "kg",
+		"gramas": "g", "g": "g",
+		"litras": "l", "l": "l",
+		"mililitras": "ml", "ml": "ml",
+		"vienetų": "vnt.", "vienetai": "vnt.", "vienetas": "vnt.", "vnt": "vnt.", "vnt.": "vnt.",
+		"pakuotė": "pak.", "pak": "pak.", "pak.": "pak.",
 	}
-
-	for original, normalized := range unitMap {
-		if strings.Contains(unit, original) {
-			return normalized
+	if out, ok := m[u]; ok {
+		return out
+	}
+	for k, v := range m {
+		if strings.Contains(u, k) {
+			return v
 		}
 	}
-
 	return unit
 }
 
-// normalizeCategory normalizes category names
 func (e *ProductExtractor) normalizeCategory(category string) string {
-	category = strings.TrimSpace(strings.ToLower(category))
-
-	// Get available categories from prompt builder
-	availableCategories := e.promptBuilder.GetAvailableCategories()
-
-	// Find best match
-	for _, available := range availableCategories {
-		if strings.Contains(category, strings.ToLower(available)) ||
-		   strings.Contains(strings.ToLower(available), category) {
+	c := strings.TrimSpace(strings.ToLower(category))
+	if c == "" {
+		return c
+	}
+	for _, available := range e.promptBuilder.GetAvailableCategories() {
+		a := strings.ToLower(available)
+		if strings.Contains(c, a) || strings.Contains(a, c) {
 			return available
 		}
 	}
-
 	return category
 }
 
-// isValidProduct checks if a product has minimum required information
-func (e *ProductExtractor) isValidProduct(product ExtractedProduct) bool {
-	// Must have name and price
-	if product.Name == "" || product.Price == "" {
+func (e *ProductExtractor) isValidPromotion(p Promotion) bool {
+	if len(strings.TrimSpace(p.NameLT)) == 0 && p.PromotionType == "" && p.PriceEUR == nil && p.DiscountPct == nil {
 		return false
 	}
-
-	// Price must contain currency or numbers
-	if !regexp.MustCompile(`\d`).MatchString(product.Price) {
-		return false
-	}
-
-	// Name must be reasonable length
-	if len(product.Name) < 2 || len(product.Name) > 200 {
-		return false
-	}
-
-	return true
+	// Keep entries with either a price or a percent (or explicit bundle/loyalty tag).
+	hasPrice := p.PriceEUR != nil && regexp.MustCompile(`\d+[,.]\d{2}\s*€`).MatchString(*p.PriceEUR)
+	hasPct := p.DiscountPct != nil && *p.DiscountPct > 0 && *p.DiscountPct < 100
+	isBundle := strings.EqualFold(p.DiscountType, "bundle") || strings.Contains(strings.Join(p.SpecialTags, " "), "+")
+	isLoyalty := strings.EqualFold(p.DiscountType, "loyalty") || p.LoyaltyRequired
+	return hasPrice || hasPct || isBundle || isLoyalty
 }
 
-// calculateConfidence calculates a confidence score for a product
-func (e *ProductExtractor) calculateConfidence(product ExtractedProduct) float64 {
-	confidence := 0.5 // Base confidence
-
-	// Increase confidence for complete information
-	if product.Name != "" {
-		confidence += 0.1
+func (e *ProductExtractor) calculatePromotionConfidence(p Promotion) float64 {
+	conf := 0.5
+	if p.NameLT != "" {
+		conf += 0.1
 	}
-	if product.Price != "" {
-		confidence += 0.2
+	if p.PriceEUR != nil && *p.PriceEUR != "" {
+		conf += 0.2
 	}
-	if product.Unit != "" {
-		confidence += 0.1
+	if p.Unit != "" || p.UnitSize != "" {
+		conf += 0.05
 	}
-	if product.Brand != "" {
-		confidence += 0.05
+	if p.Brand != "" {
+		conf += 0.05
 	}
-	if product.Category != "" {
-		confidence += 0.05
+	if p.CategoryGuessLT != "" {
+		conf += 0.05
 	}
-
-	// Increase confidence for well-formatted prices
-	if regexp.MustCompile(`\d+[,.]\d{2}\s*€`).MatchString(product.Price) {
-		confidence += 0.1
+	if p.PriceEUR != nil && regexp.MustCompile(`\d+[,.]\d{2}\s*€`).MatchString(*p.PriceEUR) {
+		conf += 0.05
 	}
-
-	// Decrease confidence for suspicious patterns
-	if strings.Contains(strings.ToLower(product.Name), "error") ||
-	   strings.Contains(strings.ToLower(product.Name), "unknown") {
-		confidence -= 0.3
+	if strings.Contains(strings.ToLower(p.NameLT), "unknown") {
+		conf -= 0.2
 	}
-
-	// Cap confidence between 0 and 1
-	if confidence > 1.0 {
-		confidence = 1.0
+	if conf > 1.0 {
+		conf = 1.0
 	}
-	if confidence < 0.0 {
-		confidence = 0.0
+	if conf < 0.0 {
+		conf = 0.0
 	}
-
-	return confidence
+	return conf
 }
 
-// GetExtractionStats returns statistics about extraction operations
-func (e *ProductExtractor) GetExtractionStats(results []*ExtractionResult) ExtractionStats {
-	stats := ExtractionStats{
-		TotalPages: len(results),
-	}
-
-	var totalProducts, totalTokens int
-	var totalProcessingTime time.Duration
-	var successfulExtractions int
-
-	for _, result := range results {
-		if result.Success {
-			successfulExtractions++
-			totalProducts += result.TotalProducts
+// promotionsToProducts maps priceful promotions to legacy ExtractedProduct.
+func (e *ProductExtractor) promotionsToProducts(items []Promotion) []ExtractedProduct {
+	out := make([]ExtractedProduct, 0, len(items))
+	for _, p := range items {
+		if p.PriceEUR == nil || strings.TrimSpace(*p.PriceEUR) == "" {
+			continue // only tangible price entries become "products"
 		}
-		totalTokens += result.TokensUsed
-		totalProcessingTime += result.ProcessingTime
+		discount := ""
+		if p.DiscountPct != nil {
+			discount = fmt.Sprintf("-%d%%", *p.DiscountPct)
+		} else if p.DiscountText != "" {
+			discount = p.DiscountText
+		}
+		orig := ""
+		if p.OriginalPriceEUR != nil {
+			orig = strings.TrimSpace(*p.OriginalPriceEUR)
+		}
+		out = append(out, ExtractedProduct{
+			Name:            strings.TrimSpace(p.NameLT),
+			Price:           e.normalizePrice(*p.PriceEUR),
+			Unit:            p.UnitSize,
+			OriginalPrice:   orig,
+			Discount:        discount,
+			DiscountType:    p.DiscountType,
+			SpecialDiscount: strings.Join(p.SpecialTags, ", "),
+			Brand:           p.Brand,
+			Category:        p.CategoryGuessLT,
+			Confidence:      p.Confidence,
+			BoundingBox:     p.BoundingBox,
+		})
 	}
+	return out
+}
 
-	stats.SuccessfulExtractions = successfulExtractions
+// -------------------- Legacy utils kept for stats ---------------------------
+
+func (e *ProductExtractor) GetExtractionStats(results []*ExtractionResult) ExtractionStats {
+	stats := ExtractionStats{TotalPages: len(results)}
+	var totalProducts, totalTokens int
+	var totalProcessing time.Duration
+	var ok int
+	for _, r := range results {
+		if r.Success {
+			ok++
+			totalProducts += r.TotalProducts
+		}
+		totalTokens += r.TokensUsed
+		totalProcessing += r.ProcessingTime
+	}
+	stats.SuccessfulExtractions = ok
 	stats.TotalProductsExtracted = totalProducts
 	stats.TotalTokensUsed = totalTokens
-
 	if len(results) > 0 {
-		stats.AverageProcessingTime = totalProcessingTime / time.Duration(len(results))
-		stats.SuccessRate = float64(successfulExtractions) / float64(len(results))
+		stats.AverageProcessingTime = totalProcessing / time.Duration(len(results))
+		stats.SuccessRate = float64(ok) / float64(len(results))
 	}
-
-	if successfulExtractions > 0 {
-		stats.AverageProductsPerPage = float64(totalProducts) / float64(successfulExtractions)
+	if ok > 0 {
+		stats.AverageProductsPerPage = float64(totalProducts) / float64(ok)
 	}
-
 	return stats
 }
 
-// ExtractionStats represents statistics about extraction operations
 type ExtractionStats struct {
-	TotalPages              int           `json:"total_pages"`
-	SuccessfulExtractions   int           `json:"successful_extractions"`
-	TotalProductsExtracted  int           `json:"total_products_extracted"`
-	AverageProductsPerPage  float64       `json:"average_products_per_page"`
-	TotalTokensUsed         int           `json:"total_tokens_used"`
-	AverageProcessingTime   time.Duration `json:"average_processing_time"`
-	SuccessRate             float64       `json:"success_rate"`
+	TotalPages             int           `json:"total_pages"`
+	SuccessfulExtractions  int           `json:"successful_extractions"`
+	TotalProductsExtracted int           `json:"total_products_extracted"`
+	AverageProductsPerPage float64       `json:"average_products_per_page"`
+	TotalTokensUsed        int           `json:"total_tokens_used"`
+	AverageProcessingTime  time.Duration `json:"average_processing_time"`
+	SuccessRate            float64       `json:"success_rate"`
+}
+
+// helpers
+func strPtrOrNil(s string) *string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return &s
 }

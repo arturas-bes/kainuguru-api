@@ -29,10 +29,11 @@ type Product struct {
 	Tags           []string `bun:"tags,array" json:"tags,omitempty"`
 
 	// Pricing information
-	CurrentPrice    float64  `bun:"current_price,notnull" json:"current_price"`
-	OriginalPrice   *float64 `bun:"original_price" json:"original_price,omitempty"`
-	DiscountPercent *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
-	Currency        string   `bun:"-" json:"currency"` // Not stored in DB, always EUR
+	CurrentPrice     float64  `bun:"current_price,notnull" json:"current_price"`
+	OriginalPrice    *float64 `bun:"original_price" json:"original_price,omitempty"`
+	DiscountPercent  *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
+	SpecialDiscount  *string  `bun:"special_discount" json:"special_discount,omitempty"` // e.g., "1+1", "3 už 2"
+	Currency         string   `bun:"-" json:"currency"`                                   // Not stored in DB, always EUR
 
 	// Product specifications
 	UnitSize    *string `bun:"unit_size" json:"unit_size,omitempty"`
@@ -107,7 +108,11 @@ func (pb *ProductBoundingBox) Scan(value interface{}) error {
 }
 
 func (pb ProductBoundingBox) Value() (driver.Value, error) {
-	return json.Marshal(pb)
+	b, err := json.Marshal(pb)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
 }
 
 func (pp *ProductPosition) Scan(value interface{}) error {
@@ -124,7 +129,11 @@ func (pp *ProductPosition) Scan(value interface{}) error {
 }
 
 func (pp ProductPosition) Value() (driver.Value, error) {
-	return json.Marshal(pp)
+	b, err := json.Marshal(pp)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
 }
 
 // IsCurrentlyOnSale checks if the product is currently on sale

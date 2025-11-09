@@ -73,6 +73,7 @@ type ProductPrice {
   currency: String!
   discount: Float
   discountPercent: Float
+  specialDiscount: String # e.g., "1+1", "3 už 2 €", "Antra prekė -50%"
 
   # Computed pricing fields
   discountAmount: Float!

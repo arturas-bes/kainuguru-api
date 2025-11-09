@@ -227,10 +227,9 @@ func (s *productService) CreateBatch(ctx context.Context, products []*models.Pro
 		}
 	}
 
-	// Batch insert with ON CONFLICT handling
+	// Batch insert
 	_, err := s.db.NewInsert().
 		Model(&products).
-		On("CONFLICT (flyer_id, normalized_name, valid_from) DO NOTHING").
 		Exec(ctx)
 
 	if err != nil {
@@ -241,7 +240,29 @@ func (s *productService) CreateBatch(ctx context.Context, products []*models.Pro
 }
 
 func (s *productService) Update(ctx context.Context, product *models.Product) error {
-	return fmt.Errorf("productService.Update not implemented")
+	product.UpdatedAt = time.Now()
+	
+	// Normalize name if changed
+	if product.NormalizedName == "" && product.Name != "" {
+		product.NormalizedName = NormalizeProductText(product.Name)
+	}
+	
+	// Generate search vector
+	if product.SearchVector == "" && product.NormalizedName != "" {
+		product.SearchVector = GenerateSearchVector(product.NormalizedName)
+	}
+	
+	// Update the product
+	_, err := s.db.NewUpdate().
+		Model(product).
+		WherePK().
+		Exec(ctx)
+	
+	if err != nil {
+		return fmt.Errorf("failed to update product: %w", err)
+	}
+	
+	return nil
 }
 
 func (s *productService) Delete(ctx context.Context, id int) error {

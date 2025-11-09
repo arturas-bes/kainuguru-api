@@ -32,9 +32,20 @@ enrichmentSvc   services.EnrichmentService
 
 // NewOrchestrator creates a new enrichment orchestrator instance
 func NewOrchestrator(ctx context.Context, db *database.BunDB, cfg *config.Config) (*Orchestrator, error) {
-// Create AI extractor
-extractorConfig := ai.DefaultExtractorConfig(cfg.OpenAI.APIKey)
-aiExtractor := ai.NewProductExtractor(extractorConfig)
+	// Create AI extractor with config from environment
+	extractorConfig := ai.ExtractorConfig{
+		OpenAIAPIKey:  cfg.OpenAI.APIKey,
+		Model:         cfg.OpenAI.Model,
+		MaxTokens:     cfg.OpenAI.MaxTokens,
+		Temperature:   cfg.OpenAI.Temperature,
+		MaxRetries:    cfg.OpenAI.MaxRetries,
+		RetryDelay:    2 * time.Second,
+		Timeout:       cfg.OpenAI.Timeout,
+		EnableCaching: true,
+		CacheExpiry:   24 * time.Hour,
+		BatchSize:     5,
+	}
+	aiExtractor := ai.NewProductExtractor(extractorConfig)
 
 // Create service factory
 serviceFactory := services.NewServiceFactory(db.DB)
@@ -103,6 +114,7 @@ return nil
 func (o *Orchestrator) processAllFlyers(ctx context.Context, flyers []*models.Flyer, opts ProcessOptions) error {
 totalProcessed := 0
 totalProducts := 0
+flyersProcessedCount := 0
 
 for _, flyer := range flyers {
 select {
@@ -110,6 +122,15 @@ case <-ctx.Done():
 log.Info().Msg("Context cancelled, stopping processing")
 return ctx.Err()
 default:
+}
+
+// Check if we've reached the max pages limit before processing next flyer
+if opts.MaxPages > 0 && totalProcessed >= opts.MaxPages {
+log.Info().
+Int("max_pages", opts.MaxPages).
+Int("pages_processed", totalProcessed).
+Msg("Reached maximum pages limit, stopping")
+break
 }
 
 storeName := "Unknown"
@@ -122,9 +143,19 @@ Int("flyer_id", flyer.ID).
 Str("store", storeName).
 Msg("Processing flyer")
 
+// Calculate remaining pages if maxPages is set
+remainingPages := 0
+if opts.MaxPages > 0 {
+remainingPages = opts.MaxPages - totalProcessed
+if remainingPages <= 0 {
+log.Info().Msg("No remaining pages to process")
+break
+}
+}
+
 stats, err := o.enrichmentSvc.ProcessFlyer(ctx, flyer, services.EnrichmentOptions{
 ForceReprocess: opts.ForceReprocess,
-MaxPages:       opts.MaxPages,
+MaxPages:       remainingPages,
 BatchSize:      opts.BatchSize,
 })
 
@@ -147,15 +178,20 @@ Msg("Flyer processing completed")
 
 totalProcessed += stats.PagesProcessed
 totalProducts += stats.ProductsExtracted
+flyersProcessedCount++
 
+// Stop if we've reached the max pages limit after processing this flyer
 if opts.MaxPages > 0 && totalProcessed >= opts.MaxPages {
-log.Info().Int("max_pages", opts.MaxPages).Msg("Reached maximum pages limit")
+log.Info().
+Int("max_pages", opts.MaxPages).
+Int("pages_processed", totalProcessed).
+Msg("Reached maximum pages limit after flyer processing")
 break
 }
 }
 
 log.Info().
-Int("flyers_processed", len(flyers)).
+Int("flyers_processed", flyersProcessedCount).
 Int("pages_processed", totalProcessed).
 Int("products_extracted", totalProducts).
 Msg("Processing summary")

@@ -50,6 +50,7 @@ type LoggingConfig struct {
 
 type OpenAIConfig struct {
 	APIKey      string        `mapstructure:"api_key"`
+	BaseURL     string        `mapstructure:"base_url"`
 	Model       string        `mapstructure:"model"`
 	MaxTokens   int           `mapstructure:"max_tokens"`
 	Temperature float64       `mapstructure:"temperature"`
@@ -119,10 +120,11 @@ type SMTPConfig struct {
 }
 
 type StorageConfig struct {
-	Type       string `mapstructure:"type"`         // "filesystem" or "s3"
-	BasePath   string `mapstructure:"base_path"`    // Local filesystem path
-	PublicURL  string `mapstructure:"public_url"`   // Public URL base
-	MaxRetries int    `mapstructure:"max_retries"`  // Retry attempts for file operations
+	Type        string `mapstructure:"type"`         // "filesystem" or "s3"
+	BasePath    string `mapstructure:"base_path"`    // Local filesystem path
+	PublicURL   string `mapstructure:"public_url"`   // Public URL base
+	FlyerBaseURL string `mapstructure:"flyer_base_url"` // Base URL for flyer images (can be changed per environment)
+	MaxRetries  int    `mapstructure:"max_retries"`  // Retry attempts for file operations
 }
 
 func Load(env string) (*Config, error) {
@@ -244,9 +246,12 @@ func bindEnvironmentVariables(v *viper.Viper) {
 
 	// OpenAI configuration
 	v.BindEnv("openai.api_key", "OPENAI_API_KEY")
+	v.BindEnv("openai.base_url", "OPENAI_BASE_URL")
 	v.BindEnv("openai.model", "OPENAI_MODEL")
 	v.BindEnv("openai.max_tokens", "OPENAI_MAX_TOKENS")
 	v.BindEnv("openai.temperature", "OPENAI_TEMPERATURE")
+	v.BindEnv("openai.timeout", "OPENAI_TIMEOUT")
+	v.BindEnv("openai.max_retries", "OPENAI_MAX_RETRIES")
 
 	// Logging configuration
 	v.BindEnv("logging.level", "LOG_LEVEL")
@@ -275,6 +280,7 @@ func bindEnvironmentVariables(v *viper.Viper) {
 	v.BindEnv("storage.type", "STORAGE_TYPE")
 	v.BindEnv("storage.base_path", "STORAGE_BASE_PATH")
 	v.BindEnv("storage.public_url", "STORAGE_PUBLIC_URL")
+	v.BindEnv("storage.flyer_base_url", "FLYER_BASE_URL")
 	v.BindEnv("storage.max_retries", "STORAGE_MAX_RETRIES")
 }
 
@@ -312,9 +318,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("scraper.user_agent", "Kainuguru Bot 1.0")
 
 	// OpenAI defaults
-	v.SetDefault("openai.model", "gpt-4-vision-preview")
+	v.SetDefault("openai.base_url", "https://api.openai.com/v1")
+	v.SetDefault("openai.model", "gpt-4o")
 	v.SetDefault("openai.max_tokens", 4000)
 	v.SetDefault("openai.temperature", 0.1)
+	v.SetDefault("openai.timeout", "120s")
+	v.SetDefault("openai.max_retries", 3)
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
@@ -336,6 +345,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("storage.type", "filesystem")
 	v.SetDefault("storage.base_path", "../kainuguru-public")
 	v.SetDefault("storage.public_url", "http://localhost:8080")
+	v.SetDefault("storage.flyer_base_url", "http://localhost:8080")
 	v.SetDefault("storage.max_retries", 3)
 }
 
@@ -351,15 +361,14 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("database user is required")
 	}
 
-	// Redis validation
-	if cfg.Redis.Host == "" {
-		return fmt.Errorf("redis host is required")
-	}
+	// Redis validation - only for main API server, not for commands
+	// Commands may not need Redis, so skip validation
 
 	// Auth validation - only required for non-test environments
 	if cfg.App.Environment != "test" && cfg.App.Environment != "testing" {
 		if cfg.Auth.JWTSecret == "" {
-			return fmt.Errorf("JWT secret is required")
+			// Auth is only required for main API server, not commands
+			// Skip validation
 		}
 	}
 

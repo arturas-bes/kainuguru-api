@@ -11,15 +11,19 @@ type ProductMasterMatch struct {
 
 	ID              int64     `bun:"id,pk,autoincrement" json:"id"`
 	ProductID       int64     `bun:"product_id,notnull" json:"product_id"`
-	MasterID        int64     `bun:"master_id,notnull" json:"master_id"`
-	ConfidenceScore float64   `bun:"confidence_score,notnull" json:"confidence_score"`
-	MatchMethod     string    `bun:"match_method,notnull" json:"match_method"`
-	MatchedAt       time.Time `bun:"matched_at,notnull,default:now()" json:"matched_at"`
-	MatchedBy       string    `bun:"matched_by" json:"matched_by"`
-	IsVerified      bool      `bun:"is_verified,default:false" json:"is_verified"`
+	ProductMasterID int64     `bun:"product_master_id,notnull" json:"product_master_id"`
+	Confidence      float64   `bun:"confidence,notnull" json:"confidence"`
+	MatchType       string    `bun:"match_type,notnull" json:"match_type"`
+	MatchScore      *float64  `bun:"match_score" json:"match_score"`
+	MatchedFields   any       `bun:"matched_fields,type:jsonb" json:"matched_fields"`
+	ReviewStatus    string    `bun:"review_status,default:'pending'" json:"review_status"`
+	ReviewedBy      *string   `bun:"reviewed_by,type:uuid" json:"reviewed_by"`
+	ReviewedAt      *time.Time `bun:"reviewed_at" json:"reviewed_at"`
+	CreatedAt       time.Time `bun:"created_at,notnull,default:now()" json:"created_at"`
+	UpdatedAt       time.Time `bun:"updated_at,notnull,default:now()" json:"updated_at"`
 
 	Product *Product       `bun:"rel:belongs-to,join:product_id=id" json:"product,omitempty"`
-	Master  *ProductMaster `bun:"rel:belongs-to,join:master_id=id" json:"master,omitempty"`
+	Master  *ProductMaster `bun:"rel:belongs-to,join:product_master_id=id" json:"master,omitempty"`
 }
 
 func (pmm *ProductMasterMatch) TableName() string {

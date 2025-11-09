@@ -2,7 +2,11 @@ package enrichment
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -96,10 +100,25 @@ func (s *service) ProcessFlyer(ctx context.Context, flyer *models.Flyer, opts se
 		batchSize = 10
 	}
 	
-	for i := 0; i < len(pages); i += batchSize {
+	for i := 0; i < len(pages) && (opts.MaxPages == 0 || stats.PagesProcessed < opts.MaxPages); i += batchSize {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return stats, ctx.Err()
+		default:
+		}
+		
 		end := i + batchSize
 		if end > len(pages) {
 			end = len(pages)
+		}
+		
+		// Limit batch size if we're approaching max pages
+		if opts.MaxPages > 0 {
+			remaining := opts.MaxPages - stats.PagesProcessed
+			if end-i > remaining {
+				end = i + remaining
+			}
 		}
 		
 		batch := pages[i:end]
@@ -114,11 +133,6 @@ func (s *service) ProcessFlyer(ctx context.Context, flyer *models.Flyer, opts se
 		stats.PagesProcessed += batchStats.PagesProcessed
 		stats.PagesFailed += batchStats.PagesFailed
 		stats.ProductsExtracted += batchStats.ProductsExtracted
-		
-		// Check if we should stop
-		if opts.MaxPages > 0 && stats.PagesProcessed >= opts.MaxPages {
-			break
-		}
 	}
 	
 	// Calculate average confidence
@@ -141,6 +155,11 @@ func (s *service) getPagesToProcess(ctx context.Context, flyerID int, opts servi
 	var toProcess []*models.FlyerPage
 	
 	for _, page := range pages {
+		// Stop if we've reached maxPages limit
+		if opts.MaxPages > 0 && len(toProcess) >= opts.MaxPages {
+			break
+		}
+		
 		// Skip if already completed and not forcing reprocess
 		if page.ExtractionStatus == "completed" && !opts.ForceReprocess {
 			continue
@@ -229,8 +248,18 @@ func (s *service) processPage(ctx context.Context, flyer *models.Flyer, page *mo
 		storeCode = flyer.Store.Code
 	}
 	
-	// Extract products using AI
-	result, err := s.aiExtractor.ExtractProducts(ctx, *page.ImageURL, storeCode, page.PageNumber)
+	// Convert local image URL to base64 (OpenAI cannot access localhost URLs)
+	base64Image, err := s.convertImageToBase64(*page.ImageURL)
+	if err != nil {
+		page.ExtractionStatus = "failed"
+		errMsg := fmt.Sprintf("failed to load image: %v", err)
+		page.ExtractionError = &errMsg
+		s.pageService.Update(ctx, page)
+		return nil, fmt.Errorf("image conversion failed: %w", err)
+	}
+	
+	// Extract products using AI (with base64)
+	result, err := s.aiExtractor.ExtractProductsFromBase64(ctx, base64Image, storeCode, page.PageNumber)
 	if err != nil {
 		page.ExtractionStatus = "failed"
 		errMsg := err.Error()
@@ -269,6 +298,12 @@ func (s *service) processPage(ctx context.Context, flyer *models.Flyer, page *mo
 			page.ExtractionError = &errMsg
 			s.pageService.Update(ctx, page)
 			return nil, fmt.Errorf("failed to create products: %w", err)
+		}
+		
+		// Match products to masters or create new masters
+		if err := s.matchProductsToMasters(ctx, products); err != nil {
+			log.Warn().Err(err).Msg("Failed to match products to masters")
+			// Don't fail the entire batch for matching errors
 		}
 	}
 	
@@ -357,6 +392,7 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 			
 			Name:           extracted.Name,
 			NormalizedName: normalizeText(extracted.Name),
+			Tags:           extractProductTags(extracted),
 			
 			ExtractionConfidence: extracted.Confidence,
 			ExtractionMethod:     "ai_vision",
@@ -397,11 +433,19 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 			product.Category = &extracted.Category
 		}
 		
-		if extracted.BoundingBox != nil {
+		// Set special discount if present
+		if extracted.SpecialDiscount != "" {
+			product.SpecialDiscount = &extracted.SpecialDiscount
+			product.IsOnSale = true
+		}
+		
+		// Only set bounding box if it has valid data
+		if extracted.BoundingBox != nil && extracted.BoundingBox.Width > 0 && extracted.BoundingBox.Height > 0 {
 			product.BoundingBox = extracted.BoundingBox
 		}
 		
-		if extracted.PagePosition != nil {
+		// Only set page position if it has valid data
+		if extracted.PagePosition != nil && extracted.PagePosition.Zone != "" {
 			product.PagePosition = extracted.PagePosition
 		}
 		
@@ -409,4 +453,108 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 	}
 	
 	return products
+}
+
+// matchProductsToMasters matches products to existing masters or creates new ones
+func (s *service) matchProductsToMasters(ctx context.Context, products []*models.Product) error {
+	for _, product := range products {
+		// Try to find a matching master
+		matches, err := s.masterService.FindBestMatch(ctx, product, 3)
+		if err != nil {
+			log.Warn().Err(err).Int("product_id", product.ID).Msg("Failed to find master match")
+			continue
+		}
+		
+		// Auto-link if confidence is high enough (>= 0.85)
+		if len(matches) > 0 && matches[0].Confidence >= 0.85 {
+			masterIDInt := int(matches[0].Master.ID)
+			product.ProductMasterID = &masterIDInt
+			if err := s.productService.Update(ctx, product); err != nil {
+				log.Warn().Err(err).Int("product_id", product.ID).Msg("Failed to link product to master")
+			}
+			log.Debug().
+				Int("product_id", product.ID).
+				Int64("master_id", matches[0].Master.ID).
+				Float64("confidence", matches[0].Confidence).
+				Msg("Auto-linked product to master")
+			continue
+		}
+		
+		// Create new master if no good match found (confidence < 0.65)
+		if len(matches) == 0 || matches[0].Confidence < 0.65 {
+			master, err := s.masterService.CreateFromProduct(ctx, product)
+			if err != nil {
+				log.Warn().Err(err).Int("product_id", product.ID).Msg("Failed to create product master")
+				continue
+			}
+			
+			// Link product to the new master
+			masterIDInt := int(master.ID)
+			product.ProductMasterID = &masterIDInt
+			if err := s.productService.Update(ctx, product); err != nil {
+				log.Warn().Err(err).Int("product_id", product.ID).Msg("Failed to link product to new master")
+			}
+			log.Debug().
+				Int("product_id", product.ID).
+				Int64("master_id", master.ID).
+				Msg("Created new master for product")
+			continue
+		}
+		
+		// Medium confidence (0.65 - 0.85): flag for manual review
+		if len(matches) > 0 {
+			// Mark product as requiring review
+			product.RequiresReview = true
+			if err := s.productService.Update(ctx, product); err != nil {
+				log.Warn().Err(err).Int("product_id", product.ID).Msg("Failed to flag product for review")
+			}
+			log.Debug().
+				Int("product_id", product.ID).
+				Int64("suggested_master_id", matches[0].Master.ID).
+				Float64("confidence", matches[0].Confidence).
+				Msg("Product flagged for manual review")
+		}
+	}
+	
+	return nil
+}
+
+// convertImageToBase64 converts a local image path to base64 data URI
+func (s *service) convertImageToBase64(imageURL string) (string, error) {
+	// imageURL is stored as relative path like: flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-8.jpg
+	// Or as full URL like: http://localhost:8080/flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-8.jpg
+	
+	// Remove the base URL part if present
+	relativePath := strings.TrimPrefix(imageURL, "http://localhost:8080/")
+	relativePath = strings.TrimPrefix(relativePath, "https://localhost:8080/")
+	
+	// Build absolute path - kainuguru-public is sibling to kainuguru-api
+	basePath := filepath.Join("..", "kainuguru-public")
+	imagePath := filepath.Join(basePath, relativePath)
+	
+	// Read image file
+	imageData, err := os.ReadFile(imagePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read image from %s: %w", imagePath, err)
+	}
+	
+	// Detect MIME type based on file extension
+	mimeType := "image/jpeg"
+	ext := strings.ToLower(filepath.Ext(imagePath))
+	switch ext {
+	case ".png":
+		mimeType = "image/png"
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	case ".webp":
+		mimeType = "image/webp"
+	}
+	
+	// Encode to base64
+	base64Data := base64.StdEncoding.EncodeToString(imageData)
+	
+	// Format as data URI
+	dataURI := fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
+	
+	return dataURI, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/services/matching"
@@ -379,12 +380,10 @@ func (s *productMasterService) MatchProduct(ctx context.Context, productID int, 
 		_, err = tx.NewInsert().
 			Model(&models.ProductMasterMatch{
 				ProductID:       int64(productID),
-				MasterID:        masterID,
-				ConfidenceScore: master.ConfidenceScore,
-				MatchMethod:     "manual",
-				MatchedAt:       time.Now(),
-				MatchedBy:       "system",
-				IsVerified:      true,
+				ProductMasterID: masterID,
+				Confidence:      master.ConfidenceScore,
+				MatchType:       "manual",
+				ReviewStatus:    "approved",
 			}).
 			Exec(ctx)
 
@@ -407,6 +406,92 @@ func (s *productMasterService) MatchProduct(ctx context.Context, productID int, 
 	return nil
 }
 
+// FindBestMatch finds the best matching product masters for a product
+func (s *productMasterService) FindBestMatch(ctx context.Context, product *models.Product, limit int) ([]*ProductMasterMatch, error) {
+	matchResults, err := s.matcher.FindBestMatches(ctx, product, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find best matches: %w", err)
+	}
+
+	var matches []*ProductMasterMatch
+	for _, result := range matchResults {
+		matches = append(matches, &ProductMasterMatch{
+			Master:      result.Master,
+			MatchScore:  result.Score,
+			Method:      result.Method,
+			Confidence:  result.Confidence,
+		})
+	}
+
+	return matches, nil
+}
+
+// CreateFromProduct creates a new product master from a product
+func (s *productMasterService) CreateFromProduct(ctx context.Context, product *models.Product) (*models.ProductMaster, error) {
+	now := time.Now()
+	
+	// Normalize product name by removing brand
+	genericName := s.normalizeProductName(product.Name, product.Brand)
+	
+	master := &models.ProductMaster{
+		Name:            genericName,
+		NormalizedName:  s.normalizer.NormalizeForSearch(genericName),
+		Brand:           product.Brand,
+		Category:        product.Category,
+		Subcategory:     product.Subcategory,
+		Tags:            product.Tags,
+		MatchCount:      1,
+		ConfidenceScore: 0.5,
+		LastSeenDate:    &now,
+		Status:          string(models.ProductMasterStatusActive),
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	if product.UnitSize != nil {
+		master.StandardUnit = product.UnitSize
+	}
+
+	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewInsert().
+			Model(master).
+			Exec(ctx)
+
+		if err != nil {
+			return fmt.Errorf("failed to create master: %w", err)
+		}
+
+		_, err = tx.NewInsert().
+			Model(&models.ProductMasterMatch{
+				ProductID:       int64(product.ID),
+				ProductMasterID: master.ID,
+				Confidence:      master.ConfidenceScore,
+				MatchType:       "new_master",
+				ReviewStatus:    "pending",
+			}).
+			Exec(ctx)
+
+		if err != nil {
+			return fmt.Errorf("failed to create match record: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Info("created master from product",
+		slog.Int("product_id", product.ID),
+		slog.Int64("master_id", master.ID),
+		slog.String("name", master.Name),
+		slog.String("original_name", product.Name),
+	)
+
+	return master, nil
+}
+
 func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error) {
 	product := &models.Product{}
 	err := s.db.NewSelect().
@@ -420,9 +505,13 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 	}
 
 	now := time.Now()
+	
+	// Normalize product name by removing brand
+	genericName := s.normalizeProductName(product.Name, product.Brand)
+	
 	master := &models.ProductMaster{
-		Name:            product.Name,
-		NormalizedName:  product.NormalizedName,
+		Name:            genericName,
+		NormalizedName:  s.normalizer.NormalizeForSearch(genericName),
 		Brand:           product.Brand,
 		Category:        product.Category,
 		Subcategory:     product.Subcategory,
@@ -463,12 +552,10 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 		_, err = tx.NewInsert().
 			Model(&models.ProductMasterMatch{
 				ProductID:       int64(productID),
-				MasterID:        master.ID,
-				ConfidenceScore: master.ConfidenceScore,
-				MatchMethod:     "new_master",
-				MatchedAt:       now,
-				MatchedBy:       "system",
-				IsVerified:      false,
+				ProductMasterID: master.ID,
+				Confidence:      master.ConfidenceScore,
+				MatchType:       "new_master",
+				ReviewStatus:    "pending",
 			}).
 			Exec(ctx)
 
@@ -703,4 +790,76 @@ func (s *productMasterService) GetOverallMatchingStats(ctx context.Context) (*Ov
 	}
 
 	return &stats, nil
+}
+
+// normalizeProductName removes brand names from product names to create generic product masters
+// Examples:
+// "Saulėgrąžų aliejus NATURA 1L" -> "Saulėgrąžų aliejus"
+// "Glaistytas varškės sūrelis MAGIJA" -> "Glaistytas varškės sūrelis"
+// "SOSTINĖS batonas" -> "Batonas"
+// "IKI varškė" -> "Varškė"
+func (s *productMasterService) normalizeProductName(name string, brand *string) string {
+	normalized := name
+	
+	// Remove brand from name if present
+	if brand != nil && *brand != "" {
+		brandUpper := strings.ToUpper(*brand)
+		brandLower := strings.ToLower(*brand)
+		brandTitle := strings.Title(strings.ToLower(*brand))
+		
+		// Remove all variations of the brand
+		normalized = strings.ReplaceAll(normalized, brandUpper, "")
+		normalized = strings.ReplaceAll(normalized, *brand, "")
+		normalized = strings.ReplaceAll(normalized, brandLower, "")
+		normalized = strings.ReplaceAll(normalized, brandTitle, "")
+	}
+	
+	// Define known brands to remove
+	knownBrands := map[string]bool{
+		"IKI": true, "MAXIMA": true, "RIMI": true,
+		"DVARO": true, "ROKIŠKIO": true, "SVALYA": true,
+		"NATURA": true, "MAGIJA": true, "SOSTINĖS": true,
+		"CLEVER": true, "TARCZYNSKI": true, "JUBILIEJAUS": true,
+	}
+	
+	words := strings.Fields(normalized)
+	filteredWords := []string{}
+	
+	for _, word := range words {
+		// Keep word if it's not all uppercase or if it's a measurement
+		isAllUpper := word == strings.ToUpper(word) && len(word) > 1
+		isMeasurement := strings.Contains(strings.ToLower(word), "kg") || 
+						 strings.Contains(strings.ToLower(word), "ml") ||
+						 strings.Contains(strings.ToLower(word), "vnt") ||
+						 strings.Contains(strings.ToLower(word), "l") ||
+						 strings.Contains(strings.ToLower(word), "g")
+		
+		if !isAllUpper || isMeasurement {
+			// Not all uppercase, keep it
+			filteredWords = append(filteredWords, word)
+		} else {
+			// All uppercase - check if it's a known brand
+			if !knownBrands[strings.ToUpper(word)] {
+				// Not a known brand, keep it
+				filteredWords = append(filteredWords, word)
+			}
+			// If it's a known brand, skip it (don't add to filteredWords)
+		}
+	}
+	
+	normalized = strings.Join(filteredWords, " ")
+	
+	// Clean up extra spaces and punctuation
+	normalized = strings.TrimSpace(normalized)
+	normalized = strings.Trim(normalized, ",")
+	normalized = strings.TrimSpace(normalized)
+	
+	// Capitalize first letter
+	if len(normalized) > 0 {
+		runes := []rune(normalized)
+		runes[0] = unicode.ToUpper(runes[0])
+		normalized = string(runes)
+	}
+	
+	return normalized
 }

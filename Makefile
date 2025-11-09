@@ -58,6 +58,7 @@ build:
 	@go build -o bin/api cmd/api/main.go
 	@go build -o bin/seeder cmd/seeder/main.go
 	@go build -o bin/enrich-flyers cmd/enrich-flyers/*.go
+	@go build -o bin/archive-flyers cmd/archive-flyers/*.go
 	@echo "✅ Binaries built successfully!"
 
 build-enrich:
@@ -65,6 +66,12 @@ build-enrich:
 	@mkdir -p bin/
 	@go build -o bin/enrich-flyers cmd/enrich-flyers/*.go
 	@echo "✅ Enrichment command built: bin/enrich-flyers"
+
+build-archive:
+	@echo "📦 Building archive command..."
+	@mkdir -p bin/
+	@go build -o bin/archive-flyers cmd/archive-flyers/*.go
+	@echo "✅ Archive command built: bin/archive-flyers"
 
 format:
 	@echo "🧹 Cleaning up and formatting code..."

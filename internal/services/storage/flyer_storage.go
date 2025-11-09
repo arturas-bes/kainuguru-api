@@ -16,7 +16,7 @@ import (
 // FlyerStorageService handles flyer image storage operations
 type FlyerStorageService interface {
 	SaveFlyerPage(ctx context.Context, flyer *models.Flyer, pageNumber int, imageData io.Reader) (string, error)
-	GetFlyerPageURL(flyer *models.Flyer, pageNumber int) string
+	GetFlyerPageURL(flyer *models.Flyer, pageNumber int, baseURL string) string
 	GetFlyerPagePath(flyer *models.Flyer, pageNumber int) string
 	DeleteFlyer(ctx context.Context, flyer *models.Flyer) error
 	EnforceStorageLimit(ctx context.Context, storeCode string) error
@@ -36,7 +36,7 @@ func NewFileSystemStorage(basePath, publicURL string) FlyerStorageService {
 	}
 }
 
-// SaveFlyerPage saves a flyer page image to disk and returns the public URL
+// SaveFlyerPage saves a flyer page image to disk and returns the relative path
 func (s *fileSystemStorage) SaveFlyerPage(ctx context.Context, flyer *models.Flyer, pageNumber int, imageData io.Reader) (string, error) {
 	// Construct file path
 	relativePath := flyer.GetImageBasePath()
@@ -69,16 +69,19 @@ func (s *fileSystemStorage) SaveFlyerPage(ctx context.Context, flyer *models.Fly
 		Int("page", pageNumber).
 		Msg("Saved flyer page")
 
-	// Return the public URL
-	publicURL := s.GetFlyerPageURL(flyer, pageNumber)
-	return publicURL, nil
+	// Return the relative path (not full URL)
+	return fmt.Sprintf("%s/%s", relativePath, fileName), nil
 }
 
 // GetFlyerPageURL returns the public URL for a flyer page
-func (s *fileSystemStorage) GetFlyerPageURL(flyer *models.Flyer, pageNumber int) string {
+func (s *fileSystemStorage) GetFlyerPageURL(flyer *models.Flyer, pageNumber int, baseURL string) string {
 	relativePath := flyer.GetImageBasePath()
 	fileName := fmt.Sprintf("page-%d.jpg", pageNumber)
-	return fmt.Sprintf("%s/%s/%s", s.publicURL, relativePath, fileName)
+	// Use provided baseURL or fall back to configured publicURL
+	if baseURL == "" {
+		baseURL = s.publicURL
+	}
+	return fmt.Sprintf("%s/%s/%s", baseURL, relativePath, fileName)
 }
 
 // GetFlyerPagePath returns the local filesystem path for a flyer page

@@ -7,28 +7,64 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
 // ClientConfig holds configuration for OpenAI client
 type ClientConfig struct {
-	APIKey     string        `json:"api_key"`
-	BaseURL    string        `json:"base_url"`
-	Timeout    time.Duration `json:"timeout"`
-	MaxRetries int           `json:"max_retries"`
-	RetryDelay time.Duration `json:"retry_delay"`
-	UserAgent  string        `json:"user_agent"`
+	APIKey      string        `json:"api_key"`
+	Model       string        `json:"model"`
+	BaseURL     string        `json:"base_url"`
+	Timeout     time.Duration `json:"timeout"`
+	MaxRetries  int           `json:"max_retries"`
+	RetryDelay  time.Duration `json:"retry_delay"`
+	UserAgent   string        `json:"user_agent"`
+	MaxTokens   int           `json:"max_tokens"`
+	Temperature float64       `json:"temperature"`
+	Referer     string        `json:"referer"`
+	AppTitle    string        `json:"app_title"`
 }
 
 // DefaultClientConfig returns sensible defaults
 func DefaultClientConfig(apiKey string) ClientConfig {
+	model := os.Getenv("OPENAI_MODEL")
+	if model == "" {
+		model = "gpt-4o"
+	}
+	
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+	
+	// For OpenRouter, add openai/ prefix if not present
+	if baseURL == "https://openrouter.ai/api/v1" && model == "gpt-4o" {
+		model = "openai/gpt-4o"
+	}
+	
+	referer := os.Getenv("OPENAI_REFERER")
+	if referer == "" {
+		referer = "https://kainuguru.com"
+	}
+	
+	appTitle := os.Getenv("OPENAI_APP_TITLE")
+	if appTitle == "" {
+		appTitle = "Kainuguru"
+	}
+	
 	return ClientConfig{
-		APIKey:     apiKey,
-		BaseURL:    "https://api.openai.com/v1",
-		Timeout:    60 * time.Second,
-		MaxRetries: 3,
-		RetryDelay: 2 * time.Second,
-		UserAgent:  "KainuguruBot/1.0",
+		APIKey:      apiKey,
+		Model:       model,
+		BaseURL:     baseURL,
+		Timeout:     60 * time.Second,
+		MaxRetries:  3,
+		RetryDelay:  2 * time.Second,
+		UserAgent:   "KainuguruBot/1.0",
+		MaxTokens:   4000,
+		Temperature: 0.1,
+		Referer:     referer,
+		AppTitle:    appTitle,
 	}
 }
 
@@ -117,7 +153,7 @@ type ErrorResponse struct {
 // AnalyzeImage sends an image to OpenAI Vision API for analysis
 func (c *Client) AnalyzeImage(ctx context.Context, imageURL, prompt string) (*VisionResponse, error) {
 	request := VisionRequest{
-		Model: "gpt-4-vision-preview",
+		Model: c.config.Model,
 		Messages: []Message{
 			{
 				Role: "user",
@@ -136,8 +172,8 @@ func (c *Client) AnalyzeImage(ctx context.Context, imageURL, prompt string) (*Vi
 				},
 			},
 		},
-		MaxTokens:   1000,
-		Temperature: 0.1,
+		MaxTokens:   c.config.MaxTokens,
+		Temperature: c.config.Temperature,
 	}
 
 	return c.makeVisionRequest(ctx, request)
@@ -146,7 +182,7 @@ func (c *Client) AnalyzeImage(ctx context.Context, imageURL, prompt string) (*Vi
 // AnalyzeImageWithBase64 sends a base64 encoded image to OpenAI Vision API
 func (c *Client) AnalyzeImageWithBase64(ctx context.Context, base64Image, prompt string) (*VisionResponse, error) {
 	request := VisionRequest{
-		Model: "gpt-4-vision-preview",
+		Model: c.config.Model,
 		Messages: []Message{
 			{
 				Role: "user",
@@ -165,8 +201,8 @@ func (c *Client) AnalyzeImageWithBase64(ctx context.Context, base64Image, prompt
 				},
 			},
 		},
-		MaxTokens:   1000,
-		Temperature: 0.1,
+		MaxTokens:   c.config.MaxTokens,
+		Temperature: c.config.Temperature,
 	}
 
 	return c.makeVisionRequest(ctx, request)
@@ -215,6 +251,14 @@ func (c *Client) makeVisionRequest(ctx context.Context, request VisionRequest) (
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 	httpReq.Header.Set("User-Agent", c.config.UserAgent)
+	
+	// Add OpenRouter specific headers if configured
+	if c.config.Referer != "" {
+		httpReq.Header.Set("HTTP-Referer", c.config.Referer)
+	}
+	if c.config.AppTitle != "" {
+		httpReq.Header.Set("X-Title", c.config.AppTitle)
+	}
 
 	// Make request with retries
 	var response *VisionResponse
@@ -238,7 +282,7 @@ func (c *Client) makeVisionRequest(ctx context.Context, request VisionRequest) (
 		switch resp.StatusCode {
 		case http.StatusOK:
 			if err := json.Unmarshal(body, &response); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+				return nil, fmt.Errorf("failed to unmarshal response: %v (body preview: %s)", err, string(body[:min(200, len(body))]))
 			}
 			return response, nil
 
@@ -355,11 +399,17 @@ func ValidateAPIKey(apiKey string) error {
 // GetModelLimits returns the known limits for different models
 func GetModelLimits(model string) ModelLimits {
 	limits := map[string]ModelLimits{
-		"gpt-4-vision-preview": {
+		"gpt-4o": {
 			MaxTokens:       4096,
 			MaxImageSize:    20 * 1024 * 1024, // 20MB
 			MaxImages:       10,
-			CostPer1KTokens: 0.01, // Approximate pricing
+			CostPer1KTokens: 0.01,
+		},
+		"gpt-4-vision-preview": {  // Deprecated but keeping for reference
+			MaxTokens:       4096,
+			MaxImageSize:    20 * 1024 * 1024,
+			MaxImages:       10,
+			CostPer1KTokens: 0.01,
 		},
 		"gpt-4": {
 			MaxTokens:       8192,
@@ -373,7 +423,7 @@ func GetModelLimits(model string) ModelLimits {
 		return limit
 	}
 
-	// Default limits
+	// Default limits for gpt-4o
 	return ModelLimits{
 		MaxTokens:       4096,
 		MaxImageSize:    20 * 1024 * 1024,

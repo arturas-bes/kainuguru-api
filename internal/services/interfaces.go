@@ -55,6 +55,7 @@ type FlyerService interface {
 	CompleteProcessing(ctx context.Context, flyerID int, productsExtracted int) error
 	FailProcessing(ctx context.Context, flyerID int) error
 	ArchiveFlyer(ctx context.Context, flyerID int) error
+	ArchiveOldFlyers(ctx context.Context) (int, error)
 
 	// Relations
 	GetWithPages(ctx context.Context, flyerID int) (*models.Flyer, error)
@@ -146,6 +147,8 @@ type ProductMasterService interface {
 	// Matching operations
 	FindMatchingMasters(ctx context.Context, productName string, brand string, category string) ([]*models.ProductMaster, error)
 	FindMatchingMastersWithScores(ctx context.Context, productName string, brand string, category string) ([]*ProductMasterMatch, error)
+	FindBestMatch(ctx context.Context, product *models.Product, limit int) ([]*ProductMasterMatch, error)
+	CreateFromProduct(ctx context.Context, product *models.Product) (*models.ProductMaster, error)
 	MatchProduct(ctx context.Context, productID int, masterID int64) error
 	CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error)
 
@@ -309,6 +312,7 @@ type ProductMasterMatch struct {
 	Master     *models.ProductMaster `json:"master"`
 	MatchScore float64               `json:"match_score"`
 	Method     string                `json:"method"`
+	Confidence float64               `json:"confidence"`
 }
 
 // Statistics structures

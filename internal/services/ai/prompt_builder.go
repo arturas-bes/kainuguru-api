@@ -6,21 +6,20 @@ import (
 	"time"
 )
 
-// PromptBuilder creates optimized prompts for Lithuanian grocery flyer analysis
+// PromptBuilder builds high-quality prompts for flyer vision extraction.
+// Instruction language is EN. OCR text in outputs must stay Lithuanian exactly as printed.
 type PromptBuilder struct {
-	language     string
 	storeContext map[string]string
 	categories   []string
 }
 
-// NewPromptBuilder creates a new Lithuanian prompt builder
+// NewPromptBuilder creates a new prompt builder.
 func NewPromptBuilder() *PromptBuilder {
 	return &PromptBuilder{
-		language: "lithuanian",
 		storeContext: map[string]string{
-			"iki":    "IKI yra populiari Lietuvos prekybos tinklai",
-			"maxima": "Maxima yra didžiausias maisto prekių tinklas Lietuvoje",
-			"rimi":   "Rimi yra skandinavų prekybos tinklas veikiantis Lietuvoje",
+			"iki":    "IKI (LT grocery). Common visual tags: SUPER KAINA, TIK, MEILĖ IKI (loyalty hearts), IKI EXPRESS, red percentage badges.",
+			"maxima": "MAXIMA (LT grocery).",
+			"rimi":   "RIMI (LT grocery).",
 		},
 		categories: []string{
 			"mėsa ir žuvis", "pieno produktai", "duona ir konditerija",
@@ -31,121 +30,173 @@ func NewPromptBuilder() *PromptBuilder {
 	}
 }
 
-// ProductExtractionPrompt creates a prompt for extracting products from flyer pages
-func (pb *PromptBuilder) ProductExtractionPrompt(storeCode string, pageNumber int) string {
-	storeContext := pb.getStoreContext(storeCode)
-
-	prompt := fmt.Sprintf(`Analizuok šį %s prekybos tinklo leidinio %d puslapį ir ištrauk visų produktų informaciją.
-
-KONTEKSTAS:
-%s
-
-UŽDUOTIS:
-Ištrauk visus aiškiai matomus produktus su kainomis. Kiekvienam produktui nurodyk:
-
-1. Produkto pavadinimas (lietuviškai, kaip parašyta leidinyje)
-2. Kaina (su valiuta, pvz., "2,99 €")
-3. Mato vienetas/kiekis (pvz., "1 kg", "500 g", "1 l", "vnt.")
-4. Nuolaidos informacija (jei yra)
-5. Nuolaidos tipas ("percentage", "absolute", "bundle", "loyalty")
-6. Prekės ženklas (jei matomas)
-7. Kategorija (iš šių: %s)
-8. Pasitikėjimo lygis (0.0-1.0)
-9. Bounding box koordinatės (x, y, width, height normalizuotos nuo 0 iki 1)
-10. Pozicija puslapyje (eilutė, stulpelis, zona)
-
-FORMATAS:
-Grąžink JSON masyvą su objektais:
-{
-  "products": [
+// Schema returns the JSON schema description we expect from the model.
+func (pb *PromptBuilder) Schema() string {
+	return `{
+  "page_meta": {
+    "store_code": "iki|maxima|rimi|...(lowercase exact)",
+    "currency": "EUR",
+    "locale": "lt-LT",
+    "valid_from": "YYYY-MM-DD|null",
+    "valid_to": "YYYY-MM-DD|null",
+    "page_number": 1,
+    "detected_text_sample": "raw OCR snippet near main prices/percents"
+  },
+  "promotions": [
     {
-      "name": "produkto pavadinimas",
-      "price": "kaina su valiuta",
-      "unit": "mato vienetas",
-      "original_price": "pradinė kaina jei yra nuolaida",
-      "discount": "nuolaidos aprašymas",
-      "discount_type": "percentage",
-      "brand": "prekės ženklas",
-      "category": "kategorija",
-      "confidence": 0.95,
-      "bounding_box": {
-        "x": 0.1,
-        "y": 0.2,
-        "width": 0.2,
-        "height": 0.15
-      },
-      "page_position": {
-        "row": 1,
-        "column": 2,
-        "zone": "main"
-      }
+      "promotion_type": "single_product|category|brand_line|equipment|bundle|loyalty",
+      "name_lt": "EXACT Lithuanian text printed near the price/percent (no translation, no paraphrase). If unreadable -> null",
+      "brand": "string|null",
+      "category_guess_lt": "one from fixed list|null",
+      "unit": "kg|g|l|ml|vnt.|pak.|null",
+      "unit_size": "e.g., '125 g'|'1 kg'|null",
+      "price_eur": "X,XX €|null",
+      "original_price_eur": "X,XX €|null",
+      "price_per_unit_eur": "X,XX €|null",
+      "discount_pct": "integer|null",
+      "discount_text": "e.g., '-25 %' as printed|null",
+      "discount_type": "percentage|absolute|bundle|loyalty|null",
+      "special_tags": ["SUPER KAINA","TIK","MEILĖ IKI","IKI EXPRESS","1+1","2+1","3+1","..."],
+      "loyalty_required": "true|false",
+      "bundle_details": "e.g., '1+1','2+1','3 už 2'|null",
+      "bounding_box": {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0},
+      "confidence": 0.0
     }
-  ]
+  ],
+  "warnings": []
+}`
 }
 
-KOORDINATĖS:
-- x, y: viršutinio kairiojo kampo koordinatės (0-1)
-- width, height: elemento plotis ir aukštis (0-1)
-- Koordinatės normalizuotos: 0 = kairė/viršus, 1 = dešinė/apačia
+// ---- Core prompts -----------------------------------------------------------
 
-POZICIJA:
-- row: eilutė puslapyje (1, 2, 3...)
-- column: stulpelis (1, 2, 3...)
-- zone: "header", "main", "footer", "sidebar"
+// ProductExtractionPrompt now returns the UNIFIED SCHEMA, not legacy "products".
+func (pb *PromptBuilder) ProductExtractionPrompt(storeCode string, pageNumber int) string {
+	return fmt.Sprintf(
+		`ROLE
+You extract promotion modules from a Lithuanian grocery flyer image.
 
-SVARBU:
-- Ištrauk tik produktus su aiškiai matomais kainomis
-- Išlaikyk originalų lietuvišką tekstą
-- Jei kaina neaiški, neįtraukk produkto
-- Už vienetus naudok standartines santrumpas (kg, g, l, ml, vnt.)
-- Tiksliai nuraidyk kainų formatus (pvz., "1,99 €", "2.50 €")
-- Nurodyk tikslias bounding box koordinates kiekvienam produktui`,
-		strings.ToUpper(storeCode), pageNumber, storeContext, strings.Join(pb.categories, ", "))
+OUTPUT
+Return ONE JSON object matching the schema below. Strict JSON. No markdown. No commentary.
 
-	return prompt
+WHAT TO CAPTURE
+A "promotion" is one rectangular module showing any of: a price (€), a percent badge, a bundle (1+1/2+1), or a loyalty tag. Treat group/category callouts (e.g., "Vytintiems mėsos gaminiams -30%%") as a single "category" promotion. If only price exists, "single_product". If only percent exists, set "discount_pct" and keep "price_eur" null. Never invent missing numbers.
+
+ANTI-HALLUCINATION RULES
+- Use EXACT Lithuanian text as printed around that price/percent for "name_lt". If the product name is unreadable, set name_lt = null or use the short category headline EXACTLY as printed (e.g., "Makaronams ir užpilamiems makaronams"), not a guessed SKU.
+- Do NOT infer flavors/weights/brands unless they are clearly readable near the price/percent inside the same module.
+- Do NOT copy a visible price to other modules. Each module must be justified by its own local glyphs (€, percent, bundle).
+- If a module shows a loyalty heart/MEILĖ IKI only, set discount_type="loyalty" and loyalty_required=true, with other fields null unless printed.
+- If the top of the page is a banner, ignore it unless it contains an actual price/percent/bundle.
+
+NORMALIZATION
+- Prices must be "X,XX €". If you read "0 99 €", normalize to "0,99 €". If no €, set price_eur=null.
+- Percent must be integer without the sign in "discount_pct", but include the printed form (e.g., "-25 %%") in "discount_text".
+
+STORE: %s | PAGE: %d
+SCHEMA
+%s`,
+		strings.ToLower(storeCode), pageNumber, pb.Schema(),
+	)
 }
 
-// TextExtractionPrompt creates a prompt for extracting all text from a flyer page
+// DetectionPrompt (pass 1) – find modules + coarse fields.
+func (pb *PromptBuilder) DetectionPrompt(storeCode string, pageNumber int) string {
+	return fmt.Sprintf(`PASS 1: DETECT MODULES
+
+Task: List EVERY rectangular promotion module that shows either a € price, a %% badge, a bundle (1+1/2+1/3+1), or a loyalty tag. For each, return:
+- promotion_type (guess)
+- name_lt (exact printed headline near price/percent if readable; else null)
+- discount_pct OR price_eur (whichever actually printed; never invent both)
+- discount_text (as printed if percent)
+- loyalty_required (true/false based on hearts/MEILĖ IKI text)
+- special_tags
+- bounding_box (normalized 0..1)
+- confidence
+
+Output strict JSON following the schema. No markdown. Do not drop small corner modules.
+
+STORE: %s | PAGE: %d
+SCHEMA
+%s`, strings.ToLower(storeCode), pageNumber, pb.Schema())
+}
+
+// FillDetailsPrompt (pass 2) – enrich modules provided via bounding boxes.
+func (pb *PromptBuilder) FillDetailsPrompt(storeCode string, pageNumber int) string {
+	return fmt.Sprintf(`PASS 2: FILL DETAILS
+
+You are given the page image and a JSON list named PROMOTION_BOXES that contains bounding boxes and coarse data found in pass 1.
+For each box, read ONLY inside that rectangle and fill or correct fields:
+- brand, unit, unit_size
+- price_eur, original_price_eur, price_per_unit_eur
+- discount_pct and discount_text
+- discount_type: percentage|absolute|bundle|loyalty
+- category_guess_lt from: [%s]
+- special_tags exactly as printed: {"SUPER KAINA","TIK","MEILĖ IKI","IKI EXPRESS","1+1","2+1","3+1",...}
+
+Rules:
+- NEVER guess values not printed inside the box.
+- If a field is unreadable: null.
+- Keep name_lt EXACTLY as printed; if only a category headline is present, use that text verbatim.
+- Normalize price to "X,XX €". Normalize percent to integer in discount_pct and preserved form in discount_text.
+- Return the SAME number of promotions as PROMOTION_BOXES, in the SAME order, each with a bounding_box.
+
+STORE: %s | PAGE: %d
+SCHEMA
+%s`,
+		strings.Join(pb.categories, ", "),
+		strings.ToLower(storeCode), pageNumber, pb.Schema(),
+	)
+}
+
+// ---- Utilities / secondary prompts -----------------------------------------
+
+// TextExtractionPrompt – English instructions; keep Lithuanian text.
 func (pb *PromptBuilder) TextExtractionPrompt(storeCode string) string {
 	storeContext := pb.getStoreContext(storeCode)
+	return fmt.Sprintf(`Extract ALL legible text from this %s flyer page. Preserve Lithuanian exactly.
 
-	prompt := fmt.Sprintf(`Ištrauk visą tekstą iš šio %s prekybos tinklo leidinio puslapio.
-
-KONTEKSTAS:
+CONTEXT:
 %s
 
-UŽDUOTIS:
-Ištrauk ir struktūrizuok visą matomą tekstą, įskaitant:
-
-1. Produktų pavadinimus
-2. Kainas ir nuolaidas
-3. Kampanijų aprašymus
-4. Datų informaciją
-5. Kontaktinę informaciją
-6. Kitus svarbius tekstus
-
-FORMATAS:
-Grąžink JSON objektą:
+Return strict JSON:
 {
-  "header_text": "antraštės ir svarbus tekstas",
-  "products_text": "produktų tekstas",
-  "prices_text": "kainų informacija",
-  "dates_text": "datos ir galiojimo laikas",
-  "promotional_text": "akcijų ir nuolaidų tekstas",
-  "other_text": "kitas tekstas"
+  "header_text": "…",
+  "products_text": "…",
+  "prices_text": "…",
+  "dates_text": "…",
+  "promotional_text": "…",
+  "other_text": "…"
 }
 
-SVARBU:
-- Išlaikyk originalų lietuvišką rašybą ir skyrybą
-- Struktūrizuok panašų turinį į atitinkamus laukus
-- Nekoreguok kainų formatų
-- Ištrauk visą matomą tekstą, net jei jis atrodo nesvarus`,
+Notes:
+- Keep diacritics.
+- Do not normalize numbers.
+- Include validity date ranges if present.`,
 		strings.ToUpper(storeCode), storeContext)
-
-	return prompt
 }
 
-// ValidationPrompt creates a prompt for validating extracted product data
+// ValidationPromptV2 – strict schema validation/repair (kept for optional use).
+func (pb *PromptBuilder) ValidationPromptV2(extractedData string) string {
+	prompt := `You will receive JSON that should match the flyer schema. Validate and repair it.
+
+INPUT:
+%s
+
+CHECKS
+- price_eur / original_price_eur must be "X,XX €" or null. Convert "0 99 €" -> "0,99 €".
+- discount_pct is integer 1..99 or null; keep printed form in discount_text if present.
+- promotion_type ∈ {single_product, category, brand_line, equipment, bundle, loyalty}.
+- Remove obvious non-promotions (legal notes, page legends).
+- If both price_eur and original_price_eur exist and original < price, keep both but add a warning.
+- Normalize unit/unit_size to [kg,g,l,ml,vnt.,pak.].
+- Extract valid_from/valid_to into ISO if present in the text.
+
+OUTPUT
+Return the same JSON schema plus a "warnings" array describing fixes. JSON only.`
+	return fmt.Sprintf(prompt, extractedData)
+}
+
+// Legacy prompt (kept for compatibility if needed elsewhere).
 func (pb *PromptBuilder) ValidationPrompt(extractedData string) string {
 	prompt := `Patikrink ir pakoreguok ištrauktų produktų duomenis.
 
@@ -165,121 +216,48 @@ Pataisyk klaidingas kainas, pavadinimus ir kategorijas. Pašalink produktus be k
 FORMATAS:
 Grąžink pataisytą JSON su papildomu lauku "validation_notes" kiekvienam produktui:
 {
-  "products": [
-    {
-      "name": "pataisytas pavadinimas",
-      "price": "pataisyta kaina",
-      "unit": "pataisytas vienetas",
-      "original_price": "pradinė kaina",
-      "discount": "nuolaidos aprašymas",
-      "brand": "prekės ženklas",
-      "category": "pataisyta kategorija",
-      "validation_notes": "koregavimo pastabos jei būtina"
-    }
-  ],
-  "removed_products": [
-    {
-      "reason": "pašalinimo priežastis",
-      "original_data": "originalūs duomenys"
-    }
-  ]
+  "products": [...],
+  "removed_products": [...]
 }`
-
 	return fmt.Sprintf(prompt, extractedData, strings.Join(pb.categories, ", "))
 }
 
-// CategoryClassificationPrompt creates a prompt for classifying product categories
 func (pb *PromptBuilder) CategoryClassificationPrompt(productName string) string {
-	prompt := fmt.Sprintf(`Klasifikuok šį produktą pagal kategoriją.
+	return fmt.Sprintf(`Classify the Lithuanian text below into ONE of:
+[%s]
 
-PRODUKTO PAVADINIMAS: "%s"
+TEXT: "%s"
 
-GALIMOS KATEGORIJOS:
-%s
-
-UŽDUOTIS:
-Nustatyk tinkamiausią kategoriją šiam produktui. Atsižvelgk į:
-- Produkto pobūdį ir paskirtį
-- Įprastą kategorizaciją prekybos centruose
-- Lietuvių kalbos specifiką
-
-FORMATAS:
-Grąžink JSON objektą:
-{
-  "category": "pasirinkta kategorija",
-  "confidence": 0.95,
-  "reasoning": "argumentacija lietuviškai"
+Return: {"category":"...", "confidence":0.00}`,
+		strings.Join(pb.categories, ", "), productName)
 }
 
-SVARBU:
-- Pasirink tik iš pateiktų kategorijų
-- Nurodyk pasitikėjimo lygį (0.0-1.0)
-- Paaiškink pasirinkimą lietuviškai`,
-		productName, strings.Join(pb.categories, "\n- "))
-
-	return prompt
-}
-
-// PriceAnalysisPrompt creates a prompt for analyzing pricing information
 func (pb *PromptBuilder) PriceAnalysisPrompt(products []string) string {
 	productsText := strings.Join(products, "\n")
-
-	prompt := fmt.Sprintf(`Analizuok kainų informaciją šiuose produktuose.
-
-PRODUKTAI:
+	return fmt.Sprintf(`Input: final promotions JSON
 %s
 
-ANALIZĖS KRITERIJAI:
-1. Kainų formatų nuoseklumas
-2. Nuolaidų apskaičiavimas
-3. Kainų palyginimas pagal vienetą
-4. Akcijų galiojimo datos
+TASK
+- Count items with price_eur vs percent-only.
+- Average discount_pct over items that have it.
+- Compute price_per_unit_eur where price and unit_size exist but PPU is missing.
+- List format issues for prices not matching "X,XX €".
 
-UŽDUOTIS:
-Patikrink kainų teisingumą ir apskaičiuok papildomą informaciją.
-
-FORMATAS:
-Grąžink JSON objektą:
+OUTPUT
 {
-  "pricing_analysis": {
-    "total_products": skaičius,
-    "products_on_sale": skaičius,
-    "average_discount_percentage": procentai,
-    "price_range": {
-      "min": "minimali kaina",
-      "max": "maksimali kaina"
-    }
-  },
-  "price_corrections": [
-    {
-      "product": "produkto pavadinimas",
-      "original_price": "originali kaina",
-      "corrected_price": "pataisyta kaina",
-      "reason": "pataisymo priežastis"
-    }
-  ],
-  "unit_price_calculations": [
-    {
-      "product": "produkto pavadinimas",
-      "price_per_unit": "kaina už vienetą",
-      "comparison_note": "palyginimo pastaba"
-    }
-  ]
-}`,
-		productsText)
-
-	return prompt
+  "summary": {"total_promotions":N,"with_price":N,"with_percent_only":N,"avg_discount_pct":number|null},
+  "repairs":[{"index":i,"field":"price_per_unit_eur","value":"X,XX €","note":"computed from ..."}],
+  "format_issues":["..."]
+}`, productsText)
 }
 
-// getStoreContext returns context information for a specific store
 func (pb *PromptBuilder) getStoreContext(storeCode string) string {
-	if context, exists := pb.storeContext[strings.ToLower(storeCode)]; exists {
+	if context, ok := pb.storeContext[strings.ToLower(storeCode)]; ok {
 		return context
 	}
 	return "Lietuvos prekybos tinklas"
 }
 
-// LayoutAnalysisPrompt creates a prompt for analyzing page layout
 func (pb *PromptBuilder) LayoutAnalysisPrompt() string {
 	return `Analizuok šio leidinio puslapio išdėstymą ir struktūrą.
 
@@ -293,76 +271,37 @@ Identifikuok ir apibūdink:
 5. Prekių ženklų ir kategorijų žymėjimą
 
 FORMATAS:
-Grąžink JSON objektą:
 {
   "layout_analysis": {
-    "page_structure": "puslapio struktūros aprašymas",
-    "product_layout": "produktų išdėstymo aprašymas",
-    "sections": [
-      {
-        "type": "skyriaus tipas",
-        "content": "turinio aprašymas",
-        "position": "pozicija puslapyje"
-      }
-    ],
-    "special_offers": [
-      {
-        "type": "akcijos tipas",
-        "description": "akcijos aprašymas",
-        "visual_emphasis": "vizualinio išryškinimo aprašymas"
-      }
-    ]
+    "page_structure": "…",
+    "product_layout": "…",
+    "sections": [{"type":"…","content":"…","position":"…"}],
+    "special_offers": [{"type":"…","description":"…","visual_emphasis":"…"}]
   }
 }`
 }
 
-// QualityCheckPrompt creates a prompt for quality checking extracted data
-func (pb *PromptBuilder) QualityCheckPrompt(extractedData string, originalImage string) string {
-	prompt := fmt.Sprintf(`Patikrink ištrauktų duomenų kokybę palyginti su originaliu vaizdu.
+func (pb *PromptBuilder) QualityCheckPrompt(extractedData string, _ string) string {
+	return fmt.Sprintf(`Patikrink ištrauktų duomenų kokybę palyginti su originaliu vaizdu.
 
 IŠTRAUKTI DUOMENYS:
 %s
 
-KOKYBĖS KRITERIJAI:
-1. Duomenų išsamumas (ar visi produktai ištraukti?)
-2. Tikslumas (ar kainos ir pavadinimai teisingi?)
-3. Nuoseklumas (ar formatai vienodi?)
-4. Lietuvių kalbos teisingumas
-
-UŽDUOTIS:
-Įvertink duomenų kokybę ir pateik rekomendacijas.
-
 FORMATAS:
-Grąžink JSON objektą:
 {
   "quality_score": 0.85,
   "completeness": 0.90,
   "accuracy": 0.80,
   "consistency": 0.85,
-  "issues_found": [
-    {
-      "type": "problemos tipas",
-      "description": "problemos aprašymas",
-      "severity": "high/medium/low",
-      "suggestion": "siūlymas sprendimui"
-    }
-  ],
+  "issues_found": [{"type":"…","description":"…","severity":"high|medium|low","suggestion":"…"}],
   "missing_products": skaičius,
-  "recommendations": [
-    "rekomendacija 1",
-    "rekomendacija 2"
-  ]
-}`,
-		extractedData)
-
-	return prompt
+  "recommendations": ["…","…"]
+}`, extractedData)
 }
 
-// BuildCustomPrompt creates a custom prompt with Lithuanian context
 func (pb *PromptBuilder) BuildCustomPrompt(task, context, requirements string) string {
-	timestamp := time.Now().Format("2006-01-02 15:04")
-
-	prompt := fmt.Sprintf(`UŽDUOTIS: %s
+	ts := time.Now().Format("2006-01-02 15:04")
+	return fmt.Sprintf(`UŽDUOTIS: %s
 
 KONTEKSTAS:
 %s
@@ -373,32 +312,21 @@ REIKALAVIMAI:
 KALBOS SPECIFIKA:
 - Visas tekstas turi būti lietuvių kalba
 - Išlaikyk originalų rašybą ir skyrybą
-- Naudok standartines lietuvių kalbos formas
 - Prekių pavadinimus palik kaip originaliai parašyta
 
 LAIKO ŽYMA: %s
 
-Atlikk užduotį tiksliai pagal pateiktus reikalavimus.`,
-		task, context, requirements, timestamp)
-
-	return prompt
+Atlikk užduotį tiksliai pagal pateiktus reikalavimus.`, task, context, requirements, ts)
 }
 
-// GetAvailableCategories returns the list of available product categories
-func (pb *PromptBuilder) GetAvailableCategories() []string {
-	return pb.categories
-}
-
-// AddStoreContext adds context information for a new store
+func (pb *PromptBuilder) GetAvailableCategories() []string { return pb.categories }
 func (pb *PromptBuilder) AddStoreContext(storeCode, context string) {
 	pb.storeContext[strings.ToLower(storeCode)] = context
 }
-
-// GetSupportedStores returns the list of stores with context
 func (pb *PromptBuilder) GetSupportedStores() []string {
 	stores := make([]string, 0, len(pb.storeContext))
-	for store := range pb.storeContext {
-		stores = append(stores, store)
+	for s := range pb.storeContext {
+		stores = append(stores, s)
 	}
 	return stores
 }
