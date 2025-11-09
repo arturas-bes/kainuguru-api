@@ -280,6 +280,79 @@ func extractProductTags(extracted ai.ExtractedProduct) []string {
 	return uniqueTags
 }
 
+// extractPromotionTags extracts relevant tags from promotion information (new unified schema)
+func extractPromotionTags(promo ai.Promotion) []string {
+	tags := []string{}
+	
+	// Add category as tag
+	if promo.CategoryGuessLT != "" {
+		tags = append(tags, strings.ToLower(promo.CategoryGuessLT))
+	}
+	
+	// Add brand as tag if present
+	if promo.Brand != "" {
+		tags = append(tags, strings.ToLower(promo.Brand))
+	}
+	
+	// Add discount-related tags
+	if promo.DiscountPct != nil && *promo.DiscountPct > 0 {
+		tags = append(tags, "nuolaida")
+	}
+	if promo.DiscountText != "" && strings.Contains(strings.ToLower(promo.DiscountText), "akcija") {
+		tags = append(tags, "akcija")
+	}
+	
+	// Add unit type tags
+	if promo.UnitSize != "" {
+		unit := strings.ToLower(promo.UnitSize)
+		if strings.Contains(unit, "kg") || strings.Contains(unit, "g") {
+			tags = append(tags, "svoris")
+		} else if strings.Contains(unit, "l") || strings.Contains(unit, "ml") {
+			tags = append(tags, "tūris")
+		}
+	}
+	
+	// Add tags based on product name keywords
+	name := strings.ToLower(promo.NameLT)
+	
+	// Organic/Bio products
+	if strings.Contains(name, "ekologišk") || strings.Contains(name, "bio") {
+		tags = append(tags, "ekologiškas")
+	}
+	
+	// Fresh products
+	if strings.Contains(name, "šviež") {
+		tags = append(tags, "šviežias")
+	}
+	
+	// Frozen products
+	if strings.Contains(name, "šaldyt") {
+		tags = append(tags, "šaldytas")
+	}
+	
+	// Light/Diet products
+	if strings.Contains(name, "lengv") || strings.Contains(name, "diet") {
+		tags = append(tags, "lengvas")
+	}
+	
+	// New products
+	if strings.Contains(name, "nauj") {
+		tags = append(tags, "naujiena")
+	}
+	
+	// Remove duplicates
+	tagMap := make(map[string]bool)
+	uniqueTags := []string{}
+	for _, tag := range tags {
+		if !tagMap[tag] {
+			tagMap[tag] = true
+			uniqueTags = append(uniqueTags, tag)
+		}
+	}
+	
+	return uniqueTags
+}
+
 // normalizeProductNameForMaster removes brand and extracts generic product name
 func normalizeProductNameForMaster(name string, brand *string) string {
 	normalized := name

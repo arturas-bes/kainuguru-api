@@ -286,10 +286,15 @@ func (s *service) processPage(ctx context.Context, flyer *models.Flyer, page *mo
 		page.ExtractionError = &errMsg
 		page.NeedsManualReview = true
 		s.pageService.Update(ctx, page)
-		return nil, fmt.Errorf("extraction quality failed: %d products", len(result.Products))
+		// Use Promotions count if available, otherwise Products
+		extractionCount := len(result.Promotions)
+		if extractionCount == 0 {
+			extractionCount = len(result.Products)
+		}
+		return nil, fmt.Errorf("extraction quality failed: %d promotions", extractionCount)
 	}
 	
-	// Create products
+	// Create products from promotions
 	products := s.convertToProducts(result, flyer, page)
 	if len(products) > 0 {
 		if err := s.productService.CreateBatch(ctx, products); err != nil {
@@ -314,19 +319,28 @@ func (s *service) processPage(ctx context.Context, flyer *models.Flyer, page *mo
 		return nil, fmt.Errorf("failed to update page: %w", err)
 	}
 	
-	// Calculate stats
+	// Calculate stats - use Promotions if available
 	var totalConfidence float64
-	for _, p := range result.Products {
-		totalConfidence += p.Confidence
+	statSource := result.Promotions
+	if len(statSource) == 0 {
+		// Fallback to legacy Products
+		for _, p := range result.Products {
+			totalConfidence += p.Confidence
+		}
+	} else {
+		for _, p := range statSource {
+			totalConfidence += p.Confidence
+		}
 	}
 	
 	avgConfidence := 0.0
-	if len(result.Products) > 0 {
-		avgConfidence = totalConfidence / float64(len(result.Products))
+	productCount := len(products)
+	if productCount > 0 {
+		avgConfidence = totalConfidence / float64(productCount)
 	}
 	
 	return &PageProcessingStats{
-		ProductCount:  len(result.Products),
+		ProductCount:  productCount,
 		AvgConfidence: avgConfidence,
 	}, nil
 }
@@ -347,30 +361,42 @@ func (s *service) assessQuality(result *ai.ExtractionResult) *QualityAssessment 
 		Issues: []string{},
 	}
 	
+	// Use Promotions count if available, otherwise Products
+	promoCount := len(result.Promotions)
 	productCount := len(result.Products)
+	extractionCount := promoCount
+	if extractionCount == 0 {
+		extractionCount = productCount
+	}
 	
-	// Check product count
-	if productCount == 0 {
+	// Check extraction count
+	if extractionCount == 0 {
 		assessment.State = "warning"
 		assessment.RequiresReview = true
 		assessment.Score = 0.0
-		assessment.Issues = append(assessment.Issues, "No products extracted")
+		assessment.Issues = append(assessment.Issues, "No promotions extracted")
 		return assessment
 	}
 	
-	if productCount < 5 {
+	if extractionCount < 5 {
 		assessment.State = "warning"
 		assessment.RequiresReview = true
 		assessment.Score = 0.4
-		assessment.Issues = append(assessment.Issues, "Low product count")
+		assessment.Issues = append(assessment.Issues, "Low promotion count")
 	}
 	
-	// Calculate average confidence
+	// Calculate average confidence from Promotions if available
 	var totalConfidence float64
-	for _, p := range result.Products {
-		totalConfidence += p.Confidence
+	if promoCount > 0 {
+		for _, p := range result.Promotions {
+			totalConfidence += p.Confidence
+		}
+	} else {
+		for _, p := range result.Products {
+			totalConfidence += p.Confidence
+		}
 	}
-	avgConfidence := totalConfidence / float64(productCount)
+	avgConfidence := totalConfidence / float64(extractionCount)
 	
 	if avgConfidence < 0.5 {
 		assessment.RequiresReview = true
@@ -380,39 +406,48 @@ func (s *service) assessQuality(result *ai.ExtractionResult) *QualityAssessment 
 	return assessment
 }
 
-// convertToProducts converts AI extracted products to Product models
+// convertToProducts converts AI extracted promotions to Product models
+// Now uses result.Promotions to capture ALL modules (including percent-only ones)
 func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.Flyer, page *models.FlyerPage) []*models.Product {
-	products := make([]*models.Product, 0, len(result.Products))
+	// Use Promotions if available (new unified schema), fallback to Products for compatibility
+	sourceCount := len(result.Promotions)
+	if sourceCount == 0 {
+		sourceCount = len(result.Products)
+	}
+	products := make([]*models.Product, 0, sourceCount)
 	
-	for _, extracted := range result.Products {
+	// Process new unified Promotions first
+	for _, promo := range result.Promotions {
 		product := &models.Product{
 			FlyerID:     flyer.ID,
 			FlyerPageID: &page.ID,
 			StoreID:     flyer.StoreID,
 			
-			Name:           extracted.Name,
-			NormalizedName: normalizeText(extracted.Name),
-			Tags:           extractProductTags(extracted),
+			Name:           promo.NameLT,
+			NormalizedName: normalizeText(promo.NameLT),
+			Tags:           extractPromotionTags(promo),
 			
-			ExtractionConfidence: extracted.Confidence,
+			ExtractionConfidence: promo.Confidence,
 			ExtractionMethod:     "ai_vision",
 			
 			ValidFrom: flyer.ValidFrom,
 			ValidTo:   flyer.ValidTo,
 		}
 		
-		// Parse price
-		if price, err := parsePrice(extracted.Price); err == nil {
-			product.CurrentPrice = price
+		// Parse price (if present)
+		if promo.PriceEUR != nil && *promo.PriceEUR != "" {
+			if price, err := parsePrice(*promo.PriceEUR); err == nil {
+				product.CurrentPrice = price
+			}
 		}
 		
 		// Parse original price
-		if extracted.OriginalPrice != "" {
-			if origPrice, err := parsePrice(extracted.OriginalPrice); err == nil {
+		if promo.OriginalPriceEUR != nil && *promo.OriginalPriceEUR != "" {
+			if origPrice, err := parsePrice(*promo.OriginalPriceEUR); err == nil {
 				product.OriginalPrice = &origPrice
 				
-				// Calculate discount
-				if origPrice > 0 {
+				// Calculate discount if not already provided
+				if origPrice > 0 && product.CurrentPrice > 0 {
 					discount := ((origPrice - product.CurrentPrice) / origPrice) * 100
 					product.DiscountPercent = &discount
 					product.IsOnSale = true
@@ -420,36 +455,97 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 			}
 		}
 		
-		// Set other fields
-		if extracted.Unit != "" {
-			product.UnitSize = &extracted.Unit
-		}
-		
-		if extracted.Brand != "" {
-			product.Brand = &extracted.Brand
-		}
-		
-		if extracted.Category != "" {
-			product.Category = &extracted.Category
-		}
-		
-		// Set special discount if present
-		if extracted.SpecialDiscount != "" {
-			product.SpecialDiscount = &extracted.SpecialDiscount
+		// Use discount_pct directly if present (for percent-only promotions)
+		if promo.DiscountPct != nil && *promo.DiscountPct > 0 {
+			discount := float64(*promo.DiscountPct)
+			product.DiscountPercent = &discount
 			product.IsOnSale = true
 		}
 		
-		// Only set bounding box if it has valid data
-		if extracted.BoundingBox != nil && extracted.BoundingBox.Width > 0 && extracted.BoundingBox.Height > 0 {
-			product.BoundingBox = extracted.BoundingBox
+		// Set unit/size fields
+		if promo.UnitSize != "" {
+			product.UnitSize = &promo.UnitSize
 		}
 		
-		// Only set page position if it has valid data
-		if extracted.PagePosition != nil && extracted.PagePosition.Zone != "" {
-			product.PagePosition = extracted.PagePosition
+		if promo.Brand != "" {
+			product.Brand = &promo.Brand
+		}
+		
+		if promo.CategoryGuessLT != "" {
+			product.Category = &promo.CategoryGuessLT
+		}
+		
+		// Set special discount/tags
+		if len(promo.SpecialTags) > 0 {
+			specialDiscount := strings.Join(promo.SpecialTags, ", ")
+			product.SpecialDiscount = &specialDiscount
+			product.IsOnSale = true
+		}
+		
+		// Set bounding box if valid
+		if promo.BoundingBox != nil && promo.BoundingBox.Width > 0 && promo.BoundingBox.Height > 0 {
+			product.BoundingBox = promo.BoundingBox
 		}
 		
 		products = append(products, product)
+	}
+	
+	// Fallback: process legacy Products if no Promotions found
+	if len(result.Promotions) == 0 {
+		for _, extracted := range result.Products {
+			product := &models.Product{
+				FlyerID:     flyer.ID,
+				FlyerPageID: &page.ID,
+				StoreID:     flyer.StoreID,
+				
+				Name:           extracted.Name,
+				NormalizedName: normalizeText(extracted.Name),
+				Tags:           extractProductTags(extracted),
+				
+				ExtractionConfidence: extracted.Confidence,
+				ExtractionMethod:     "ai_vision",
+				
+				ValidFrom: flyer.ValidFrom,
+				ValidTo:   flyer.ValidTo,
+			}
+			
+			if price, err := parsePrice(extracted.Price); err == nil {
+				product.CurrentPrice = price
+			}
+			
+			if extracted.OriginalPrice != "" {
+				if origPrice, err := parsePrice(extracted.OriginalPrice); err == nil {
+					product.OriginalPrice = &origPrice
+					if origPrice > 0 {
+						discount := ((origPrice - product.CurrentPrice) / origPrice) * 100
+						product.DiscountPercent = &discount
+						product.IsOnSale = true
+					}
+				}
+			}
+			
+			if extracted.Unit != "" {
+				product.UnitSize = &extracted.Unit
+			}
+			if extracted.Brand != "" {
+				product.Brand = &extracted.Brand
+			}
+			if extracted.Category != "" {
+				product.Category = &extracted.Category
+			}
+			if extracted.SpecialDiscount != "" {
+				product.SpecialDiscount = &extracted.SpecialDiscount
+				product.IsOnSale = true
+			}
+			if extracted.BoundingBox != nil && extracted.BoundingBox.Width > 0 && extracted.BoundingBox.Height > 0 {
+				product.BoundingBox = extracted.BoundingBox
+			}
+			if extracted.PagePosition != nil && extracted.PagePosition.Zone != "" {
+				product.PagePosition = extracted.PagePosition
+			}
+			
+			products = append(products, product)
+		}
 	}
 	
 	return products

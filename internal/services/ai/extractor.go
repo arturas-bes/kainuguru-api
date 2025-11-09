@@ -494,14 +494,19 @@ func (e *ProductExtractor) normalizeCategory(category string) string {
 }
 
 func (e *ProductExtractor) isValidPromotion(p Promotion) bool {
+	// A promotion is valid if it has meaningful content
 	if len(strings.TrimSpace(p.NameLT)) == 0 && p.PromotionType == "" && p.PriceEUR == nil && p.DiscountPct == nil {
 		return false
 	}
-	// Keep entries with either a price or a percent (or explicit bundle/loyalty tag).
+	
+	// CRITICAL: Keep entries with either a price OR a percent (or explicit bundle/loyalty tag)
+	// Many valid promotions have ONLY a percent badge without a price
 	hasPrice := p.PriceEUR != nil && regexp.MustCompile(`\d+[,.]\d{2}\s*€`).MatchString(*p.PriceEUR)
 	hasPct := p.DiscountPct != nil && *p.DiscountPct > 0 && *p.DiscountPct < 100
 	isBundle := strings.EqualFold(p.DiscountType, "bundle") || strings.Contains(strings.Join(p.SpecialTags, " "), "+")
 	isLoyalty := strings.EqualFold(p.DiscountType, "loyalty") || p.LoyaltyRequired
+	
+	// Accept if ANY of these conditions is true (not all required)
 	return hasPrice || hasPct || isBundle || isLoyalty
 }
 
@@ -510,8 +515,11 @@ func (e *ProductExtractor) calculatePromotionConfidence(p Promotion) float64 {
 	if p.NameLT != "" {
 		conf += 0.1
 	}
+	// EITHER price OR percent contributes to confidence (not both required)
 	if p.PriceEUR != nil && *p.PriceEUR != "" {
 		conf += 0.2
+	} else if p.DiscountPct != nil && *p.DiscountPct > 0 {
+		conf += 0.15 // Percent-only promotions are valid (slightly lower confidence)
 	}
 	if p.Unit != "" || p.UnitSize != "" {
 		conf += 0.05

@@ -22,6 +22,7 @@ func GenerateSearchVector(normalizedName string) string {
 }
 
 // ValidateProduct validates a product model
+// Note: price can be 0 for category/brand_line promotions that only have discount_percent
 func ValidateProduct(name string, price float64) error {
 	if name == "" {
 		return fmt.Errorf("product name is required")
@@ -32,7 +33,9 @@ func ValidateProduct(name string, price float64) error {
 	if len(name) > 150 {
 		return fmt.Errorf("product name too long: %s", name)
 	}
-	if price <= 0 {
+	// Allow price = 0 for percent-only promotions (category/brand_line)
+	// Only reject negative prices
+	if price < 0 {
 		return fmt.Errorf("invalid price: %f", price)
 	}
 	if price > 9999.99 {

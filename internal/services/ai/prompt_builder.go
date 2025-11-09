@@ -79,18 +79,28 @@ OUTPUT
 Return ONE JSON object matching the schema below. Strict JSON. No markdown. No commentary.
 
 WHAT TO CAPTURE
-A "promotion" is one rectangular module showing any of: a price (€), a percent badge, a bundle (1+1/2+1), or a loyalty tag. Treat group/category callouts (e.g., "Vytintiems mėsos gaminiams -30%%") as a single "category" promotion. If only price exists, "single_product". If only percent exists, set "discount_pct" and keep "price_eur" null. Never invent missing numbers.
+A "promotion" is one rectangular module showing any of: a price (€), a percent badge, a bundle (1+1/2+1), or a loyalty tag. 
 
-ANTI-HALLUCINATION RULES
-- Use EXACT Lithuanian text as printed around that price/percent for "name_lt". If the product name is unreadable, set name_lt = null or use the short category headline EXACTLY as printed (e.g., "Makaronams ir užpilamiems makaronams"), not a guessed SKU.
-- Do NOT infer flavors/weights/brands unless they are clearly readable near the price/percent inside the same module.
-- Do NOT copy a visible price to other modules. Each module must be justified by its own local glyphs (€, percent, bundle).
-- If a module shows a loyalty heart/MEILĖ IKI only, set discount_type="loyalty" and loyalty_required=true, with other fields null unless printed.
-- If the top of the page is a banner, ignore it unless it contains an actual price/percent/bundle.
+PROMOTION TYPES:
+- "single_product": One specific product with a price (e.g., "SUDOCREM kremas 125 g — 4,99 €")
+- "category": Generic category discount WITHOUT specific product names (e.g., "Vytintiems mėsos gaminiams -30%%")
+- "brand_line": Brand-specific discount, may apply to multiple products (e.g., "VIGO šiukšlių maišams -50%%")
+- "equipment": Non-food items like coffee machines (e.g., "Kapsulinis kavos aparatas LAVAZZA — 39,99 €")
+- "bundle": Special offers like "1+1", "2+1", "3 už 2"
+- "loyalty": Loyalty program exclusive (MEILĖ IKI hearts, loyalty card required)
+
+CRITICAL RULES:
+1. PRICE OR PERCENT — NOT BOTH REQUIRED: A promotion is valid if it has EITHER a price OR a percent badge (or bundle/loyalty marker). DO NOT require both.
+2. PERCENT-ONLY MODULES: Many promotions show ONLY a percent badge without a specific price. These are VALID. Extract them with discount_pct set and price_eur=null.
+3. EXACT TEXT: Use EXACT Lithuanian text for "name_lt" as printed near the discount/price. For category promotions, copy the category headline exactly (e.g., "Pampers sauskelnėms ir drėgnoms servetėlėms", "BILLA BIO vaikų tyrelėms ir užkandžiams").
+4. MULTIPLE BADGES: If a module has multiple discount badges (e.g., -30%% and -50%%), report the STRONGER (higher) discount and set loyalty_required=true if one badge has a loyalty heart.
+5. NO HALLUCINATION: Do NOT invent prices, weights, or brands not visible in the module. If only a category name and percent are visible, that is sufficient.
+6. IGNORE BANNERS: Skip page headers/footers unless they contain an actual promotion.
 
 NORMALIZATION
-- Prices must be "X,XX €". If you read "0 99 €", normalize to "0,99 €". If no €, set price_eur=null.
-- Percent must be integer without the sign in "discount_pct", but include the printed form (e.g., "-25 %%") in "discount_text".
+- Prices must be "X,XX €". If you read "0 99 €", normalize to "0,99 €". If no € symbol is visible, set price_eur=null.
+- Percent must be integer (1-99) in "discount_pct", and include the printed form (e.g., "-25 %%") in "discount_text".
+- If unreadable or missing: use null, never guess.
 
 STORE: %s | PAGE: %d
 SCHEMA
@@ -103,15 +113,24 @@ SCHEMA
 func (pb *PromptBuilder) DetectionPrompt(storeCode string, pageNumber int) string {
 	return fmt.Sprintf(`PASS 1: DETECT MODULES
 
-Task: List EVERY rectangular promotion module that shows either a € price, a %% badge, a bundle (1+1/2+1/3+1), or a loyalty tag. For each, return:
-- promotion_type (guess)
-- name_lt (exact printed headline near price/percent if readable; else null)
-- discount_pct OR price_eur (whichever actually printed; never invent both)
-- discount_text (as printed if percent)
-- loyalty_required (true/false based on hearts/MEILĖ IKI text)
-- special_tags
+Task: List EVERY rectangular promotion module that shows either a € price, a %% badge, a bundle (1+1/2+1/3+1), or a loyalty tag. 
+
+IMPORTANT:
+- PERCENT-ONLY MODULES ARE VALID: Many modules show only a percent badge without a price. Extract these with discount_pct filled and price_eur=null.
+- CATEGORY PROMOTIONS: Modules like "Pampers sauskelnėms ir drėgnoms servetėlėms -30%%" are valid even without a specific price. Use promotion_type="category" or "brand_line".
+- MULTIPLE BADGES: If a module has multiple percent badges, report the STRONGER (higher) discount. If one badge has a loyalty heart, set loyalty_required=true.
+- EXACT TEXT: Copy "name_lt" EXACTLY as printed near the discount/price (e.g., "VIGO šiukšlių maišams", "Makaronams ir užpilamiems makaronams").
+
+For each module, return:
+- promotion_type (single_product|category|brand_line|equipment|bundle|loyalty)
+- name_lt (exact printed text; if unreadable -> null)
+- discount_pct (integer 1-99, or null if not visible)
+- price_eur (formatted "X,XX €", or null if not visible)
+- discount_text (as printed if percent, e.g., "-30 %%")
+- loyalty_required (true if loyalty heart/MEILĖ IKI visible)
+- special_tags (array: ["SUPER KAINA","TIK","MEILĖ IKI",etc.])
 - bounding_box (normalized 0..1)
-- confidence
+- confidence (0.0-1.0)
 
 Output strict JSON following the schema. No markdown. Do not drop small corner modules.
 
@@ -127,18 +146,21 @@ func (pb *PromptBuilder) FillDetailsPrompt(storeCode string, pageNumber int) str
 You are given the page image and a JSON list named PROMOTION_BOXES that contains bounding boxes and coarse data found in pass 1.
 For each box, read ONLY inside that rectangle and fill or correct fields:
 - brand, unit, unit_size
-- price_eur, original_price_eur, price_per_unit_eur
+- price_eur, original_price_eur, price_per_unit_eur (IF AND ONLY IF these are printed inside the box)
 - discount_pct and discount_text
 - discount_type: percentage|absolute|bundle|loyalty
 - category_guess_lt from: [%s]
 - special_tags exactly as printed: {"SUPER KAINA","TIK","MEILĖ IKI","IKI EXPRESS","1+1","2+1","3+1",...}
 
-Rules:
-- NEVER guess values not printed inside the box.
-- If a field is unreadable: null.
-- Keep name_lt EXACTLY as printed; if only a category headline is present, use that text verbatim.
-- Normalize price to "X,XX €". Normalize percent to integer in discount_pct and preserved form in discount_text.
-- Return the SAME number of promotions as PROMOTION_BOXES, in the SAME order, each with a bounding_box.
+CRITICAL RULES:
+1. RESPECT PASS-1 FINDINGS: If pass-1 found discount_pct but no price_eur, DO NOT invent a price. Keep price_eur=null.
+2. PERCENT-ONLY IS VALID: Many modules (especially category/brand_line promotions) show only a percent badge without a price. This is correct.
+3. MULTIPLE BADGES: If multiple discount badges are visible, report the STRONGER (higher %) discount. If one has a loyalty heart, set loyalty_required=true.
+4. EXACT TEXT: Keep name_lt EXACTLY as printed. For category promotions, use the printed category headline verbatim (e.g., "Pampers sauskelnėms ir drėgnoms servetėlėms").
+5. NO HALLUCINATION: NEVER guess prices, weights, or brands not printed inside the box. If unreadable or missing: null.
+6. NORMALIZATION: Price format "X,XX €". Percent as integer in discount_pct, printed form in discount_text.
+
+OUTPUT: Return the SAME number of promotions as PROMOTION_BOXES, in the SAME order, each with a bounding_box.
 
 STORE: %s | PAGE: %d
 SCHEMA
