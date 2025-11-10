@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/uptrace/bun"
@@ -155,19 +156,52 @@ func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters)
 }
 
 func (s *flyerPageService) Create(ctx context.Context, page *models.FlyerPage) error {
-	return fmt.Errorf("flyerPageService.Create not implemented")
+	page.CreatedAt = time.Now()
+	page.UpdatedAt = time.Now()
+
+	_, err := s.db.NewInsert().
+		Model(page).
+		Exec(ctx)
+
+	return err
 }
 
 func (s *flyerPageService) CreateBatch(ctx context.Context, pages []*models.FlyerPage) error {
-	return fmt.Errorf("flyerPageService.CreateBatch not implemented")
+	if len(pages) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	for _, page := range pages {
+		page.CreatedAt = now
+		page.UpdatedAt = now
+	}
+
+	_, err := s.db.NewInsert().
+		Model(&pages).
+		Exec(ctx)
+
+	return err
 }
 
 func (s *flyerPageService) Update(ctx context.Context, page *models.FlyerPage) error {
-	return fmt.Errorf("flyerPageService.Update not implemented")
+	page.UpdatedAt = time.Now()
+
+	_, err := s.db.NewUpdate().
+		Model(page).
+		Where("id = ?", page.ID).
+		Exec(ctx)
+
+	return err
 }
 
 func (s *flyerPageService) Delete(ctx context.Context, id int) error {
-	return fmt.Errorf("flyerPageService.Delete not implemented")
+	_, err := s.db.NewDelete().
+		Model((*models.FlyerPage)(nil)).
+		Where("id = ?", id).
+		Exec(ctx)
+
+	return err
 }
 
 // Processing operations

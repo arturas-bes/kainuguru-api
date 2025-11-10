@@ -1,3 +1,0 @@
-{
-  "query": "mutation { register(input: { email: \"test-new@example.com\", password: \"MyS3cur3P@ssw0rd!\", fullName: \"Test User\" }) { user { id email fullName } accessToken expiresAt } }"
-}

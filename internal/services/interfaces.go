@@ -55,6 +55,7 @@ type FlyerService interface {
 	CompleteProcessing(ctx context.Context, flyerID int, productsExtracted int) error
 	FailProcessing(ctx context.Context, flyerID int) error
 	ArchiveFlyer(ctx context.Context, flyerID int) error
+	ArchiveOldFlyers(ctx context.Context) (int, error)
 
 	// Relations
 	GetWithPages(ctx context.Context, flyerID int) (*models.Flyer, error)
@@ -145,6 +146,9 @@ type ProductMasterService interface {
 
 	// Matching operations
 	FindMatchingMasters(ctx context.Context, productName string, brand string, category string) ([]*models.ProductMaster, error)
+	FindMatchingMastersWithScores(ctx context.Context, productName string, brand string, category string) ([]*ProductMasterMatch, error)
+	FindBestMatch(ctx context.Context, product *models.Product, limit int) ([]*ProductMasterMatch, error)
+	CreateFromProduct(ctx context.Context, product *models.Product) (*models.ProductMaster, error)
 	MatchProduct(ctx context.Context, productID int, masterID int64) error
 	CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error)
 
@@ -156,6 +160,30 @@ type ProductMasterService interface {
 	// Statistics
 	GetMatchingStatistics(ctx context.Context, masterID int64) (*ProductMasterStats, error)
 	GetOverallMatchingStats(ctx context.Context) (*OverallMatchingStats, error)
+}
+
+// EnrichmentOptions defines options for enrichment processing
+type EnrichmentOptions struct {
+	ForceReprocess bool
+	MaxPages       int
+	BatchSize      int
+}
+
+// EnrichmentStats contains statistics about the enrichment process
+type EnrichmentStats struct {
+	PagesProcessed    int
+	PagesFailed       int
+	ProductsExtracted int
+	AvgConfidence     float64
+	Duration          time.Duration
+}
+
+// EnrichmentService defines the interface for flyer enrichment operations
+type EnrichmentService interface {
+	// Get flyers eligible for processing based on date
+	GetEligibleFlyers(ctx context.Context, date time.Time, storeCode string) ([]*models.Flyer, error)
+	// Process a single flyer and all its pages
+	ProcessFlyer(ctx context.Context, flyer *models.Flyer, opts EnrichmentOptions) (*EnrichmentStats, error)
 }
 
 // ExtractionJobService defines the interface for extraction job operations
@@ -202,11 +230,13 @@ type StoreFilters struct {
 
 type FlyerFilters struct {
 	StoreIDs   []int
+	StoreCode  *string
 	StoreCodes []string
 	Status     []string
 	IsArchived *bool
 	ValidFrom  *time.Time
 	ValidTo    *time.Time
+	ValidOn    *string
 	IsCurrent  *bool
 	IsValid    *bool
 	Limit      int
@@ -275,6 +305,14 @@ type ExtractionJobFilters struct {
 	Offset          int
 	OrderBy         string
 	OrderDir        string
+}
+
+// Match result with score
+type ProductMasterMatch struct {
+	Master     *models.ProductMaster `json:"master"`
+	MatchScore float64               `json:"match_score"`
+	Method     string                `json:"method"`
+	Confidence float64               `json:"confidence"`
 }
 
 // Statistics structures
@@ -525,14 +563,6 @@ type ProductMatch struct {
 	PriceMatch    bool                  `json:"price_match"`
 	BrandMatch    bool                  `json:"brand_match"`
 	SizeMatch     bool                  `json:"size_match"`
-}
-
-type ProductMasterMatch struct {
-	ProductMaster *models.ProductMaster `json:"product_master"`
-	Confidence    float64               `json:"confidence"`
-	ReasonCodes   []string              `json:"reason_codes"`
-	AvgPrice      *float64              `json:"avg_price,omitempty"`
-	Availability  float64               `json:"availability"`
 }
 
 type ProductSuggestion struct {

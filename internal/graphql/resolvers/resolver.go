@@ -4,6 +4,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
+	"github.com/uptrace/bun"
 )
 
 // Resolver is the root resolver that holds all service dependencies
@@ -19,6 +20,7 @@ type Resolver struct {
 	shoppingListService      services.ShoppingListService
 	shoppingListItemService  services.ShoppingListItemService
 	priceHistoryService      services.PriceHistoryService
+	db                       *bun.DB
 }
 
 // NewServiceResolver creates a new resolver with all service dependencies
@@ -34,6 +36,7 @@ func NewServiceResolver(
 	shoppingListService services.ShoppingListService,
 	shoppingListItemService services.ShoppingListItemService,
 	priceHistoryService services.PriceHistoryService,
+	db *bun.DB,
 ) *Resolver {
 	return &Resolver{
 		storeService:            storeService,
@@ -47,5 +50,6 @@ func NewServiceResolver(
 		shoppingListService:     shoppingListService,
 		shoppingListItemService: shoppingListItemService,
 		priceHistoryService:     priceHistoryService,
+		db:                      db,
 	}
 }

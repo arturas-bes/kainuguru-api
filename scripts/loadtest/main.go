@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 )
 
 func main() {

@@ -320,6 +320,7 @@ type ComplexityRoot struct {
 		StockLevel           func(childComplexity int) int
 		Store                func(childComplexity int) int
 		Subcategory          func(childComplexity int) int
+		Tags                 func(childComplexity int) int
 		UnitPrice            func(childComplexity int) int
 		UnitSize             func(childComplexity int) int
 		UnitType             func(childComplexity int) int
@@ -2125,6 +2126,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Product.Subcategory(childComplexity), true
+	case "Product.tags":
+		if e.complexity.Product.Tags == nil {
+			break
+		}
+
+		return e.complexity.Product.Tags(childComplexity), true
 	case "Product.unitPrice":
 		if e.complexity.Product.UnitPrice == nil {
 			break
@@ -3733,6 +3740,7 @@ type Product {
   description: String
   category: String
   subcategory: String
+  tags: [String!]
 
   # Pricing (Complex structure like Hyena)
   price: ProductPrice!
@@ -4473,6 +4481,7 @@ input SearchInput {
   maxPrice: Float
   onSaleOnly: Boolean = false
   category: String
+  tags: [String!]
   first: Int = 50
   after: String
   preferFuzzy: Boolean = false
@@ -12012,6 +12021,35 @@ func (ec *executionContext) fieldContext_Product_subcategory(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Product_tags(ctx context.Context, field graphql.CollectedField, obj *models.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Product_tags,
+		func(ctx context.Context) (any, error) {
+			return obj.Tags, nil
+		},
+		nil,
+		ec.marshalOString2ᚕstringᚄ,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Product_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_price(ctx context.Context, field graphql.CollectedField, obj *models.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -13390,6 +13428,8 @@ func (ec *executionContext) fieldContext_ProductEdge_node(_ context.Context, fie
 				return ec.fieldContext_Product_category(ctx, field)
 			case "subcategory":
 				return ec.fieldContext_Product_subcategory(ctx, field)
+			case "tags":
+				return ec.fieldContext_Product_tags(ctx, field)
 			case "price":
 				return ec.fieldContext_Product_price(ctx, field)
 			case "isOnSale":
@@ -14836,6 +14876,8 @@ func (ec *executionContext) fieldContext_ProductSearchResult_product(_ context.C
 				return ec.fieldContext_Product_category(ctx, field)
 			case "subcategory":
 				return ec.fieldContext_Product_subcategory(ctx, field)
+			case "tags":
+				return ec.fieldContext_Product_tags(ctx, field)
 			case "price":
 				return ec.fieldContext_Product_price(ctx, field)
 			case "isOnSale":
@@ -15625,6 +15667,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_category(ctx, field)
 			case "subcategory":
 				return ec.fieldContext_Product_subcategory(ctx, field)
+			case "tags":
+				return ec.fieldContext_Product_tags(ctx, field)
 			case "price":
 				return ec.fieldContext_Product_price(ctx, field)
 			case "isOnSale":
@@ -19669,6 +19713,8 @@ func (ec *executionContext) fieldContext_ShoppingListItem_linkedProduct(_ contex
 				return ec.fieldContext_Product_category(ctx, field)
 			case "subcategory":
 				return ec.fieldContext_Product_subcategory(ctx, field)
+			case "tags":
+				return ec.fieldContext_Product_tags(ctx, field)
 			case "price":
 				return ec.fieldContext_Product_price(ctx, field)
 			case "isOnSale":
@@ -23632,7 +23678,7 @@ func (ec *executionContext) unmarshalInputSearchInput(ctx context.Context, obj a
 		asMap["preferFuzzy"] = false
 	}
 
-	fieldsInOrder := [...]string{"q", "storeIDs", "minPrice", "maxPrice", "onSaleOnly", "category", "first", "after", "preferFuzzy"}
+	fieldsInOrder := [...]string{"q", "storeIDs", "minPrice", "maxPrice", "onSaleOnly", "category", "tags", "first", "after", "preferFuzzy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23681,6 +23727,13 @@ func (ec *executionContext) unmarshalInputSearchInput(ctx context.Context, obj a
 				return it, err
 			}
 			it.Category = data
+		case "tags":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tags = data
 		case "first":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -27115,6 +27168,8 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._Product_category(ctx, field, obj)
 		case "subcategory":
 			out.Values[i] = ec._Product_subcategory(ctx, field, obj)
+		case "tags":
+			out.Values[i] = ec._Product_tags(ctx, field, obj)
 		case "price":
 			field := field
 

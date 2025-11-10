@@ -82,6 +82,7 @@ type SessionService interface {
 }
 
 // EmailService defines the interface for email operations
+// This is injected from the email package - auth doesn't own email
 type EmailService interface {
 	SendVerificationEmail(ctx context.Context, user *models.User, token string) error
 	SendPasswordResetEmail(ctx context.Context, user *models.User, token string) error

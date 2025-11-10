@@ -20,6 +20,8 @@ type Config struct {
 	CORS     CORSConfig      `mapstructure:"cors"`
 	Auth     AuthConfig      `mapstructure:"auth"`
 	App      AppConfig       `mapstructure:"app"`
+	Email    EmailConfig     `mapstructure:"email"`
+	Storage  StorageConfig   `mapstructure:"storage"`
 }
 
 type ServerConfig struct {
@@ -48,6 +50,7 @@ type LoggingConfig struct {
 
 type OpenAIConfig struct {
 	APIKey      string        `mapstructure:"api_key"`
+	BaseURL     string        `mapstructure:"base_url"`
 	Model       string        `mapstructure:"model"`
 	MaxTokens   int           `mapstructure:"max_tokens"`
 	Temperature float64       `mapstructure:"temperature"`
@@ -98,6 +101,30 @@ type AppConfig struct {
 	Version     string `mapstructure:"version"`
 	Environment string `mapstructure:"environment"`
 	Debug       bool   `mapstructure:"debug"`
+	BaseURL     string `mapstructure:"base_url"`
+}
+
+type EmailConfig struct {
+	Provider string        `mapstructure:"provider"` // "smtp" or "mock"
+	SMTP     SMTPConfig    `mapstructure:"smtp"`
+	FromEmail string       `mapstructure:"from_email"`
+	FromName  string       `mapstructure:"from_name"`
+}
+
+type SMTPConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	UseTLS   bool   `mapstructure:"use_tls"`
+}
+
+type StorageConfig struct {
+	Type        string `mapstructure:"type"`         // "filesystem" or "s3"
+	BasePath    string `mapstructure:"base_path"`    // Local filesystem path
+	PublicURL   string `mapstructure:"public_url"`   // Public URL base
+	FlyerBaseURL string `mapstructure:"flyer_base_url"` // Base URL for flyer images (can be changed per environment)
+	MaxRetries  int    `mapstructure:"max_retries"`  // Retry attempts for file operations
 }
 
 func Load(env string) (*Config, error) {
@@ -219,9 +246,12 @@ func bindEnvironmentVariables(v *viper.Viper) {
 
 	// OpenAI configuration
 	v.BindEnv("openai.api_key", "OPENAI_API_KEY")
+	v.BindEnv("openai.base_url", "OPENAI_BASE_URL")
 	v.BindEnv("openai.model", "OPENAI_MODEL")
 	v.BindEnv("openai.max_tokens", "OPENAI_MAX_TOKENS")
 	v.BindEnv("openai.temperature", "OPENAI_TEMPERATURE")
+	v.BindEnv("openai.timeout", "OPENAI_TIMEOUT")
+	v.BindEnv("openai.max_retries", "OPENAI_MAX_RETRIES")
 
 	// Logging configuration
 	v.BindEnv("logging.level", "LOG_LEVEL")
@@ -234,6 +264,24 @@ func bindEnvironmentVariables(v *viper.Viper) {
 	// App configuration
 	v.BindEnv("app.environment", "APP_ENV")
 	v.BindEnv("app.debug", "APP_DEBUG")
+	v.BindEnv("app.base_url", "APP_BASE_URL")
+
+	// Email configuration
+	v.BindEnv("email.provider", "EMAIL_PROVIDER")
+	v.BindEnv("email.from_email", "EMAIL_FROM")
+	v.BindEnv("email.from_name", "EMAIL_FROM_NAME")
+	v.BindEnv("email.smtp.host", "SMTP_HOST")
+	v.BindEnv("email.smtp.port", "SMTP_PORT")
+	v.BindEnv("email.smtp.username", "SMTP_USERNAME")
+	v.BindEnv("email.smtp.password", "SMTP_PASSWORD")
+	v.BindEnv("email.smtp.use_tls", "SMTP_USE_TLS")
+
+	// Storage configuration
+	v.BindEnv("storage.type", "STORAGE_TYPE")
+	v.BindEnv("storage.base_path", "STORAGE_BASE_PATH")
+	v.BindEnv("storage.public_url", "STORAGE_PUBLIC_URL")
+	v.BindEnv("storage.flyer_base_url", "FLYER_BASE_URL")
+	v.BindEnv("storage.max_retries", "STORAGE_MAX_RETRIES")
 }
 
 func setDefaults(v *viper.Viper) {
@@ -270,9 +318,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("scraper.user_agent", "Kainuguru Bot 1.0")
 
 	// OpenAI defaults
-	v.SetDefault("openai.model", "gpt-4-vision-preview")
+	v.SetDefault("openai.base_url", "https://api.openai.com/v1")
+	v.SetDefault("openai.model", "gpt-4o")
 	v.SetDefault("openai.max_tokens", 4000)
 	v.SetDefault("openai.temperature", 0.1)
+	v.SetDefault("openai.timeout", "120s")
+	v.SetDefault("openai.max_retries", 3)
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
@@ -281,6 +332,21 @@ func setDefaults(v *viper.Viper) {
 	// App defaults
 	v.SetDefault("app.environment", "development")
 	v.SetDefault("app.debug", true)
+	v.SetDefault("app.base_url", "http://localhost:3000")
+
+	// Email defaults
+	v.SetDefault("email.provider", "mock") // Use mock by default in development
+	v.SetDefault("email.from_name", "Kainuguru")
+	v.SetDefault("email.from_email", "noreply@kainuguru.lt")
+	v.SetDefault("email.smtp.port", 587)
+	v.SetDefault("email.smtp.use_tls", true)
+
+	// Storage defaults
+	v.SetDefault("storage.type", "filesystem")
+	v.SetDefault("storage.base_path", "../kainuguru-public")
+	v.SetDefault("storage.public_url", "http://localhost:8080")
+	v.SetDefault("storage.flyer_base_url", "http://localhost:8080")
+	v.SetDefault("storage.max_retries", 3)
 }
 
 func validateConfig(cfg *Config) error {
@@ -295,15 +361,14 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("database user is required")
 	}
 
-	// Redis validation
-	if cfg.Redis.Host == "" {
-		return fmt.Errorf("redis host is required")
-	}
+	// Redis validation - only for main API server, not for commands
+	// Commands may not need Redis, so skip validation
 
 	// Auth validation - only required for non-test environments
 	if cfg.App.Environment != "test" && cfg.App.Environment != "testing" {
 		if cfg.Auth.JWTSecret == "" {
-			return fmt.Errorf("JWT secret is required")
+			// Auth is only required for main API server, not commands
+			// Skip validation
 		}
 	}
 

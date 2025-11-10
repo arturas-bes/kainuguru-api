@@ -98,6 +98,14 @@ func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*mo
 		query = query.Where("valid_to <= ?", *filters.ValidTo)
 	}
 
+	if filters.ValidOn != nil {
+		validDate, err := time.Parse("2006-01-02", *filters.ValidOn)
+		if err == nil {
+			query = query.Where("valid_from <= ?", validDate).
+				Where("valid_to >= ?", validDate)
+		}
+	}
+
 	if filters.IsCurrent != nil && *filters.IsCurrent {
 		now := time.Now()
 		weekStart := now.AddDate(0, 0, -int(now.Weekday()-time.Monday))
@@ -282,6 +290,32 @@ func (fs *flyerService) ArchiveFlyer(ctx context.Context, flyerID int) error {
 
 	flyer.Archive()
 	return fs.Update(ctx, flyer)
+}
+
+// ArchiveOldFlyers archives flyers that are older than one cycle (7 days past valid_to)
+// This allows multiple active flyers per store and only archives truly old ones
+func (fs *flyerService) ArchiveOldFlyers(ctx context.Context) (int, error) {
+	// Archive flyers where valid_to is more than 7 days in the past
+	cutoffDate := time.Now().AddDate(0, 0, -7)
+	
+	result, err := fs.db.NewUpdate().
+		Model((*models.Flyer)(nil)).
+		Set("is_archived = ?", true).
+		Set("archived_at = ?", time.Now()).
+		Where("valid_to < ?", cutoffDate).
+		Where("is_archived = ?", false).
+		Exec(ctx)
+	
+	if err != nil {
+		return 0, fmt.Errorf("failed to archive old flyers: %w", err)
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	
+	return int(rowsAffected), nil
 }
 
 // GetWithPages retrieves a flyer with its pages

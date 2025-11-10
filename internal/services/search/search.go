@@ -14,6 +14,7 @@ type SearchRequest struct {
 	MaxPrice    *float64 `json:"max_price,omitempty" validate:"omitempty,gte=0"`
 	OnSaleOnly  bool     `json:"on_sale_only"`
 	Category    string   `json:"category,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
 	Limit       int      `json:"limit" validate:"min=1,max=100"`
 	Offset      int      `json:"offset" validate:"min=0"`
 	PreferFuzzy bool     `json:"prefer_fuzzy"`

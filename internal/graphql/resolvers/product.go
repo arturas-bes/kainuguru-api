@@ -39,6 +39,7 @@ func (r *productResolver) Price(ctx context.Context, obj *models.Product) (*mode
 		Currency:        obj.Currency,
 		Discount:        &discount,
 		DiscountPercent: &discountPercent,
+		SpecialDiscount: obj.SpecialDiscount,
 		DiscountAmount:  discount,
 		IsDiscounted:    obj.IsOnSale,
 	}

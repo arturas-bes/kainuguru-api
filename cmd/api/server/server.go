@@ -143,6 +143,7 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 		ShoppingListService:     serviceFactory.ShoppingListService(),
 		ShoppingListItemService: serviceFactory.ShoppingListItemService(),
 		PriceHistoryService:     serviceFactory.PriceHistoryService(),
+		DB:                      db.DB,
 	}
 
 	// GraphQL endpoint with full service integration

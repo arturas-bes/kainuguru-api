@@ -1,0 +1,34 @@
+	•  Unified search returns products across all active flyers and all shops.
+	•	Product search uses Lithuanian normalization + fuzzy match (trigram/FTS).
+	•	Flyers page lists all active flyers with pagination.
+	•	Flyers can be filtered by shop.
+	•	Flyers can be searched by flyer title/name.
+	•	Opening a flyer shows all pages as images.
+	•	In-flyer search finds products within that flyer only.
+	•	Clicking a product in results jumps to the correct flyer page (with highlight box if available).
+	•	Users can add a product from a flyer directly to a shopping list.
+	•	Shopping list items persist across weeks via Product Master/Tag fallback when the flyer entry expires.
+	•	Users can view, rename, reorder, and remove items in shopping lists.
+	•	Users can delete a shopping list.
+	•	Users can create multiple shopping lists.
+	•	Users can register/login (JWT) and see their lists when authenticated.
+	•	Users can opt-in to reminders when new flyers are published.
+	•	System recommends where to buy list items cheapest (per item; simple heuristic).
+	•	Last week’s flyers remain visible but greyed-out/marked expired.
+	•	Scraper abstraction supports per-shop strategies to fetch flyer images/PDFs.
+	•	System converts PDFs to images (one image per page).
+	•	AI extraction parses product name, price(s), unit, brand, page index.
+	•	Fallback extractor (OCR/regex) runs when AI is empty or fails; results are validated/cleaned.
+	•	Products are normalized (diacritics removed, case/whitespace fixed) before storage/search.
+	•	Product Master catalog deduplicates the same item across weeks/shops.
+	•	System stores flyer images with stable URLs/keys (FS now, S3-ready later).
+	•	System preserves price history per Product Master.
+	•	System deletes/archives old flyers and product instances after an age buffer.
+	•	Partitioned/archived tables keep active data fast; indexes on names/normalized fields.
+	•	Duplicate flyer detection prevents re-ingest of the same issue.
+	•	Rate-limit/retry logic around AI and scraping calls.
+	•	GraphQL API exposes flyers, products, search, shopping lists, and auth.
+	•	Auth middleware protects list/profile endpoints; passwords hashed.
+	•	Config via env (DB, Redis, OpenAI, storage); Dockerized services; DB migrations.
+	•	Logging/metrics for scraper, AI success rate, extraction errors, and query latency.
+	•	Basic tests for search, add-to-list, in-flyer jump, and auth flows.

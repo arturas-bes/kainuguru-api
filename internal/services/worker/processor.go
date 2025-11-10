@@ -188,7 +188,7 @@ func (wp *WorkerProcessor) processJob(ctx context.Context, job *Job, workerID in
 		if err != nil {
 			return fmt.Errorf("failed to mark job as failed: %w", err)
 		}
-		return fmt.Errorf(errorMsg)
+		return fmt.Errorf("%s", errorMsg)
 	}
 
 	// Create context with timeout

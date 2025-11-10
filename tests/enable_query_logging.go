@@ -6,9 +6,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -56,7 +56,7 @@ func (h *QueryLoggingHook) AfterQuery(ctx context.Context, event *bun.QueryEvent
 		return
 	}
 
-	duration := event.Dur.Milliseconds()
+	duration := time.Since(event.StartTime).Milliseconds()
 
 	// Color code based on duration
 	color := "\033[0;32m" // Green for fast queries

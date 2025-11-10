@@ -41,7 +41,7 @@ install:
 
 seed-data:
 	@echo "📦 Loading test fixtures into database..."
-	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_price_fixtures.go
+	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_complete_fixtures.go
 	@echo "✅ Test fixtures loaded successfully!"
 
 db-reset:
@@ -57,7 +57,21 @@ build:
 	@mkdir -p bin/
 	@go build -o bin/api cmd/api/main.go
 	@go build -o bin/seeder cmd/seeder/main.go
+	@go build -o bin/enrich-flyers cmd/enrich-flyers/*.go
+	@go build -o bin/archive-flyers cmd/archive-flyers/*.go
 	@echo "✅ Binaries built successfully!"
+
+build-enrich:
+	@echo "🤖 Building enrichment command..."
+	@mkdir -p bin/
+	@go build -o bin/enrich-flyers cmd/enrich-flyers/*.go
+	@echo "✅ Enrichment command built: bin/enrich-flyers"
+
+build-archive:
+	@echo "📦 Building archive command..."
+	@mkdir -p bin/
+	@go build -o bin/archive-flyers cmd/archive-flyers/*.go
+	@echo "✅ Archive command built: bin/archive-flyers"
 
 format:
 	@echo "🧹 Cleaning up and formatting code..."
@@ -80,62 +94,6 @@ clean:
 	@docker system prune -f 2>/dev/null || true
 	@rm -rf test_output/ coverage.out coverage.html bin/
 	@echo "✅ Environment cleaned!"
-
-# 🔍 VALIDATION FRAMEWORK COMMANDS
-
-validate-setup:
-	@echo "🔧 Setting up validation framework..."
-	@echo "Note: Validation framework is configured to use BDD tests"
-	@mkdir -p tests/validation/logs tests/validation/results
-	@echo "✅ Validation framework ready!"
-
-validate-all:
-	@echo "🔍 Running complete system validation..."
-	@echo "Note: This will execute all BDD feature tests"
-	@echo "TODO: Implement comprehensive validation framework"
-	@echo "✅ Validation framework pending implementation"
-
-validate-database:
-	@echo "🗄️ Validating database integrity..."
-	@docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "\dt" | grep -E "stores|products|price_history"
-	@echo "✅ Database validation completed!"
-
-validate-graphql:
-	@echo "🔗 Validating GraphQL endpoints..."
-	@curl -s -X POST http://localhost:8080/graphql -H "Content-Type: application/json" -d '{"query": "{ __schema { types { name } } }"}' | grep -q "data" && echo "GraphQL endpoint is responding" || echo "GraphQL endpoint failed"
-	@echo "✅ GraphQL validation completed!"
-
-validate-auth:
-	@echo "🔐 Validating authentication flows..."
-	@echo "TODO: Add authentication validation tests"
-	@echo "✅ Authentication validation pending!"
-
-validate-search:
-	@echo "🔍 Validating search functionality..."
-	@echo "TODO: Add search validation tests"
-	@echo "✅ Search validation pending!"
-
-validate-shopping:
-	@echo "🛒 Validating shopping list operations..."
-	@echo "TODO: Add shopping list validation tests"
-	@echo "✅ Shopping list validation pending!"
-
-validate-pricing:
-	@echo "💰 Validating price history and trends..."
-	@docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "SELECT COUNT(*) FROM price_history;" | grep -E "[0-9]+"
-	@echo "✅ Pricing validation completed!"
-
-validate-quick:
-	@echo "⚡ Running quick validation (essential checks)..."
-	@echo "Checking API health..."
-	@curl -s http://localhost:8080/health | grep -q "healthy" && echo "✅ API is healthy" || echo "❌ API health check failed"
-	@echo "Checking database..."
-	@docker exec kainuguru-api-db-1 pg_isready -U kainuguru && echo "✅ Database is ready" || echo "❌ Database check failed"
-	@echo "Checking Redis..."
-	@docker exec kainuguru-api-redis-1 redis-cli ping | grep -q "PONG" && echo "✅ Redis is ready" || echo "❌ Redis check failed"
-	@echo "✅ Quick validation completed!"
-
-# 🔧 HELPER COMMANDS (internal use)
 
 _test-unit:
 	@echo "Running unit tests..."
