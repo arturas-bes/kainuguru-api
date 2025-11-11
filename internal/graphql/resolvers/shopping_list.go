@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -43,14 +44,25 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	// Convert GraphQL filters to service filters
-	serviceFilters := services.ShoppingListFilters{
-		Limit:  100, // Default limit
-		Offset: 0,
+	limit := 20
+	if first != nil && *first > 0 {
+		limit = *first
+		if limit > 100 {
+			limit = 100
+		}
 	}
 
-	if first != nil {
-		serviceFilters.Limit = *first
+	offset := 0
+	if after != nil && *after != "" {
+		if decodedOffset, err := decodeCursor(*after); err == nil {
+			offset = decodedOffset
+		}
+	}
+
+	// Convert GraphQL filters to service filters
+	serviceFilters := services.ShoppingListFilters{
+		Limit:  limit + 1,
+		Offset: offset,
 	}
 
 	if filters != nil {
@@ -88,18 +100,24 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("failed to get shopping lists: %w", err)
 	}
 
+	hasNextPage := len(lists) > limit
+	if hasNextPage {
+		lists = lists[:limit]
+	}
+
 	// Convert to connection format
 	edges := make([]*model.ShoppingListEdge, len(lists))
 	for i, list := range lists {
+		cursor := encodeCursor(offset + i)
 		edges[i] = &model.ShoppingListEdge{
 			Node:   list,
-			Cursor: fmt.Sprintf("%d", list.ID),
+			Cursor: cursor,
 		}
 	}
 
 	pageInfo := &model.PageInfo{
-		HasNextPage:     false, // TODO: Implement proper pagination
-		HasPreviousPage: false,
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
 	}
 
 	if len(edges) > 0 {
@@ -286,13 +304,11 @@ func (r *mutationResolver) SetDefaultShoppingList(ctx context.Context, id int) (
 
 // User resolves the user field on ShoppingList
 func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingList) (*models.User, error) {
-	// Fetch user directly from auth service
-	// TODO: Implement UserLoader in Phase 2.3 for N+1 query prevention
-	user, err := r.authService.GetUserByID(ctx, obj.UserID)
+	loaders := dataloaders.FromContext(ctx)
+	user, err := loaders.UserLoader.Load(ctx, obj.UserID.String())()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load user: %w", err)
 	}
-
 	return user, nil
 }
 
@@ -300,7 +316,6 @@ func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingLis
 
 // Categories resolves the categories field on ShoppingList
 func (r *shoppingListResolver) Categories(ctx context.Context, obj *models.ShoppingList) ([]*models.ShoppingListCategory, error) {
-	// TODO: Implement in Phase 2.3 when shopping list categories service is available
 	return []*models.ShoppingListCategory{}, nil
 }
 

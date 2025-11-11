@@ -1,13 +1,28 @@
 -- Test Fixture Data for Search Testing
 -- This file creates sample flyers and products for testing search functionality
 
+TRUNCATE TABLE price_history RESTART IDENTITY CASCADE;
+TRUNCATE TABLE products RESTART IDENTITY CASCADE;
+TRUNCATE TABLE flyers RESTART IDENTITY CASCADE;
+TRUNCATE TABLE stores RESTART IDENTITY CASCADE;
+
+-- Ensure stores exist before inserting dependent rows
+INSERT INTO stores (code, name, is_active, created_at, updated_at)
+VALUES
+('maxima', 'Maxima', TRUE, NOW(), NOW()),
+('rimi', 'Rimi', TRUE, NOW(), NOW()),
+('iki', 'IKI', TRUE, NOW(), NOW()),
+('lidl', 'Lidl', TRUE, NOW(), NOW()),
+('norfa', 'Norfa', TRUE, NOW(), NOW())
+ON CONFLICT (code) DO NOTHING;
+
 -- Create test flyers for different stores
 INSERT INTO flyers (store_id, title, valid_from, valid_to, is_archived, created_at) VALUES
-(1, 'Maxima Savaitės Pasiūlymai', CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '6 days', FALSE, NOW()),
-(2, 'Rimi Super Kainos', CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '6 days', FALSE, NOW()),
-(3, 'Iki Mega Nuolaidos', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', FALSE, NOW()),
-(4, 'Lidl Savaitės Akcijos', CURRENT_DATE - INTERVAL '2 days', CURRENT_DATE + INTERVAL '4 days', FALSE, NOW()),
-(5, 'Norfa Kainų Mūšis', CURRENT_DATE, CURRENT_DATE + INTERVAL '5 days', FALSE, NOW())
+((SELECT id FROM stores WHERE code = 'maxima'), 'Maxima Savaitės Pasiūlymai', CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '6 days', FALSE, NOW()),
+((SELECT id FROM stores WHERE code = 'rimi'), 'Rimi Super Kainos', CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '6 days', FALSE, NOW()),
+((SELECT id FROM stores WHERE code = 'iki'), 'Iki Mega Nuolaidos', CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', FALSE, NOW()),
+((SELECT id FROM stores WHERE code = 'lidl'), 'Lidl Savaitės Akcijos', CURRENT_DATE - INTERVAL '2 days', CURRENT_DATE + INTERVAL '4 days', FALSE, NOW()),
+((SELECT id FROM stores WHERE code = 'norfa'), 'Norfa Kainų Mūšis', CURRENT_DATE, CURRENT_DATE + INTERVAL '5 days', FALSE, NOW())
 RETURNING id;
 
 -- Get flyer IDs (they should be 1-5 in order)

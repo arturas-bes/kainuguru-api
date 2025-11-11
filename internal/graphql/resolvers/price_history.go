@@ -47,12 +47,20 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 	limit := 20
 	if first != nil && *first > 0 {
 		limit = *first
+		if limit > 100 {
+			limit = 100
+		}
 	}
-	serviceFilters.Limit = limit + 1 // Fetch one extra to determine if there are more
 
-	// TODO: Implement cursor-based pagination with 'after' parameter
-	// For now, we'll use simple offset-based pagination
-	serviceFilters.Offset = 0
+	offset := 0
+	if after != nil && *after != "" {
+		if decodedOffset, err := decodeCursor(*after); err == nil {
+			offset = decodedOffset
+		}
+	}
+
+	serviceFilters.Limit = limit + 1 // Fetch one extra to determine if there are more
+	serviceFilters.Offset = offset
 
 	// Get price history from service
 	priceHistory, err := r.priceHistoryService.GetByProductMasterID(ctx, productMasterID, storeID, serviceFilters)
@@ -69,8 +77,7 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 
 	edges := make([]*model.PriceHistoryEdge, len(priceHistory))
 	for i, ph := range priceHistory {
-		// Create cursor from ID (simple approach for now)
-		cursor := fmt.Sprintf("%d", ph.ID)
+		cursor := encodeCursor(offset + i)
 		edges[i] = &model.PriceHistoryEdge{
 			Node:   ph,
 			Cursor: cursor,
@@ -87,7 +94,7 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 		Edges: edges,
 		PageInfo: &model.PageInfo{
 			HasNextPage:     hasNextPage,
-			HasPreviousPage: false, // TODO: Implement based on 'after' cursor
+			HasPreviousPage: offset > 0,
 			StartCursor:     startCursor,
 			EndCursor:       endCursor,
 		},

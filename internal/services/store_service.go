@@ -244,3 +244,28 @@ func (s *storeService) UpdateLocations(ctx context.Context, storeID int, locatio
 
 	return err
 }
+
+func (s *storeService) Count(ctx context.Context, filters StoreFilters) (int, error) {
+	query := s.db.NewSelect().Model((*models.Store)(nil))
+
+	if filters.IsActive != nil {
+		query = query.Where("is_active = ?", *filters.IsActive)
+	}
+
+	if len(filters.Codes) > 0 {
+		query = query.Where("code IN (?)", bun.In(filters.Codes))
+	}
+
+	if filters.HasFlyers != nil && *filters.HasFlyers {
+		query = query.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = stores.id)")
+	} else if filters.HasFlyers != nil && !*filters.HasFlyers {
+		query = query.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = stores.id)")
+	}
+
+	count, err := query.Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count stores: %w", err)
+	}
+
+	return count, nil
+}

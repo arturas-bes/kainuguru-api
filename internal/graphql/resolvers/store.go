@@ -86,7 +86,14 @@ func (r *storeResolver) Flyers(ctx context.Context, obj *models.Store, filters *
 		return nil, fmt.Errorf("failed to get flyers for store: %w", err)
 	}
 
-	return buildFlyerConnection(flyers, limit, offset), nil
+	countFilters := convertFlyerFilters(filters, 0, 0)
+	countFilters.StoreIDs = append(countFilters.StoreIDs, obj.ID)
+	totalCount, err := r.flyerService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count flyers for store: %w", err)
+	}
+
+	return buildFlyerConnection(flyers, limit, offset, totalCount), nil
 }
 
 func (r *storeResolver) Products(ctx context.Context, obj *models.Store, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
@@ -117,7 +124,14 @@ func (r *storeResolver) Products(ctx context.Context, obj *models.Store, filters
 		return nil, fmt.Errorf("failed to get products for store: %w", err)
 	}
 
-	return buildProductConnection(products, limit, offset), nil
+	countFilters := convertProductFilters(filters, 0, 0)
+	countFilters.StoreIDs = append(countFilters.StoreIDs, obj.ID)
+	totalCount, err := r.productService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count store products: %w", err)
+	}
+
+	return buildProductConnection(products, limit, offset, totalCount), nil
 }
 
 // Helper functions moved to helpers.go

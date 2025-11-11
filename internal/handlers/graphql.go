@@ -22,18 +22,18 @@ import (
 
 // GraphQLConfig holds configuration for GraphQL handler
 type GraphQLConfig struct {
-	StoreService             services.StoreService
-	FlyerService             services.FlyerService
-	FlyerPageService         services.FlyerPageService
-	ProductService           services.ProductService
-	ProductMasterService     services.ProductMasterService
-	ExtractionJobService     services.ExtractionJobService
-	SearchService            search.Service
-	AuthService              auth.AuthService
-	ShoppingListService      services.ShoppingListService
-	ShoppingListItemService  services.ShoppingListItemService
-	PriceHistoryService      services.PriceHistoryService
-	DB                       *bun.DB
+	StoreService            services.StoreService
+	FlyerService            services.FlyerService
+	FlyerPageService        services.FlyerPageService
+	ProductService          services.ProductService
+	ProductMasterService    services.ProductMasterService
+	ExtractionJobService    services.ExtractionJobService
+	SearchService           search.Service
+	AuthService             auth.AuthService
+	ShoppingListService     services.ShoppingListService
+	ShoppingListItemService services.ShoppingListItemService
+	PriceHistoryService     services.PriceHistoryService
+	DB                      *bun.DB
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
@@ -63,9 +63,8 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 	gqlHandler := handler.NewDefaultServer(schema)
 
 	return func(c *fiber.Ctx) error {
-		// Start with base context
 		baseCtx := c.Context()
-		ctx := context.Background()
+		ctx := deriveGraphQLContext(c)
 
 		// Extract and validate JWT token (optional auth - don't fail if missing)
 		authHeader := c.Get("Authorization")
@@ -94,6 +93,8 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 			config.StoreService,
 			config.FlyerService,
 			config.FlyerPageService,
+			config.ShoppingListService,
+			config.ProductService,
 			config.ProductMasterService,
 			config.AuthService,
 		)
@@ -138,6 +139,23 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		// Return the GraphQL response
 		return c.JSON(gqlResponse)
 	}
+}
+
+func deriveGraphQLContext(c *fiber.Ctx) context.Context {
+	if c == nil {
+		return context.Background()
+	}
+
+	userCtx := c.UserContext()
+	if userCtx != nil && userCtx != context.Background() {
+		return userCtx
+	}
+
+	if requestCtx := c.Context(); requestCtx != nil {
+		return requestCtx
+	}
+
+	return context.Background()
 }
 
 // graphQLRequest represents a GraphQL request body

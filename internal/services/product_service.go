@@ -116,58 +116,8 @@ func (s *productService) GetAll(ctx context.Context, filters ProductFilters) ([]
 		Relation("Flyer").
 		Relation("FlyerPage")
 
-	// Apply filters
-	if len(filters.StoreIDs) > 0 {
-		query = query.Where("p.store_id IN (?)", bun.In(filters.StoreIDs))
-	}
-
-	if len(filters.FlyerIDs) > 0 {
-		query = query.Where("p.flyer_id IN (?)", bun.In(filters.FlyerIDs))
-	}
-
-	if len(filters.FlyerPageIDs) > 0 {
-		query = query.Where("p.flyer_page_id IN (?)", bun.In(filters.FlyerPageIDs))
-	}
-
-	if len(filters.Categories) > 0 {
-		query = query.Where("p.category IN (?)", bun.In(filters.Categories))
-	}
-
-	if len(filters.Brands) > 0 {
-		query = query.Where("p.brand IN (?)", bun.In(filters.Brands))
-	}
-
-	if filters.IsOnSale != nil {
-		query = query.Where("p.is_on_sale = ?", *filters.IsOnSale)
-	}
-
-	if filters.IsAvailable != nil {
-		query = query.Where("p.is_available = ?", *filters.IsAvailable)
-	}
-
-	if filters.MinPrice != nil {
-		query = query.Where("p.current_price >= ?", *filters.MinPrice)
-	}
-
-	if filters.MaxPrice != nil {
-		query = query.Where("p.current_price <= ?", *filters.MaxPrice)
-	}
-
-	if filters.RequiresReview != nil {
-		query = query.Where("p.requires_review = ?", *filters.RequiresReview)
-	}
-
-	// Apply pagination
-	if filters.Limit > 0 {
-		query = query.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		query = query.Offset(filters.Offset)
-	}
-
-	// Default ordering
-	query = query.Order("p.id DESC")
+	s.applyProductFilterConditions(query, filters)
+	applyProductPagination(query, filters)
 
 	var products []*models.Product
 	err := query.Scan(ctx, &products)
@@ -241,27 +191,27 @@ func (s *productService) CreateBatch(ctx context.Context, products []*models.Pro
 
 func (s *productService) Update(ctx context.Context, product *models.Product) error {
 	product.UpdatedAt = time.Now()
-	
+
 	// Normalize name if changed
 	if product.NormalizedName == "" && product.Name != "" {
 		product.NormalizedName = NormalizeProductText(product.Name)
 	}
-	
+
 	// Generate search vector
 	if product.SearchVector == "" && product.NormalizedName != "" {
 		product.SearchVector = GenerateSearchVector(product.NormalizedName)
 	}
-	
+
 	// Update the product
 	_, err := s.db.NewUpdate().
 		Model(product).
 		WherePK().
 		Exec(ctx)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to update product: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -295,7 +245,8 @@ func (s *productService) GetCurrentProducts(ctx context.Context, storeIDs []int,
 	query = query.Where("p.valid_from <= CURRENT_TIMESTAMP AND p.valid_to >= CURRENT_TIMESTAMP")
 
 	// Apply additional filters
-	s.applyProductFilters(query, filters)
+	s.applyProductFilterConditions(query, filters)
+	applyProductPagination(query, filters)
 
 	var products []*models.Product
 	err := query.Scan(ctx, &products)
@@ -318,7 +269,8 @@ func (s *productService) GetValidProducts(ctx context.Context, storeIDs []int, f
 	query = query.Where("p.valid_to >= CURRENT_TIMESTAMP")
 
 	// Apply additional filters
-	s.applyProductFilters(query, filters)
+	s.applyProductFilterConditions(query, filters)
+	applyProductPagination(query, filters)
 
 	var products []*models.Product
 	err := query.Scan(ctx, &products)
@@ -341,7 +293,8 @@ func (s *productService) GetProductsOnSale(ctx context.Context, storeIDs []int, 
 	query = query.Where("p.is_on_sale = ?", true)
 
 	// Apply additional filters
-	s.applyProductFilters(query, filters)
+	s.applyProductFilterConditions(query, filters)
+	applyProductPagination(query, filters)
 
 	var products []*models.Product
 	err := query.Scan(ctx, &products)
@@ -352,41 +305,59 @@ func (s *productService) GetProductsOnSale(ctx context.Context, storeIDs []int, 
 	return products, nil
 }
 
-// applyProductFilters is a helper to apply common filters to a query
-func (s *productService) applyProductFilters(query *bun.SelectQuery, filters ProductFilters) {
+func (s *productService) applyProductFilterConditions(query *bun.SelectQuery, filters ProductFilters) {
+	if len(filters.StoreIDs) > 0 {
+		query.Where("p.store_id IN (?)", bun.In(filters.StoreIDs))
+	}
 	if len(filters.FlyerIDs) > 0 {
 		query.Where("p.flyer_id IN (?)", bun.In(filters.FlyerIDs))
 	}
-
+	if len(filters.FlyerPageIDs) > 0 {
+		query.Where("p.flyer_page_id IN (?)", bun.In(filters.FlyerPageIDs))
+	}
 	if len(filters.Categories) > 0 {
 		query.Where("p.category IN (?)", bun.In(filters.Categories))
 	}
-
 	if len(filters.Brands) > 0 {
 		query.Where("p.brand IN (?)", bun.In(filters.Brands))
 	}
-
+	if filters.IsOnSale != nil {
+		query.Where("p.is_on_sale = ?", *filters.IsOnSale)
+	}
 	if filters.IsAvailable != nil {
 		query.Where("p.is_available = ?", *filters.IsAvailable)
 	}
-
+	if filters.RequiresReview != nil {
+		query.Where("p.requires_review = ?", *filters.RequiresReview)
+	}
 	if filters.MinPrice != nil {
 		query.Where("p.current_price >= ?", *filters.MinPrice)
 	}
-
 	if filters.MaxPrice != nil {
 		query.Where("p.current_price <= ?", *filters.MaxPrice)
 	}
+}
 
+func applyProductPagination(query *bun.SelectQuery, filters ProductFilters) {
 	if filters.Limit > 0 {
 		query.Limit(filters.Limit)
 	}
-
 	if filters.Offset > 0 {
 		query.Offset(filters.Offset)
 	}
-
 	query.Order("p.id DESC")
+}
+
+func (s *productService) Count(ctx context.Context, filters ProductFilters) (int, error) {
+	query := s.db.NewSelect().Model((*models.Product)(nil))
+	s.applyProductFilterConditions(query, filters)
+
+	count, err := query.Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count products: %w", err)
+	}
+
+	return count, nil
 }
 
 // Search operations

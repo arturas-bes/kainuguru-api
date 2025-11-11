@@ -120,13 +120,24 @@ func (r *flyerResolver) FlyerPages(ctx context.Context, obj *models.Flyer, filte
 		}
 	}
 
+	// Convert filters and scope to this flyer
+	serviceFilters := convertFlyerPageFilters(filters, limit+1, offset)
+	serviceFilters.FlyerIDs = append(serviceFilters.FlyerIDs, obj.ID)
+
 	// Get pages for this flyer
-	pages, err := r.flyerPageService.GetByFlyerID(ctx, obj.ID)
+	pages, err := r.flyerPageService.GetAll(ctx, serviceFilters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get flyer pages: %w", err)
 	}
 
-	return buildFlyerPageConnection(pages, limit, offset), nil
+	countFilters := convertFlyerPageFilters(filters, 0, 0)
+	countFilters.FlyerIDs = append(countFilters.FlyerIDs, obj.ID)
+	totalCount, err := r.flyerPageService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count flyer pages: %w", err)
+	}
+
+	return buildFlyerPageConnection(pages, limit, offset, totalCount), nil
 }
 
 func (r *flyerResolver) Products(ctx context.Context, obj *models.Flyer, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
@@ -150,6 +161,7 @@ func (r *flyerResolver) Products(ctx context.Context, obj *models.Flyer, filters
 
 	// Convert filters
 	serviceFilters := convertProductFilters(filters, limit+1, offset)
+	serviceFilters.FlyerIDs = append(serviceFilters.FlyerIDs, obj.ID)
 
 	// Get products for this flyer
 	products, err := r.productService.GetByFlyer(ctx, obj.ID, serviceFilters)
@@ -157,7 +169,14 @@ func (r *flyerResolver) Products(ctx context.Context, obj *models.Flyer, filters
 		return nil, fmt.Errorf("failed to get products for flyer: %w", err)
 	}
 
-	return buildProductConnection(products, limit, offset), nil
+	countFilters := convertProductFilters(filters, 0, 0)
+	countFilters.FlyerIDs = append(countFilters.FlyerIDs, obj.ID)
+	totalCount, err := r.productService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products for flyer: %w", err)
+	}
+
+	return buildProductConnection(products, limit, offset, totalCount), nil
 }
 
 // FlyerPage nested field resolvers
@@ -262,7 +281,7 @@ func (r *flyerPageResolver) Products(ctx context.Context, obj *models.FlyerPage,
 
 	// Convert filters and add flyer page ID
 	serviceFilters := convertProductFilters(filters, limit+1, offset)
-	serviceFilters.FlyerPageIDs = []int{obj.ID}
+	serviceFilters.FlyerPageIDs = append(serviceFilters.FlyerPageIDs, obj.ID)
 
 	// Get products for this page
 	products, err := r.productService.GetAll(ctx, serviceFilters)
@@ -270,7 +289,14 @@ func (r *flyerPageResolver) Products(ctx context.Context, obj *models.FlyerPage,
 		return nil, fmt.Errorf("failed to get products for flyer page: %w", err)
 	}
 
-	return buildProductConnection(products, limit, offset), nil
+	countFilters := convertProductFilters(filters, 0, 0)
+	countFilters.FlyerPageIDs = append(countFilters.FlyerPageIDs, obj.ID)
+	totalCount, err := r.productService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products for flyer page: %w", err)
+	}
+
+	return buildProductConnection(products, limit, offset, totalCount), nil
 }
 
 // Helper functions moved to helpers.go

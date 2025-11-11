@@ -102,49 +102,8 @@ func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters)
 	query := s.db.NewSelect().Model((*models.FlyerPage)(nil)).
 		Relation("Flyer")
 
-	// Apply filters
-	if len(filters.FlyerIDs) > 0 {
-		query = query.Where("fp.flyer_id IN (?)", bun.In(filters.FlyerIDs))
-	}
-
-	if len(filters.Status) > 0 {
-		query = query.Where("fp.extraction_status IN (?)", bun.In(filters.Status))
-	}
-
-	if filters.HasImage != nil {
-		if *filters.HasImage {
-			query = query.Where("fp.image_url IS NOT NULL AND fp.image_url != ''")
-		} else {
-			query = query.Where("fp.image_url IS NULL OR fp.image_url = ''")
-		}
-	}
-
-	if len(filters.PageNumbers) > 0 {
-		query = query.Where("fp.page_number IN (?)", bun.In(filters.PageNumbers))
-	}
-
-	// Apply pagination
-	if filters.Limit > 0 {
-		query = query.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		query = query.Offset(filters.Offset)
-	}
-
-	// Apply ordering
-	if filters.OrderBy != "" {
-		orderClause := fmt.Sprintf("fp.%s", filters.OrderBy)
-		if filters.OrderDir == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		// Default ordering by flyer and page number
-		query = query.Order("fp.flyer_id ASC").Order("fp.page_number ASC")
-	}
+	s.applyFlyerPageFilterConditions(query, filters)
+	applyFlyerPagePagination(query, filters)
 
 	var pages []*models.FlyerPage
 	err := query.Scan(ctx, &pages)
@@ -153,6 +112,18 @@ func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters)
 	}
 
 	return pages, nil
+}
+
+func (s *flyerPageService) Count(ctx context.Context, filters FlyerPageFilters) (int, error) {
+	query := s.db.NewSelect().Model((*models.FlyerPage)(nil))
+	s.applyFlyerPageFilterConditions(query, filters)
+
+	count, err := query.Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count flyer pages: %w", err)
+	}
+
+	return count, nil
 }
 
 func (s *flyerPageService) Create(ctx context.Context, page *models.FlyerPage) error {
@@ -202,6 +173,49 @@ func (s *flyerPageService) Delete(ctx context.Context, id int) error {
 		Exec(ctx)
 
 	return err
+}
+
+func (s *flyerPageService) applyFlyerPageFilterConditions(query *bun.SelectQuery, filters FlyerPageFilters) {
+	if len(filters.FlyerIDs) > 0 {
+		query.Where("fp.flyer_id IN (?)", bun.In(filters.FlyerIDs))
+	}
+
+	if len(filters.Status) > 0 {
+		query.Where("fp.extraction_status IN (?)", bun.In(filters.Status))
+	}
+
+	if filters.HasImage != nil {
+		if *filters.HasImage {
+			query.Where("fp.image_url IS NOT NULL AND fp.image_url != ''")
+		} else {
+			query.Where("fp.image_url IS NULL OR fp.image_url = ''")
+		}
+	}
+
+	if len(filters.PageNumbers) > 0 {
+		query.Where("fp.page_number IN (?)", bun.In(filters.PageNumbers))
+	}
+}
+
+func applyFlyerPagePagination(query *bun.SelectQuery, filters FlyerPageFilters) {
+	if filters.Limit > 0 {
+		query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query.Offset(filters.Offset)
+	}
+
+	if filters.OrderBy != "" {
+		orderClause := fmt.Sprintf("fp.%s", filters.OrderBy)
+		if filters.OrderDir == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query.Order(orderClause)
+	} else {
+		query.Order("fp.flyer_id ASC").Order("fp.page_number ASC")
+	}
 }
 
 // Processing operations

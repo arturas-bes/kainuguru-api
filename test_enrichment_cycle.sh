@@ -15,15 +15,22 @@ echo "Model: $MODEL"
 echo "Max Pages: $MAX_PAGES"
 echo ""
 
+# Locate docker compose project container names
+DB_CONTAINER=$(docker compose ps -q db)
+if [ -z "$DB_CONTAINER" ]; then
+  echo "❌ Could not determine database container. Run docker compose up first."
+  exit 1
+fi
+
 # Step 1: Reset products
 echo "📝 Step 1: Resetting products..."
-go run scripts/reset_products.go
+go run ./scripts/tools/reset_products
 echo "✅ Products reset"
 echo ""
 
 # Step 2: Reset page statuses
 echo "📝 Step 2: Resetting page extraction status..."
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c \
   "UPDATE flyer_pages 
    SET extraction_status = 'pending', extraction_attempts = 0 
    WHERE flyer_id IN (
@@ -36,6 +43,7 @@ echo ""
 
 # Step 3: Rebuild command
 echo "📝 Step 3: Building enricher..."
+mkdir -p ./bin
 go build -o ./bin/enrich-flyers ./cmd/enrich-flyers
 echo "✅ Build complete"
 echo ""
@@ -53,24 +61,24 @@ echo "📝 Step 5: Validating results..."
 echo ""
 
 echo "Product Count:"
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c \
   "SELECT COUNT(*) FROM products WHERE extraction_method = 'ai_vision';" | xargs
 
 echo ""
 echo "Average Confidence:"
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c \
   "SELECT ROUND(AVG(extraction_confidence)::numeric, 2) 
    FROM products WHERE extraction_method = 'ai_vision';" | xargs
 
 echo ""
 echo "Products with Special Discounts:"
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c \
   "SELECT COUNT(*) FROM products 
    WHERE extraction_method = 'ai_vision' AND special_discount IS NOT NULL;" | xargs
 
 echo ""
 echo "Products by Category:"
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c \
   "SELECT category, COUNT(*) as count 
    FROM products 
    WHERE extraction_method = 'ai_vision' 
@@ -79,7 +87,7 @@ docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c \
 
 echo ""
 echo "Sample Products:"
-docker exec -i kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c \
+docker exec -i "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c \
   "SELECT 
      LEFT(name, 50) as name,
      current_price,

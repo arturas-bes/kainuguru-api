@@ -15,6 +15,7 @@ type StoreService interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Store, error)
 	GetByCode(ctx context.Context, code string) (*models.Store, error)
 	GetAll(ctx context.Context, filters StoreFilters) ([]*models.Store, error)
+	Count(ctx context.Context, filters StoreFilters) (int, error)
 	Create(ctx context.Context, store *models.Store) error
 	Update(ctx context.Context, store *models.Store) error
 	Delete(ctx context.Context, id int) error
@@ -36,6 +37,7 @@ type FlyerService interface {
 	GetByID(ctx context.Context, id int) (*models.Flyer, error)
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error)
 	GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error)
+	Count(ctx context.Context, filters FlyerFilters) (int, error)
 	Create(ctx context.Context, flyer *models.Flyer) error
 	Update(ctx context.Context, flyer *models.Flyer) error
 	Delete(ctx context.Context, id int) error
@@ -70,6 +72,7 @@ type FlyerPageService interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error)
 	GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error)
 	GetAll(ctx context.Context, filters FlyerPageFilters) ([]*models.FlyerPage, error)
+	Count(ctx context.Context, filters FlyerPageFilters) (int, error)
 	Create(ctx context.Context, page *models.FlyerPage) error
 	CreateBatch(ctx context.Context, pages []*models.FlyerPage) error
 	Update(ctx context.Context, page *models.FlyerPage) error
@@ -97,6 +100,7 @@ type ProductService interface {
 	GetByID(ctx context.Context, id int) (*models.Product, error)
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error)
 	GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error)
+	Count(ctx context.Context, filters ProductFilters) (int, error)
 	Create(ctx context.Context, product *models.Product) error
 	CreateBatch(ctx context.Context, products []*models.Product) error
 	Update(ctx context.Context, product *models.Product) error

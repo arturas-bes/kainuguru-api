@@ -446,6 +446,20 @@ func (s *shoppingListService) GetListStatistics(ctx context.Context, listID int6
 	}, nil
 }
 
+func (s *shoppingListService) GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error) {
+	var categories []*models.ShoppingListCategory
+	err := s.db.NewSelect().
+		Model(&categories).
+		Where("slc.user_id = ?", userID).
+		Where("slc.shopping_list_id = ?", listID).
+		Order("slc.sort_order ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shopping list categories: %w", err)
+	}
+	return categories, nil
+}
+
 // List management - Stub implementations
 
 func (s *shoppingListService) DuplicateList(ctx context.Context, sourceListID int64, newName string, userID uuid.UUID) (*models.ShoppingList, error) {

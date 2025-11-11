@@ -11,6 +11,8 @@ func Middleware(
 	storeService services.StoreService,
 	flyerService services.FlyerService,
 	flyerPageService services.FlyerPageService,
+	shoppingListService services.ShoppingListService,
+	productService services.ProductService,
 	productMasterService services.ProductMasterService,
 	authService auth.AuthService,
 ) fiber.Handler {
@@ -20,6 +22,8 @@ func Middleware(
 			storeService,
 			flyerService,
 			flyerPageService,
+			shoppingListService,
+			productService,
 			productMasterService,
 			authService,
 		)

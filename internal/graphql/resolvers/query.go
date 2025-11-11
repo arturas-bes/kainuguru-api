@@ -75,20 +75,34 @@ func (r *queryResolver) Stores(ctx context.Context, filters *model.StoreFilters,
 	}
 
 	// Build page info
-	var endCursor *string
+	var startCursor, endCursor *string
 	if len(edges) > 0 {
-		endCursor = &edges[len(edges)-1].Cursor
+		startCursor = stringPtr(edges[0].Cursor)
+		endCursor = stringPtr(edges[len(edges)-1].Cursor)
 	}
 
 	pageInfo := &model.PageInfo{
-		HasNextPage: hasNextPage,
-		EndCursor:   endCursor,
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+		StartCursor:     startCursor,
+		EndCursor:       endCursor,
+	}
+
+	countFilters := services.StoreFilters{}
+	if filters != nil {
+		countFilters.IsActive = filters.IsActive
+		countFilters.Codes = filters.Codes
+		countFilters.HasFlyers = filters.HasFlyers
+	}
+	totalCount, err := r.storeService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count stores: %w", err)
 	}
 
 	return &model.StoreConnection{
 		Edges:      edges,
 		PageInfo:   pageInfo,
-		TotalCount: len(edges),
+		TotalCount: totalCount,
 	}, nil
 }
 
@@ -126,7 +140,13 @@ func (r *queryResolver) Flyers(ctx context.Context, filters *model.FlyerFilters,
 		return nil, fmt.Errorf("failed to get flyers: %w", err)
 	}
 
-	return buildFlyerConnection(flyers, limit, offset), nil
+	countFilters := convertFlyerFilters(filters, 0, 0)
+	totalCount, err := r.flyerService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count flyers: %w", err)
+	}
+
+	return buildFlyerConnection(flyers, limit, offset, totalCount), nil
 }
 
 func (r *queryResolver) CurrentFlyers(ctx context.Context, storeIDs []int, first *int, after *string) (*model.FlyerConnection, error) {
@@ -139,12 +159,6 @@ func (r *queryResolver) CurrentFlyers(ctx context.Context, storeIDs []int, first
 		}
 	}
 
-	// Get current flyers from service
-	flyers, err := r.flyerService.GetCurrentFlyers(ctx, storeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current flyers: %w", err)
-	}
-
 	// Apply pagination
 	offset := 0
 	if after != nil && *after != "" {
@@ -154,7 +168,26 @@ func (r *queryResolver) CurrentFlyers(ctx context.Context, storeIDs []int, first
 		}
 	}
 
-	return buildFlyerConnection(flyers, limit, offset), nil
+	serviceFilters := convertFlyerFilters(nil, limit+1, offset)
+	serviceFilters.StoreIDs = storeIDs
+	isCurrent := true
+	serviceFilters.IsCurrent = &isCurrent
+
+	// Get current flyers from service
+	flyers, err := r.flyerService.GetAll(ctx, serviceFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current flyers: %w", err)
+	}
+
+	countFilters := convertFlyerFilters(nil, 0, 0)
+	countFilters.StoreIDs = storeIDs
+	countFilters.IsCurrent = &isCurrent
+	totalCount, err := r.flyerService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count current flyers: %w", err)
+	}
+
+	return buildFlyerConnection(flyers, limit, offset, totalCount), nil
 }
 
 func (r *queryResolver) ValidFlyers(ctx context.Context, storeIDs []int, first *int, after *string) (*model.FlyerConnection, error) {
@@ -167,12 +200,6 @@ func (r *queryResolver) ValidFlyers(ctx context.Context, storeIDs []int, first *
 		}
 	}
 
-	// Get valid flyers from service
-	flyers, err := r.flyerService.GetValidFlyers(ctx, storeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get valid flyers: %w", err)
-	}
-
 	// Apply pagination
 	offset := 0
 	if after != nil && *after != "" {
@@ -182,7 +209,26 @@ func (r *queryResolver) ValidFlyers(ctx context.Context, storeIDs []int, first *
 		}
 	}
 
-	return buildFlyerConnection(flyers, limit, offset), nil
+	serviceFilters := convertFlyerFilters(nil, limit+1, offset)
+	serviceFilters.StoreIDs = storeIDs
+	isValid := true
+	serviceFilters.IsValid = &isValid
+
+	// Get valid flyers from service
+	flyers, err := r.flyerService.GetAll(ctx, serviceFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get valid flyers: %w", err)
+	}
+
+	countFilters := convertFlyerFilters(nil, 0, 0)
+	countFilters.StoreIDs = storeIDs
+	countFilters.IsValid = &isValid
+	totalCount, err := r.flyerService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count valid flyers: %w", err)
+	}
+
+	return buildFlyerConnection(flyers, limit, offset, totalCount), nil
 }
 
 // Query resolvers - Flyer Page operations
@@ -219,7 +265,13 @@ func (r *queryResolver) FlyerPages(ctx context.Context, filters *model.FlyerPage
 		return nil, fmt.Errorf("failed to get flyer pages: %w", err)
 	}
 
-	return buildFlyerPageConnection(pages, limit, offset), nil
+	countFilters := convertFlyerPageFilters(filters, 0, 0)
+	totalCount, err := r.flyerPageService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count flyer pages: %w", err)
+	}
+
+	return buildFlyerPageConnection(pages, limit, offset, totalCount), nil
 }
 
 // Helper functions moved to helpers.go
@@ -250,7 +302,7 @@ func convertFlyerFilters(filters *model.FlyerFilters, limit, offset int) service
 	return serviceFilters
 }
 
-func buildFlyerConnection(flyers []*models.Flyer, limit, offset int) *model.FlyerConnection {
+func buildFlyerConnection(flyers []*models.Flyer, limit, offset int, totalCount int) *model.FlyerConnection {
 	// Check if there are more results
 	hasNextPage := len(flyers) > limit
 	if hasNextPage {
@@ -268,20 +320,23 @@ func buildFlyerConnection(flyers []*models.Flyer, limit, offset int) *model.Flye
 	}
 
 	// Build page info
-	var endCursor *string
+	var startCursor, endCursor *string
 	if len(edges) > 0 {
-		endCursor = &edges[len(edges)-1].Cursor
+		startCursor = stringPtr(edges[0].Cursor)
+		endCursor = stringPtr(edges[len(edges)-1].Cursor)
 	}
 
 	pageInfo := &model.PageInfo{
-		HasNextPage: hasNextPage,
-		EndCursor:   endCursor,
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+		StartCursor:     startCursor,
+		EndCursor:       endCursor,
 	}
 
 	return &model.FlyerConnection{
 		Edges:      edges,
 		PageInfo:   pageInfo,
-		TotalCount: len(edges),
+		TotalCount: totalCount,
 	}
 }
 
@@ -319,7 +374,13 @@ func (r *queryResolver) Products(ctx context.Context, filters *model.ProductFilt
 		return nil, fmt.Errorf("failed to get products: %w", err)
 	}
 
-	return buildProductConnection(products, limit, offset), nil
+	countFilters := convertProductFilters(filters, 0, 0)
+	totalCount, err := r.productService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products: %w", err)
+	}
+
+	return buildProductConnection(products, limit, offset, totalCount), nil
 }
 
 func (r *queryResolver) ProductsOnSale(ctx context.Context, storeIDs []int, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
@@ -353,7 +414,16 @@ func (r *queryResolver) ProductsOnSale(ctx context.Context, storeIDs []int, filt
 		return nil, fmt.Errorf("failed to get products on sale: %w", err)
 	}
 
-	return buildProductConnection(products, limit, offset), nil
+	countFilters := convertProductFilters(filters, 0, 0)
+	countFilters.StoreIDs = storeIDs
+	countFilters.IsOnSale = &isOnSale
+
+	totalCount, err := r.productService.Count(ctx, countFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products on sale: %w", err)
+	}
+
+	return buildProductConnection(products, limit, offset, totalCount), nil
 }
 
 func (r *queryResolver) SearchProducts(ctx context.Context, input model.SearchInput) (*model.SearchResult, error) {
@@ -402,7 +472,7 @@ func (r *queryResolver) SearchProducts(ctx context.Context, input model.SearchIn
 			Product:     result.Product,
 			SearchScore: result.SearchScore,
 			MatchType:   matchType,
-			Similarity:  nil, // Could be calculated if needed
+			Similarity:  nil,        // Could be calculated if needed
 			Highlights:  []string{}, // Could be populated if needed
 		}
 	}
@@ -630,7 +700,7 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 	for i, row := range storeRows {
 		storeFacetOptions[i] = &model.FacetOption{
 			Value: fmt.Sprintf("%d", row.StoreID),
-			Name: &row.StoreName,
+			Name:  &row.StoreName,
 			Count: row.Count,
 		}
 	}
@@ -662,7 +732,7 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 	for i, row := range categoryRows {
 		categoryFacetOptions[i] = &model.FacetOption{
 			Value: row.Category,
-			Name: &row.Category,
+			Name:  &row.Category,
 			Count: row.Count,
 		}
 	}
@@ -695,7 +765,7 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 	for i, row := range brandRows {
 		brandFacetOptions[i] = &model.FacetOption{
 			Value: row.Brand,
-			Name: &row.Brand,
+			Name:  &row.Brand,
 			Count: row.Count,
 		}
 	}
@@ -709,26 +779,26 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 	}
 	var priceRangeRows []priceRangeFacetRow
 	priceQuery := buildBaseQuery(r.db.NewSelect()).
-		ColumnExpr("CASE "+
-			"WHEN p.current_price < 1 THEN '0-1'::text "+
-			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN '1-3' "+
-			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN '3-5' "+
-			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN '5-10' "+
-			"ELSE '10+' "+
+		ColumnExpr("CASE " +
+			"WHEN p.current_price < 1 THEN '0-1'::text " +
+			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN '1-3' " +
+			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN '3-5' " +
+			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN '5-10' " +
+			"ELSE '10+' " +
 			"END AS range_label").
-		ColumnExpr("CASE "+
-			"WHEN p.current_price < 1 THEN 0 "+
-			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN 1 "+
-			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN 3 "+
-			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN 5 "+
-			"ELSE 10 "+
+		ColumnExpr("CASE " +
+			"WHEN p.current_price < 1 THEN 0 " +
+			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN 1 " +
+			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN 3 " +
+			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN 5 " +
+			"ELSE 10 " +
 			"END AS min_price").
-		ColumnExpr("CASE "+
-			"WHEN p.current_price < 1 THEN 1 "+
-			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN 3 "+
-			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN 5 "+
-			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN 10 "+
-			"ELSE 999999 "+
+		ColumnExpr("CASE " +
+			"WHEN p.current_price < 1 THEN 1 " +
+			"WHEN p.current_price >= 1 AND p.current_price < 3 THEN 3 " +
+			"WHEN p.current_price >= 3 AND p.current_price < 5 THEN 5 " +
+			"WHEN p.current_price >= 5 AND p.current_price < 10 THEN 10 " +
+			"ELSE 999999 " +
 			"END AS max_price").
 		ColumnExpr("COUNT(*) AS count").
 		Where("p.current_price IS NOT NULL").
@@ -750,7 +820,7 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 		}
 		priceRangeFacetOptions[i] = &model.FacetOption{
 			Value: row.RangeLabel,
-			Name: &label,
+			Name:  &label,
 			Count: row.Count,
 		}
 	}
@@ -785,7 +855,7 @@ func (r *queryResolver) computeSearchFacets(ctx context.Context, req *search.Sea
 		}
 		availabilityFacetOptions = append(availabilityFacetOptions, &model.FacetOption{
 			Value: value,
-			Name: &label,
+			Name:  &label,
 			Count: row.Count,
 		})
 	}

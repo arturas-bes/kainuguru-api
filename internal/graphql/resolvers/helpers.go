@@ -33,6 +33,11 @@ func decodeCursor(cursor string) (int, error) {
 	return strconv.Atoi(parts[1])
 }
 
+func stringPtr(value string) *string {
+	v := value
+	return &v
+}
+
 // Filter conversion functions - GraphQL to Service layer
 
 // convertProductFilters converts GraphQL ProductFilters to service layer ProductFilters
@@ -84,7 +89,7 @@ func convertFlyerPageFilters(filters *model.FlyerPageFilters, limit, offset int)
 
 // buildProductConnection builds a GraphQL ProductConnection from a slice of products
 // with proper pagination metadata
-func buildProductConnection(products []*models.Product, limit, offset int) *model.ProductConnection {
+func buildProductConnection(products []*models.Product, limit, offset int, totalCount int) *model.ProductConnection {
 	// Check if there are more results
 	hasNextPage := len(products) > limit
 	if hasNextPage {
@@ -102,26 +107,29 @@ func buildProductConnection(products []*models.Product, limit, offset int) *mode
 	}
 
 	// Build page info
-	var endCursor *string
+	var startCursor, endCursor *string
 	if len(edges) > 0 {
-		endCursor = &edges[len(edges)-1].Cursor
+		startCursor = stringPtr(edges[0].Cursor)
+		endCursor = stringPtr(edges[len(edges)-1].Cursor)
 	}
 
 	pageInfo := &model.PageInfo{
-		HasNextPage: hasNextPage,
-		EndCursor:   endCursor,
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+		StartCursor:     startCursor,
+		EndCursor:       endCursor,
 	}
 
 	return &model.ProductConnection{
 		Edges:      edges,
 		PageInfo:   pageInfo,
-		TotalCount: len(edges), // TODO: Replace with actual database count
+		TotalCount: totalCount,
 	}
 }
 
 // buildFlyerPageConnection builds a GraphQL FlyerPageConnection from a slice of flyer pages
 // with proper pagination metadata
-func buildFlyerPageConnection(pages []*models.FlyerPage, limit, offset int) *model.FlyerPageConnection {
+func buildFlyerPageConnection(pages []*models.FlyerPage, limit, offset int, totalCount int) *model.FlyerPageConnection {
 	// Apply pagination
 	hasNextPage := len(pages) > limit
 	if hasNextPage {
@@ -139,19 +147,22 @@ func buildFlyerPageConnection(pages []*models.FlyerPage, limit, offset int) *mod
 	}
 
 	// Build page info
-	var endCursor *string
+	var startCursor, endCursor *string
 	if len(edges) > 0 {
-		endCursor = &edges[len(edges)-1].Cursor
+		startCursor = stringPtr(edges[0].Cursor)
+		endCursor = stringPtr(edges[len(edges)-1].Cursor)
 	}
 
 	pageInfo := &model.PageInfo{
-		HasNextPage: hasNextPage,
-		EndCursor:   endCursor,
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+		StartCursor:     startCursor,
+		EndCursor:       endCursor,
 	}
 
 	return &model.FlyerPageConnection{
 		Edges:      edges,
 		PageInfo:   pageInfo,
-		TotalCount: len(edges), // TODO: Replace with actual database count
+		TotalCount: totalCount,
 	}
 }
