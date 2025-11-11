@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/joho/godotenv"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"
@@ -60,7 +62,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer bunDB.Close()
-	
+
 	db := bunDB.DB
 
 	log.Info().Msg("Database connection established")
@@ -79,10 +81,10 @@ func main() {
 
 	// Get flyers that would be archived
 	var flyersToArchive []struct {
-		ID       int       `bun:"id"`
-		Title    string    `bun:"title"`
-		ValidTo  time.Time `bun:"valid_to"`
-		StoreID  int       `bun:"store_id"`
+		ID      int       `bun:"id"`
+		Title   string    `bun:"title"`
+		ValidTo time.Time `bun:"valid_to"`
+		StoreID int       `bun:"store_id"`
 	}
 
 	err = db.NewSelect().

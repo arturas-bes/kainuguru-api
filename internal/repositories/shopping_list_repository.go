@@ -8,49 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
-	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
 	"github.com/uptrace/bun"
 )
-
-// ShoppingListRepository defines the interface for shopping list data operations
-type ShoppingListRepository interface {
-	// Basic CRUD operations
-	Create(ctx context.Context, list *models.ShoppingList) error
-	GetByID(ctx context.Context, id int64) (*models.ShoppingList, error)
-	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingList, error)
-	GetByUserID(ctx context.Context, userID uuid.UUID, filters *services.ShoppingListFilters) ([]*models.ShoppingList, error)
-	GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error)
-	Update(ctx context.Context, list *models.ShoppingList) error
-	Delete(ctx context.Context, id int64) error
-
-	// Shopping list operations
-	GetUserDefaultList(ctx context.Context, userID uuid.UUID) (*models.ShoppingList, error)
-	SetDefaultList(ctx context.Context, userID uuid.UUID, listID int64) error
-	GetSharedLists(ctx context.Context, userID uuid.UUID) ([]*models.ShoppingList, error)
-	UpdateStatistics(ctx context.Context, listID int64) error
-	UpdateLastAccessed(ctx context.Context, listID int64) error
-
-	// List management
-	GetWithItems(ctx context.Context, listID int64) (*models.ShoppingList, error)
-	GetWithCategories(ctx context.Context, listID int64) (*models.ShoppingList, error)
-	ArchiveList(ctx context.Context, listID int64) error
-	UnarchiveList(ctx context.Context, listID int64) error
-	ClearCompletedItems(ctx context.Context, listID int64) (int, error)
-
-	// Search and filtering
-	SearchLists(ctx context.Context, userID uuid.UUID, query string, filters *services.ShoppingListFilters) ([]*models.ShoppingList, error)
-	GetListsByDateRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]*models.ShoppingList, error)
-	GetRecentlyAccessed(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ShoppingList, error)
-
-	// Statistics
-	GetUserListCount(ctx context.Context, userID uuid.UUID) (int, error)
-	GetTotalItemsCount(ctx context.Context, userID uuid.UUID) (int, error)
-	GetCompletedItemsCount(ctx context.Context, userID uuid.UUID) (int, error)
-
-	// Validation
-	CanUserAccessList(ctx context.Context, listID int64, userID uuid.UUID) (bool, error)
-	ValidateShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error)
-}
 
 // shoppingListRepository implements ShoppingListRepository
 type shoppingListRepository struct {
@@ -58,7 +18,7 @@ type shoppingListRepository struct {
 }
 
 // NewShoppingListRepository creates a new shopping list repository
-func NewShoppingListRepository(db *bun.DB) ShoppingListRepository {
+func NewShoppingListRepository(db *bun.DB) shoppinglist.Repository {
 	return &shoppingListRepository{db: db}
 }
 
@@ -98,7 +58,7 @@ func (r *shoppingListRepository) GetByIDs(ctx context.Context, ids []int64) ([]*
 }
 
 // GetByUserID retrieves shopping lists for a user with optional filters
-func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UUID, filters *services.ShoppingListFilters) ([]*models.ShoppingList, error) {
+func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UUID, filters *shoppinglist.Filters) ([]*models.ShoppingList, error) {
 	query := r.db.NewSelect().Model((*models.ShoppingList)(nil)).
 		Where("user_id = ?", userID)
 
@@ -161,6 +121,41 @@ func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UU
 	return lists, err
 }
 
+func (r *shoppingListRepository) CountByUserID(ctx context.Context, userID uuid.UUID, filters *shoppinglist.Filters) (int, error) {
+	query := r.db.NewSelect().Model((*models.ShoppingList)(nil)).Where("user_id = ?", userID)
+	if filters != nil {
+		if filters.IsDefault != nil {
+			query = query.Where("is_default = ?", *filters.IsDefault)
+		}
+		if filters.IsArchived != nil {
+			query = query.Where("is_archived = ?", *filters.IsArchived)
+		}
+		if filters.IsPublic != nil {
+			query = query.Where("is_public = ?", *filters.IsPublic)
+		}
+		if filters.HasItems != nil {
+			if *filters.HasItems {
+				query = query.Where("item_count > 0")
+			} else {
+				query = query.Where("item_count = 0")
+			}
+		}
+		if filters.CreatedAfter != nil {
+			query = query.Where("created_at >= ?", *filters.CreatedAfter)
+		}
+		if filters.CreatedBefore != nil {
+			query = query.Where("created_at <= ?", *filters.CreatedBefore)
+		}
+		if filters.UpdatedAfter != nil {
+			query = query.Where("updated_at >= ?", *filters.UpdatedAfter)
+		}
+		if filters.UpdatedBefore != nil {
+			query = query.Where("updated_at <= ?", *filters.UpdatedBefore)
+		}
+	}
+	return query.Count(ctx)
+}
+
 // GetByShareCode retrieves a shopping list by share code
 func (r *shoppingListRepository) GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error) {
 	list := &models.ShoppingList{}
@@ -175,6 +170,22 @@ func (r *shoppingListRepository) GetByShareCode(ctx context.Context, shareCode s
 	return list, err
 }
 
+func (r *shoppingListRepository) UpdateShareSettings(ctx context.Context, listID int64, isPublic bool, shareCode *string) error {
+	query := r.db.NewUpdate().
+		Model((*models.ShoppingList)(nil)).
+		Set("is_public = ?", isPublic).
+		Set("updated_at = ?", time.Now())
+
+	if shareCode != nil {
+		query = query.Set("share_code = ?", *shareCode)
+	} else {
+		query = query.Set("share_code = NULL")
+	}
+
+	_, err := query.Where("id = ?", listID).Exec(ctx)
+	return err
+}
+
 // Update updates an existing shopping list
 func (r *shoppingListRepository) Update(ctx context.Context, list *models.ShoppingList) error {
 	_, err := r.db.NewUpdate().
@@ -186,10 +197,8 @@ func (r *shoppingListRepository) Update(ctx context.Context, list *models.Shoppi
 
 // Delete soft deletes a shopping list (marks as archived)
 func (r *shoppingListRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.NewUpdate().
+	_, err := r.db.NewDelete().
 		Model((*models.ShoppingList)(nil)).
-		Set("is_archived = true").
-		Set("updated_at = ?", time.Now()).
 		Where("id = ?", id).
 		Exec(ctx)
 	return err
@@ -200,7 +209,7 @@ func (r *shoppingListRepository) GetUserDefaultList(ctx context.Context, userID 
 	list := &models.ShoppingList{}
 	err := r.db.NewSelect().
 		Model(list).
-		Where("user_id = ? AND is_default = true AND is_archived = false", userID).
+		Where("user_id = ? AND is_default = true", userID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -209,33 +218,29 @@ func (r *shoppingListRepository) GetUserDefaultList(ctx context.Context, userID 
 	return list, err
 }
 
-// SetDefaultList sets a list as the user's default (unsets others)
+// SetDefaultList sets the provided list as default.
 func (r *shoppingListRepository) SetDefaultList(ctx context.Context, userID uuid.UUID, listID int64) error {
-	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		// First, unset all default lists for this user
-		_, err := tx.NewUpdate().
-			Model((*models.ShoppingList)(nil)).
-			Set("is_default = false").
-			Set("updated_at = ?", time.Now()).
-			Where("user_id = ? AND is_default = true", userID).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to unset default lists: %w", err)
-		}
+	_, err := r.db.NewUpdate().
+		Model((*models.ShoppingList)(nil)).
+		Set("is_default = true").
+		Set("updated_at = ?", time.Now()).
+		Where("id = ? AND user_id = ?", listID, userID).
+		Exec(ctx)
+	return err
+}
 
-		// Then set the new default
-		_, err = tx.NewUpdate().
-			Model((*models.ShoppingList)(nil)).
-			Set("is_default = true").
-			Set("updated_at = ?", time.Now()).
-			Where("id = ? AND user_id = ?", listID, userID).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to set new default list: %w", err)
-		}
-
-		return nil
-	})
+// UnsetDefaultLists clears the default flag for the user.
+func (r *shoppingListRepository) UnsetDefaultLists(ctx context.Context, userID uuid.UUID, excludeID *int64) error {
+	query := r.db.NewUpdate().
+		Model((*models.ShoppingList)(nil)).
+		Set("is_default = false").
+		Set("updated_at = ?", time.Now()).
+		Where("user_id = ? AND is_default = true", userID)
+	if excludeID != nil {
+		query = query.Where("id != ?", *excludeID)
+	}
+	_, err := query.Exec(ctx)
+	return err
 }
 
 // GetSharedLists retrieves lists shared with the user
@@ -279,10 +284,10 @@ func (r *shoppingListRepository) UpdateStatistics(ctx context.Context, listID in
 }
 
 // UpdateLastAccessed updates the last accessed timestamp
-func (r *shoppingListRepository) UpdateLastAccessed(ctx context.Context, listID int64) error {
+func (r *shoppingListRepository) UpdateLastAccessed(ctx context.Context, listID int64, accessedAt time.Time) error {
 	_, err := r.db.NewUpdate().
 		Model((*models.ShoppingList)(nil)).
-		Set("last_accessed_at = ?", time.Now()).
+		Set("last_accessed_at = ?", accessedAt).
 		Where("id = ?", listID).
 		Exec(ctx)
 	return err
@@ -322,22 +327,21 @@ func (r *shoppingListRepository) GetWithCategories(ctx context.Context, listID i
 	return list, err
 }
 
-// ArchiveList marks a list as archived
-func (r *shoppingListRepository) ArchiveList(ctx context.Context, listID int64) error {
-	_, err := r.db.NewUpdate().
-		Model((*models.ShoppingList)(nil)).
-		Set("is_archived = true").
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", listID).
-		Exec(ctx)
-	return err
+func (r *shoppingListRepository) GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error) {
+	var categories []*models.ShoppingListCategory
+	err := r.db.NewSelect().
+		Model(&categories).
+		Where("slc.user_id = ?", userID).
+		Where("slc.shopping_list_id = ?", listID).
+		Order("slc.sort_order ASC").
+		Scan(ctx)
+	return categories, err
 }
 
-// UnarchiveList marks a list as active
-func (r *shoppingListRepository) UnarchiveList(ctx context.Context, listID int64) error {
+func (r *shoppingListRepository) Archive(ctx context.Context, listID int64, archived bool) error {
 	_, err := r.db.NewUpdate().
 		Model((*models.ShoppingList)(nil)).
-		Set("is_archived = false").
+		Set("is_archived = ?", archived).
 		Set("updated_at = ?", time.Now()).
 		Where("id = ?", listID).
 		Exec(ctx)
@@ -360,7 +364,7 @@ func (r *shoppingListRepository) ClearCompletedItems(ctx context.Context, listID
 }
 
 // SearchLists searches shopping lists by name and description
-func (r *shoppingListRepository) SearchLists(ctx context.Context, userID uuid.UUID, query string, filters *services.ShoppingListFilters) ([]*models.ShoppingList, error) {
+func (r *shoppingListRepository) SearchLists(ctx context.Context, userID uuid.UUID, query string, filters *shoppinglist.Filters) ([]*models.ShoppingList, error) {
 	q := r.db.NewSelect().
 		Model((*models.ShoppingList)(nil)).
 		Where("user_id = ?", userID).

@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
 )
 
 // StoreService defines the interface for store-related operations
@@ -359,6 +361,7 @@ type ShoppingListService interface {
 	GenerateShareCode(ctx context.Context, listID int64) (string, error)
 	DisableSharing(ctx context.Context, listID int64) error
 	GetSharedList(ctx context.Context, shareCode string) (*models.ShoppingList, error)
+	GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
 
 	// List statistics
 	UpdateListStatistics(ctx context.Context, listID int64) error
@@ -475,35 +478,9 @@ type CategoryService interface {
 }
 
 // Filter structures for shopping list operations
-type ShoppingListFilters struct {
-	IsDefault     *bool
-	IsArchived    *bool
-	IsPublic      *bool
-	HasItems      *bool
-	CreatedAfter  *time.Time
-	CreatedBefore *time.Time
-	UpdatedAfter  *time.Time
-	UpdatedBefore *time.Time
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ShoppingListFilters = shoppinglist.Filters
 
-type ShoppingListItemFilters struct {
-	IsChecked     *bool
-	Categories    []string
-	Tags          []string
-	HasPrice      *bool
-	IsLinked      *bool
-	StoreIDs      []int
-	CreatedAfter  *time.Time
-	CreatedBefore *time.Time
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ShoppingListItemFilters = shoppinglistitem.Filters
 
 type ProductMatchFilters struct {
 	StoreIDs      []int
@@ -546,10 +523,7 @@ type TagFilters struct {
 }
 
 // Helper structures
-type ItemOrder struct {
-	ItemID    int64 `json:"item_id"`
-	SortOrder int   `json:"sort_order"`
-}
+type ItemOrder = shoppinglistitem.ItemOrder
 
 type ItemSuggestion struct {
 	Description    string                `json:"description"`

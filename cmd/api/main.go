@@ -6,6 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/kainuguru/kainuguru-api/cmd/api/server"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/pkg/logger"

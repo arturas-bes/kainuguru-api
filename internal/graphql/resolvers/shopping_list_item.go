@@ -3,13 +3,11 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/models"
-	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
 // Shopping List Item Mutation Resolvers - Phase 2.3
@@ -227,31 +225,7 @@ func (r *shoppingListResolver) Items(ctx context.Context, obj *models.ShoppingLi
 	}
 
 	// Convert GraphQL filters to service filters
-	serviceFilters := services.ShoppingListItemFilters{
-		Limit:  limit + 1,
-		Offset: offset,
-	}
-
-	if filters != nil {
-		serviceFilters.IsChecked = filters.IsChecked
-		serviceFilters.Categories = filters.Categories
-		serviceFilters.Tags = filters.Tags
-		serviceFilters.HasPrice = filters.HasPrice
-		serviceFilters.IsLinked = filters.IsLinked
-		serviceFilters.StoreIDs = filters.StoreIDs
-
-		// Parse date filters if provided
-		if filters.CreatedAfter != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedAfter); err == nil {
-				serviceFilters.CreatedAfter = &t
-			}
-		}
-		if filters.CreatedBefore != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedBefore); err == nil {
-				serviceFilters.CreatedBefore = &t
-			}
-		}
-	}
+	serviceFilters := convertShoppingListItemFilters(filters, limit, offset)
 
 	// Get items for this shopping list
 	items, err := r.shoppingListItemService.GetByListID(ctx, obj.ID, serviceFilters)
@@ -259,44 +233,19 @@ func (r *shoppingListResolver) Items(ctx context.Context, obj *models.ShoppingLi
 		return nil, fmt.Errorf("failed to get shopping list items: %w", err)
 	}
 
-	hasNextPage := len(items) > limit
-	if hasNextPage {
-		items = items[:limit]
-	}
-
-	// Convert to connection format
-	edges := make([]*model.ShoppingListItemEdge, len(items))
-	for i, item := range items {
-		cursor := encodeCursor(offset + i)
-		edges[i] = &model.ShoppingListItemEdge{
-			Node:   item,
-			Cursor: cursor,
-		}
-	}
-
-	pageInfo := &model.PageInfo{
-		HasNextPage:     hasNextPage,
-		HasPreviousPage: offset > 0,
-	}
-
-	if len(edges) > 0 {
-		pageInfo.StartCursor = &edges[0].Cursor
-		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
-	}
-
 	// Get total count for pagination
 	totalCount, err := r.shoppingListItemService.CountByListID(ctx, obj.ID, serviceFilters)
 	if err != nil {
 		// Log error but don't fail the request
 		fmt.Printf("Warning: failed to get shopping list items count: %v\n", err)
-		totalCount = len(edges) // Fallback to current page count
+		if len(items) > limit {
+			totalCount = limit
+		} else {
+			totalCount = len(items)
+		}
 	}
 
-	return &model.ShoppingListItemConnection{
-		Edges:      edges,
-		PageInfo:   pageInfo,
-		TotalCount: totalCount,
-	}, nil
+	return buildShoppingListItemConnection(items, limit, offset, totalCount), nil
 }
 
 // ShoppingListItem Type Nested Resolvers - Phase 2.3

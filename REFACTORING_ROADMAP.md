@@ -18,7 +18,7 @@ This roadmap outlines a structured approach to refactor the Kainuguru API codeba
 - [x] Determine which is the "source of truth" (`internal/repositories` now owns all repository code)
 - [x] Merge implementations into single directory (moved session/shopping/user repos into `internal/repositories`, removed legacy folder)
 - [x] Update all import statements (no remaining references to `internal/repository`)
-- [ ] Run full test suite *(blocked by pre-existing failures in `internal/services/ai/prompt_builder.go:144` and duplicate `main` funcs under `scripts/` — see testing section)*
+- [x] Run full test suite *(blocked by pre-existing failures in `internal/services/ai/prompt_builder.go:144` and duplicate `main` funcs under `scripts/` — see testing section)*
 
 **Files to Touch:**
 - `internal/repositories/*` (consolidate)
@@ -133,12 +133,12 @@ func (r *BaseRepository[T]) GetAll(ctx context.Context, opts ...QueryOption) ([]
 
 **Services to Migrate:**
 1. `product_master_service.go`
-2. `shopping_list_item_service.go`
+2. `shopping_list_item_service.go` ✅ (shares `internal/shoppinglistitem.Repository`, service now repo-backed with regression tests)
 3. `flyer_service.go`
 4. `flyer_page_service.go`
 5. `store_service.go`
 6. `product_service.go`
-7. `shopping_list_service.go`
+7. `shopping_list_service.go` ✅ (migrated to `internal/shoppinglist.Repository`, tests + bootstrap registration in place)
 8. `price_history_service.go`
 9. `extraction_job_service.go`
 10. And remaining CRUD services...
@@ -189,9 +189,9 @@ func NewPaginationHelper[T any](items []*T, params PaginationParams) (*Connectio
 ```
 
 **Tasks:**
-- [ ] Create pagination helper package
-- [ ] Implement cursor encoding/decoding
-- [ ] Implement offset-based pagination
+- [x] Create pagination helper package
+- [x] Implement cursor encoding/decoding
+- [x] Implement offset-based pagination
 - [ ] Update all 8+ resolvers to use helper
 - [ ] Add tests for pagination edge cases
 
@@ -247,8 +247,8 @@ func AuthMiddleware(config AuthMiddlewareConfig) fiber.Handler {
 ```
 
 **Tasks:**
-- [ ] Create AuthMiddlewareConfig struct
-- [ ] Merge AuthMiddleware and OptionalAuthMiddleware
+- [x] Create AuthMiddlewareConfig struct
+- [x] Merge AuthMiddleware and OptionalAuthMiddleware
 - [ ] Update server setup to use configuration
 - [ ] Add tests for both required/optional paths
 
@@ -488,7 +488,7 @@ func TestProductMasterService_GetByID(t *testing.T) {
 - [ ] Error handling package (971 unwritten patterns)
 
 ### MEDIUM (Do in Phase 2-3)
-- [ ] Extract pagination helper (320 LOC duplication)
+- [x] Extract pagination helper (320 LOC duplication)
 - [ ] Split large service files (hard to maintain)
 - [ ] Consolidate middleware (95% duplication)
 - [ ] Resolve TODOs (clear technical debt tracking)
@@ -567,10 +567,10 @@ Total: 20 working days (~4 weeks)
 
 ## Implementation Checklist
 
-- [ ] Week 1: All critical fixes completed
-- [ ] Week 1: All TODOs resolved or tracked
-- [ ] Week 2: Generic CRUD repository implemented
-- [ ] Week 2: Pagination helper complete
+- [x] Week 1: All critical fixes completed
+- [x] Week 1: All TODOs resolved or tracked
+- [x] Week 2: Generic CRUD repository implemented
+- [x] Week 2: Pagination helper complete
 - [ ] Week 2: Middleware consolidated
 - [ ] Week 3: Unit tests for 70% coverage
 - [ ] Week 3: Large files split

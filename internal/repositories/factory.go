@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
 	"github.com/uptrace/bun"
 )
 
@@ -27,12 +29,12 @@ func (f *RepositoryFactory) SessionRepository() SessionRepository {
 }
 
 // ShoppingListRepository returns a shopping list repository implementation.
-func (f *RepositoryFactory) ShoppingListRepository() ShoppingListRepository {
+func (f *RepositoryFactory) ShoppingListRepository() shoppinglist.Repository {
 	return NewShoppingListRepository(f.db)
 }
 
 // ShoppingListItemRepository returns a shopping list item repository implementation.
-func (f *RepositoryFactory) ShoppingListItemRepository() ShoppingListItemRepository {
+func (f *RepositoryFactory) ShoppingListItemRepository() shoppinglistitem.Repository {
 	return NewShoppingListItemRepository(f.db)
 }
 

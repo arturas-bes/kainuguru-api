@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"

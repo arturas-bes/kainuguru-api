@@ -3,7 +3,6 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
@@ -60,39 +59,7 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 	}
 
 	// Convert GraphQL filters to service filters
-	serviceFilters := services.ShoppingListFilters{
-		Limit:  limit + 1,
-		Offset: offset,
-	}
-
-	if filters != nil {
-		serviceFilters.IsDefault = filters.IsDefault
-		serviceFilters.IsArchived = filters.IsArchived
-		serviceFilters.IsPublic = filters.IsPublic
-		serviceFilters.HasItems = filters.HasItems
-
-		// Parse date filters
-		if filters.CreatedAfter != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedAfter); err == nil {
-				serviceFilters.CreatedAfter = &t
-			}
-		}
-		if filters.CreatedBefore != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedBefore); err == nil {
-				serviceFilters.CreatedBefore = &t
-			}
-		}
-		if filters.UpdatedAfter != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.UpdatedAfter); err == nil {
-				serviceFilters.UpdatedAfter = &t
-			}
-		}
-		if filters.UpdatedBefore != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.UpdatedBefore); err == nil {
-				serviceFilters.UpdatedBefore = &t
-			}
-		}
-	}
+	serviceFilters := convertShoppingListFilters(filters, limit, offset)
 
 	// Get shopping lists for user
 	lists, err := r.shoppingListService.GetByUserID(ctx, userID, serviceFilters)
@@ -100,44 +67,19 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("failed to get shopping lists: %w", err)
 	}
 
-	hasNextPage := len(lists) > limit
-	if hasNextPage {
-		lists = lists[:limit]
-	}
-
-	// Convert to connection format
-	edges := make([]*model.ShoppingListEdge, len(lists))
-	for i, list := range lists {
-		cursor := encodeCursor(offset + i)
-		edges[i] = &model.ShoppingListEdge{
-			Node:   list,
-			Cursor: cursor,
-		}
-	}
-
-	pageInfo := &model.PageInfo{
-		HasNextPage:     hasNextPage,
-		HasPreviousPage: offset > 0,
-	}
-
-	if len(edges) > 0 {
-		pageInfo.StartCursor = &edges[0].Cursor
-		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
-	}
-
 	// Get total count for pagination
 	totalCount, err := r.shoppingListService.CountByUserID(ctx, userID, serviceFilters)
 	if err != nil {
 		// Log error but don't fail the request
 		fmt.Printf("Warning: failed to get shopping lists count: %v\n", err)
-		totalCount = len(edges) // Fallback to current page count
+		if len(lists) > limit {
+			totalCount = limit
+		} else {
+			totalCount = len(lists)
+		}
 	}
 
-	return &model.ShoppingListConnection{
-		Edges:      edges,
-		PageInfo:   pageInfo,
-		TotalCount: totalCount,
-	}, nil
+	return buildShoppingListConnection(lists, limit, offset, totalCount), nil
 }
 
 // MyDefaultShoppingList returns the authenticated user's default shopping list

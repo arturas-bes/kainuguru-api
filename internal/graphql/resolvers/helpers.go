@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -81,6 +82,74 @@ func convertFlyerPageFilters(filters *model.FlyerPageFilters, limit, offset int)
 			serviceFilters.Status = statusStrings
 		}
 	}
+
+	return serviceFilters
+}
+
+func convertFlyerFilters(filters *model.FlyerFilters, limit, offset int) services.FlyerFilters {
+	serviceFilters := services.FlyerFilters{
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	if filters != nil {
+		serviceFilters.StoreIDs = filters.StoreIDs
+		serviceFilters.StoreCodes = filters.StoreCodes
+		serviceFilters.IsArchived = filters.IsArchived
+		serviceFilters.IsCurrent = filters.IsCurrent
+		serviceFilters.IsValid = filters.IsValid
+		if len(filters.Status) > 0 {
+			statusStrings := make([]string, len(filters.Status))
+			for i, status := range filters.Status {
+				statusStrings[i] = string(status)
+			}
+			serviceFilters.Status = statusStrings
+		}
+	}
+
+	return serviceFilters
+}
+
+func convertShoppingListFilters(filters *model.ShoppingListFilters, limit, offset int) services.ShoppingListFilters {
+	serviceFilters := services.ShoppingListFilters{
+		Limit:  limit + 1,
+		Offset: offset,
+	}
+
+	if filters == nil {
+		return serviceFilters
+	}
+
+	serviceFilters.IsDefault = filters.IsDefault
+	serviceFilters.IsArchived = filters.IsArchived
+	serviceFilters.IsPublic = filters.IsPublic
+	serviceFilters.HasItems = filters.HasItems
+	serviceFilters.CreatedAfter = parseRFC3339Ptr(filters.CreatedAfter)
+	serviceFilters.CreatedBefore = parseRFC3339Ptr(filters.CreatedBefore)
+	serviceFilters.UpdatedAfter = parseRFC3339Ptr(filters.UpdatedAfter)
+	serviceFilters.UpdatedBefore = parseRFC3339Ptr(filters.UpdatedBefore)
+
+	return serviceFilters
+}
+
+func convertShoppingListItemFilters(filters *model.ShoppingListItemFilters, limit, offset int) services.ShoppingListItemFilters {
+	serviceFilters := services.ShoppingListItemFilters{
+		Limit:  limit + 1,
+		Offset: offset,
+	}
+
+	if filters == nil {
+		return serviceFilters
+	}
+
+	serviceFilters.IsChecked = filters.IsChecked
+	serviceFilters.Categories = filters.Categories
+	serviceFilters.Tags = filters.Tags
+	serviceFilters.HasPrice = filters.HasPrice
+	serviceFilters.IsLinked = filters.IsLinked
+	serviceFilters.StoreIDs = filters.StoreIDs
+	serviceFilters.CreatedAfter = parseRFC3339Ptr(filters.CreatedAfter)
+	serviceFilters.CreatedBefore = parseRFC3339Ptr(filters.CreatedBefore)
 
 	return serviceFilters
 }
@@ -165,4 +234,110 @@ func buildFlyerPageConnection(pages []*models.FlyerPage, limit, offset int, tota
 		PageInfo:   pageInfo,
 		TotalCount: totalCount,
 	}
+}
+
+func buildFlyerConnection(flyers []*models.Flyer, limit, offset int, totalCount int) *model.FlyerConnection {
+	hasNextPage := len(flyers) > limit
+	if hasNextPage {
+		flyers = flyers[:limit]
+	}
+
+	edges := make([]*model.FlyerEdge, len(flyers))
+	for i, flyer := range flyers {
+		cursor := encodeCursor(offset + i)
+		edges[i] = &model.FlyerEdge{
+			Node:   flyer,
+			Cursor: cursor,
+		}
+	}
+
+	pageInfo := &model.PageInfo{
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+	}
+
+	if len(edges) > 0 {
+		pageInfo.StartCursor = &edges[0].Cursor
+		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
+	}
+
+	return &model.FlyerConnection{
+		Edges:      edges,
+		PageInfo:   pageInfo,
+		TotalCount: totalCount,
+	}
+}
+
+func buildShoppingListConnection(lists []*models.ShoppingList, limit, offset int, totalCount int) *model.ShoppingListConnection {
+	hasNextPage := len(lists) > limit
+	if hasNextPage {
+		lists = lists[:limit]
+	}
+
+	edges := make([]*model.ShoppingListEdge, len(lists))
+	for i, list := range lists {
+		cursor := encodeCursor(offset + i)
+		edges[i] = &model.ShoppingListEdge{
+			Node:   list,
+			Cursor: cursor,
+		}
+	}
+
+	pageInfo := &model.PageInfo{
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+	}
+
+	if len(edges) > 0 {
+		pageInfo.StartCursor = &edges[0].Cursor
+		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
+	}
+
+	return &model.ShoppingListConnection{
+		Edges:      edges,
+		PageInfo:   pageInfo,
+		TotalCount: totalCount,
+	}
+}
+
+func buildShoppingListItemConnection(items []*models.ShoppingListItem, limit, offset int, totalCount int) *model.ShoppingListItemConnection {
+	hasNextPage := len(items) > limit
+	if hasNextPage {
+		items = items[:limit]
+	}
+
+	edges := make([]*model.ShoppingListItemEdge, len(items))
+	for i, item := range items {
+		cursor := encodeCursor(offset + i)
+		edges[i] = &model.ShoppingListItemEdge{
+			Node:   item,
+			Cursor: cursor,
+		}
+	}
+
+	pageInfo := &model.PageInfo{
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: offset > 0,
+	}
+
+	if len(edges) > 0 {
+		pageInfo.StartCursor = &edges[0].Cursor
+		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
+	}
+
+	return &model.ShoppingListItemConnection{
+		Edges:      edges,
+		PageInfo:   pageInfo,
+		TotalCount: totalCount,
+	}
+}
+
+func parseRFC3339Ptr(value *string) *time.Time {
+	if value == nil || *value == "" {
+		return nil
+	}
+	if t, err := time.Parse(time.RFC3339, *value); err == nil {
+		return &t
+	}
+	return nil
 }

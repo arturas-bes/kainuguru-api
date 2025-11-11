@@ -8,73 +8,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
-	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
-// ShoppingListItemRepository defines the interface for shopping list item data operations
-type ShoppingListItemRepository interface {
-	// Basic CRUD operations
-	Create(ctx context.Context, item *models.ShoppingListItem) error
-	GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error)
-	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error)
-	GetByListID(ctx context.Context, listID int64, filters *services.ShoppingListItemFilters) ([]*models.ShoppingListItem, error)
-	Update(ctx context.Context, item *models.ShoppingListItem) error
-	Delete(ctx context.Context, id int64) error
-
-	// Item operations
-	BulkCreate(ctx context.Context, items []*models.ShoppingListItem) error
-	BulkUpdate(ctx context.Context, items []*models.ShoppingListItem) error
-	BulkDelete(ctx context.Context, itemIDs []int64) (int, error)
-	BulkCheck(ctx context.Context, itemIDs []int64, userID uuid.UUID) error
-	BulkUncheck(ctx context.Context, itemIDs []int64) error
-
-	// Item organization
-	UpdateSortOrder(ctx context.Context, itemID int64, newOrder int) error
-	ReorderItems(ctx context.Context, listID int64, itemOrders []services.ItemOrder) error
-	GetNextSortOrder(ctx context.Context, listID int64) (int, error)
-
-	// Item search and filtering
-	SearchItems(ctx context.Context, listID int64, query string, filters *services.ShoppingListItemFilters) ([]*models.ShoppingListItem, error)
-	GetItemsByCategory(ctx context.Context, listID int64, category string) ([]*models.ShoppingListItem, error)
-	GetItemsByTags(ctx context.Context, listID int64, tags []string) ([]*models.ShoppingListItem, error)
-	GetCheckedItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
-	GetUncheckedItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
-
-	// Item relations
-	GetWithProduct(ctx context.Context, itemID int64) (*models.ShoppingListItem, error)
-	GetWithProductMaster(ctx context.Context, itemID int64) (*models.ShoppingListItem, error)
-	GetUnlinkedItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
-	GetLinkedItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
-
-	// Duplicate checking
-	FindDuplicateByDescription(ctx context.Context, listID int64, normalizedDescription string, excludeID *int64) (*models.ShoppingListItem, error)
-	GetSimilarItems(ctx context.Context, listID int64, normalizedDescription string, limit int) ([]*models.ShoppingListItem, error)
-
-	// User activity
-	GetUserItemHistory(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ShoppingListItem, error)
-	GetFrequentItems(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ShoppingListItem, error)
-	GetRecentlyUsedItems(ctx context.Context, userID uuid.UUID, days int, limit int) ([]*models.ShoppingListItem, error)
-
-	// Statistics
-	GetItemCount(ctx context.Context, listID int64) (int, error)
-	GetCheckedItemCount(ctx context.Context, listID int64) (int, error)
-	GetCategoryStats(ctx context.Context, listID int64) (map[string]int, error)
-	GetTagStats(ctx context.Context, listID int64) (map[string]int, error)
-
-	// Validation
-	CanUserAccessItem(ctx context.Context, itemID int64, userID uuid.UUID) (bool, error)
-	ValidateItemOwnership(ctx context.Context, itemID int64, userID uuid.UUID) error
-}
-
-// shoppingListItemRepository implements ShoppingListItemRepository
+// shoppingListItemRepository implements shoppinglistitem.Repository
 type shoppingListItemRepository struct {
 	db *bun.DB
 }
 
 // NewShoppingListItemRepository creates a new shopping list item repository
-func NewShoppingListItemRepository(db *bun.DB) ShoppingListItemRepository {
+func NewShoppingListItemRepository(db *bun.DB) shoppinglistitem.Repository {
 	return &shoppingListItemRepository{db: db}
 }
 
@@ -115,71 +60,46 @@ func (r *shoppingListItemRepository) GetByIDs(ctx context.Context, ids []int64) 
 }
 
 // GetByListID retrieves shopping list items for a specific list with optional filters
-func (r *shoppingListItemRepository) GetByListID(ctx context.Context, listID int64, filters *services.ShoppingListItemFilters) ([]*models.ShoppingListItem, error) {
-	query := r.db.NewSelect().Model((*models.ShoppingListItem)(nil)).
-		Where("shopping_list_id = ?", listID)
+func (r *shoppingListItemRepository) GetByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) ([]*models.ShoppingListItem, error) {
+	query := r.db.NewSelect().
+		Model((*models.ShoppingListItem)(nil)).
+		Where("shopping_list_id = ?", listID).
+		Relation("User").
+		Relation("ProductMaster").
+		Relation("LinkedProduct").
+		Relation("Store").
+		Relation("Flyer")
 
-	// Apply filters
+	query = applyShoppingListItemFilters(query, filters)
+
+	// Match the legacy service ordering: unchecked first, then sort order, then recency.
+	query = query.Order("is_checked ASC").
+		Order("sort_order ASC").
+		Order("created_at DESC")
+
 	if filters != nil {
-		if filters.IsChecked != nil {
-			query = query.Where("is_checked = ?", *filters.IsChecked)
-		}
-		if len(filters.Categories) > 0 {
-			query = query.Where("category IN (?)", bun.In(filters.Categories))
-		}
-		if len(filters.Tags) > 0 {
-			query = query.Where("tags && ?", pgdialect.Array(filters.Tags))
-		}
-		if filters.HasPrice != nil {
-			if *filters.HasPrice {
-				query = query.Where("estimated_price IS NOT NULL")
-			} else {
-				query = query.Where("estimated_price IS NULL")
-			}
-		}
-		if filters.IsLinked != nil {
-			if *filters.IsLinked {
-				query = query.Where("product_master_id IS NOT NULL OR linked_product_id IS NOT NULL")
-			} else {
-				query = query.Where("product_master_id IS NULL AND linked_product_id IS NULL")
-			}
-		}
-		if len(filters.StoreIDs) > 0 {
-			query = query.Where("store_id IN (?)", bun.In(filters.StoreIDs))
-		}
-		if filters.CreatedAfter != nil {
-			query = query.Where("created_at >= ?", *filters.CreatedAfter)
-		}
-		if filters.CreatedBefore != nil {
-			query = query.Where("created_at <= ?", *filters.CreatedBefore)
-		}
-
-		// Apply ordering
-		orderBy := "sort_order"
-		orderDir := "ASC"
-		if filters.OrderBy != "" {
-			orderBy = filters.OrderBy
-		}
-		if filters.OrderDir != "" {
-			orderDir = filters.OrderDir
-		}
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		// Apply pagination
 		if filters.Limit > 0 {
 			query = query.Limit(filters.Limit)
 		}
 		if filters.Offset > 0 {
 			query = query.Offset(filters.Offset)
 		}
-	} else {
-		// Default ordering by sort_order
-		query = query.Order("sort_order ASC")
 	}
 
 	var items []*models.ShoppingListItem
 	err := query.Scan(ctx, &items)
 	return items, err
+}
+
+// CountByListID counts items in a list matching the provided filters.
+func (r *shoppingListItemRepository) CountByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) (int, error) {
+	query := r.db.NewSelect().
+		Model((*models.ShoppingListItem)(nil)).
+		Where("shopping_list_id = ?", listID)
+
+	query = applyShoppingListItemFilters(query, filters)
+
+	return query.Count(ctx)
 }
 
 // Update updates an existing shopping list item
@@ -298,7 +218,7 @@ func (r *shoppingListItemRepository) UpdateSortOrder(ctx context.Context, itemID
 }
 
 // ReorderItems updates the sort order for multiple items
-func (r *shoppingListItemRepository) ReorderItems(ctx context.Context, listID int64, itemOrders []services.ItemOrder) error {
+func (r *shoppingListItemRepository) ReorderItems(ctx context.Context, listID int64, itemOrders []shoppinglistitem.ItemOrder) error {
 	if len(itemOrders) == 0 {
 		return nil
 	}
@@ -332,26 +252,24 @@ func (r *shoppingListItemRepository) GetNextSortOrder(ctx context.Context, listI
 }
 
 // SearchItems searches items by description and notes
-func (r *shoppingListItemRepository) SearchItems(ctx context.Context, listID int64, query string, filters *services.ShoppingListItemFilters) ([]*models.ShoppingListItem, error) {
+func (r *shoppingListItemRepository) SearchItems(ctx context.Context, listID int64, query string, filters *shoppinglistitem.Filters) ([]*models.ShoppingListItem, error) {
 	q := r.db.NewSelect().
 		Model((*models.ShoppingListItem)(nil)).
 		Where("shopping_list_id = ?", listID).
 		Where("(description ILIKE ? OR notes ILIKE ?)", "%"+query+"%", "%"+query+"%")
 
-	// Apply additional filters if provided
+	q = applyShoppingListItemFilters(q, filters)
+
 	if filters != nil {
-		if filters.IsChecked != nil {
-			q = q.Where("is_checked = ?", *filters.IsChecked)
-		}
-		if len(filters.Categories) > 0 {
-			q = q.Where("category IN (?)", bun.In(filters.Categories))
-		}
 		if filters.Limit > 0 {
 			q = q.Limit(filters.Limit)
 		}
+		if filters.Offset > 0 {
+			q = q.Offset(filters.Offset)
+		}
+	} else {
+		q = q.Order("sort_order ASC")
 	}
-
-	q = q.Order("sort_order ASC")
 
 	var items []*models.ShoppingListItem
 	err := q.Scan(ctx, &items)
@@ -635,4 +553,45 @@ func (r *shoppingListItemRepository) ValidateItemOwnership(ctx context.Context, 
 	}
 
 	return nil
+}
+
+func applyShoppingListItemFilters(query *bun.SelectQuery, filters *shoppinglistitem.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return query
+	}
+
+	if filters.IsChecked != nil {
+		query = query.Where("is_checked = ?", *filters.IsChecked)
+	}
+	if len(filters.Categories) > 0 {
+		query = query.Where("category IN (?)", bun.In(filters.Categories))
+	}
+	if len(filters.Tags) > 0 {
+		query = query.Where("tags && ?", pgdialect.Array(filters.Tags))
+	}
+	if filters.HasPrice != nil {
+		if *filters.HasPrice {
+			query = query.Where("estimated_price IS NOT NULL OR actual_price IS NOT NULL")
+		} else {
+			query = query.Where("estimated_price IS NULL AND actual_price IS NULL")
+		}
+	}
+	if filters.IsLinked != nil {
+		if *filters.IsLinked {
+			query = query.Where("product_master_id IS NOT NULL OR linked_product_id IS NOT NULL")
+		} else {
+			query = query.Where("product_master_id IS NULL AND linked_product_id IS NULL")
+		}
+	}
+	if len(filters.StoreIDs) > 0 {
+		query = query.Where("store_id IN (?)", bun.In(filters.StoreIDs))
+	}
+	if filters.CreatedAfter != nil {
+		query = query.Where("created_at >= ?", *filters.CreatedAfter)
+	}
+	if filters.CreatedBefore != nil {
+		query = query.Where("created_at <= ?", *filters.CreatedBefore)
+	}
+
+	return query
 }
