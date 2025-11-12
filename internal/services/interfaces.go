@@ -5,9 +5,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kainuguru/kainuguru-api/internal/extractionjob"
+	"github.com/kainuguru/kainuguru-api/internal/flyer"
+	"github.com/kainuguru/kainuguru-api/internal/flyerpage"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/pricehistory"
+	"github.com/kainuguru/kainuguru-api/internal/product"
+	"github.com/kainuguru/kainuguru-api/internal/productmaster"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
+	"github.com/kainuguru/kainuguru-api/internal/store"
 )
 
 // StoreService defines the interface for store-related operations
@@ -224,94 +231,17 @@ type ExtractionJobService interface {
 }
 
 // Filter structures for service operations
-type StoreFilters struct {
-	IsActive  *bool
-	HasFlyers *bool
-	Codes     []string
-	Limit     int
-	Offset    int
-	OrderBy   string
-	OrderDir  string
-}
+type StoreFilters = store.Filters
 
-type FlyerFilters struct {
-	StoreIDs   []int
-	StoreCode  *string
-	StoreCodes []string
-	Status     []string
-	IsArchived *bool
-	ValidFrom  *time.Time
-	ValidTo    *time.Time
-	ValidOn    *string
-	IsCurrent  *bool
-	IsValid    *bool
-	Limit      int
-	Offset     int
-	OrderBy    string
-	OrderDir   string
-}
+type FlyerFilters = flyer.Filters
 
-type FlyerPageFilters struct {
-	FlyerIDs    []int
-	Status      []string
-	HasImage    *bool
-	HasProducts *bool
-	PageNumbers []int
-	Limit       int
-	Offset      int
-	OrderBy     string
-	OrderDir    string
-}
+type FlyerPageFilters = flyerpage.Filters
 
-type ProductFilters struct {
-	StoreIDs         []int
-	FlyerIDs         []int
-	FlyerPageIDs     []int
-	ProductMasterIDs []int
-	Categories       []string
-	Brands           []string
-	IsOnSale         *bool
-	IsAvailable      *bool
-	RequiresReview   *bool
-	MinPrice         *float64
-	MaxPrice         *float64
-	Currency         string
-	ValidFrom        *time.Time
-	ValidTo          *time.Time
-	Limit            int
-	Offset           int
-	OrderBy          string
-	OrderDir         string
-}
+type ProductFilters = product.Filters
 
-type ProductMasterFilters struct {
-	Status        []string
-	IsVerified    *bool
-	IsActive      *bool
-	Categories    []string
-	Brands        []string
-	MinMatches    *int
-	MinConfidence *float64
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ProductMasterFilters = productmaster.Filters
 
-type ExtractionJobFilters struct {
-	JobTypes        []string
-	Status          []string
-	WorkerIDs       []string
-	Priority        *int
-	ScheduledBefore *time.Time
-	ScheduledAfter  *time.Time
-	CreatedBefore   *time.Time
-	CreatedAfter    *time.Time
-	Limit           int
-	Offset          int
-	OrderBy         string
-	OrderDir        string
-}
+type ExtractionJobFilters = extractionjob.Filters
 
 // Match result with score
 type ProductMasterMatch struct {
@@ -623,17 +553,4 @@ type PriceHistoryService interface {
 }
 
 // PriceHistoryFilters defines filters for price history queries
-type PriceHistoryFilters struct {
-	IsOnSale    *bool
-	IsAvailable *bool
-	IsActive    *bool
-	MinPrice    *float64
-	MaxPrice    *float64
-	Source      *string
-	DateFrom    *time.Time
-	DateTo      *time.Time
-	Limit       int
-	Offset      int
-	OrderBy     string
-	OrderDir    string
-}
+type PriceHistoryFilters = pricehistory.Filters

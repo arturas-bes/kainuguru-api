@@ -5,18 +5,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kainuguru/kainuguru-api/internal/flyerpage"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/uptrace/bun"
 )
 
 type flyerPageService struct {
-	db *bun.DB
+	repo flyerpage.Repository
 }
 
 // NewFlyerPageService creates a new flyer page service instance
 func NewFlyerPageService(db *bun.DB) FlyerPageService {
+	return NewFlyerPageServiceWithRepository(newFlyerPageRepository(db))
+}
+
+// NewFlyerPageServiceWithRepository allows injecting a custom repository implementation.
+func NewFlyerPageServiceWithRepository(repo flyerpage.Repository) FlyerPageService {
+	if repo == nil {
+		panic("flyer page repository cannot be nil")
+	}
 	return &flyerPageService{
-		db: db,
+		repo: repo,
 	}
 }
 
@@ -24,89 +33,44 @@ func NewFlyerPageService(db *bun.DB) FlyerPageService {
 
 // GetByID retrieves a flyer page by its ID
 func (s *flyerPageService) GetByID(ctx context.Context, id int) (*models.FlyerPage, error) {
-	page := &models.FlyerPage{}
-	err := s.db.NewSelect().
-		Model(page).
-		Relation("Flyer").
-		Where("fp.id = ?", id).
-		Scan(ctx)
-
+	page, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get flyer page by ID %d: %w", id, err)
 	}
-
 	return page, nil
 }
 
 // GetByIDs retrieves multiple flyer pages by their IDs
 func (s *flyerPageService) GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
-	if len(ids) == 0 {
-		return []*models.FlyerPage{}, nil
-	}
-
-	var pages []*models.FlyerPage
-	err := s.db.NewSelect().
-		Model(&pages).
-		Relation("Flyer").
-		Where("fp.id IN (?)", bun.In(ids)).
-		Order("fp.page_number ASC").
-		Scan(ctx)
-
+	pages, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get flyer pages by IDs: %w", err)
 	}
-
 	return pages, nil
 }
 
 // GetPagesByFlyerIDs retrieves flyer pages for multiple flyer IDs (for DataLoader)
 func (s *flyerPageService) GetPagesByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.FlyerPage, error) {
-	if len(flyerIDs) == 0 {
-		return []*models.FlyerPage{}, nil
-	}
-
-	var pages []*models.FlyerPage
-	err := s.db.NewSelect().
-		Model(&pages).
-		Relation("Flyer").
-		Where("fp.flyer_id IN (?)", bun.In(flyerIDs)).
-		Order("fp.flyer_id ASC, fp.page_number ASC").
-		Scan(ctx)
-
+	pages, err := s.repo.GetPagesByFlyerIDs(ctx, flyerIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pages by flyer IDs: %w", err)
 	}
-
 	return pages, nil
 }
 
 // GetByFlyerID retrieves all pages for a specific flyer
 func (s *flyerPageService) GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error) {
-	var pages []*models.FlyerPage
-	err := s.db.NewSelect().
-		Model(&pages).
-		Relation("Flyer").
-		Where("fp.flyer_id = ?", flyerID).
-		Order("fp.page_number ASC").
-		Scan(ctx)
-
+	pages, err := s.repo.GetByFlyerID(ctx, flyerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pages for flyer %d: %w", flyerID, err)
 	}
-
 	return pages, nil
 }
 
 // GetAll retrieves flyer pages with optional filtering
 func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters) ([]*models.FlyerPage, error) {
-	query := s.db.NewSelect().Model((*models.FlyerPage)(nil)).
-		Relation("Flyer")
-
-	s.applyFlyerPageFilterConditions(query, filters)
-	applyFlyerPagePagination(query, filters)
-
-	var pages []*models.FlyerPage
-	err := query.Scan(ctx, &pages)
+	f := filters
+	pages, err := s.repo.GetAll(ctx, &f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get flyer pages: %w", err)
 	}
@@ -115,10 +79,8 @@ func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters)
 }
 
 func (s *flyerPageService) Count(ctx context.Context, filters FlyerPageFilters) (int, error) {
-	query := s.db.NewSelect().Model((*models.FlyerPage)(nil))
-	s.applyFlyerPageFilterConditions(query, filters)
-
-	count, err := query.Count(ctx)
+	f := filters
+	count, err := s.repo.Count(ctx, &f)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count flyer pages: %w", err)
 	}
@@ -130,11 +92,10 @@ func (s *flyerPageService) Create(ctx context.Context, page *models.FlyerPage) e
 	page.CreatedAt = time.Now()
 	page.UpdatedAt = time.Now()
 
-	_, err := s.db.NewInsert().
-		Model(page).
-		Exec(ctx)
-
-	return err
+	if err := s.repo.Create(ctx, page); err != nil {
+		return fmt.Errorf("failed to create flyer page: %w", err)
+	}
+	return nil
 }
 
 func (s *flyerPageService) CreateBatch(ctx context.Context, pages []*models.FlyerPage) error {
@@ -148,74 +109,26 @@ func (s *flyerPageService) CreateBatch(ctx context.Context, pages []*models.Flye
 		page.UpdatedAt = now
 	}
 
-	_, err := s.db.NewInsert().
-		Model(&pages).
-		Exec(ctx)
-
-	return err
+	if err := s.repo.CreateBatch(ctx, pages); err != nil {
+		return fmt.Errorf("failed to create flyer pages batch: %w", err)
+	}
+	return nil
 }
 
 func (s *flyerPageService) Update(ctx context.Context, page *models.FlyerPage) error {
 	page.UpdatedAt = time.Now()
 
-	_, err := s.db.NewUpdate().
-		Model(page).
-		Where("id = ?", page.ID).
-		Exec(ctx)
-
-	return err
+	if err := s.repo.Update(ctx, page); err != nil {
+		return fmt.Errorf("failed to update flyer page %d: %w", page.ID, err)
+	}
+	return nil
 }
 
 func (s *flyerPageService) Delete(ctx context.Context, id int) error {
-	_, err := s.db.NewDelete().
-		Model((*models.FlyerPage)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-
-	return err
-}
-
-func (s *flyerPageService) applyFlyerPageFilterConditions(query *bun.SelectQuery, filters FlyerPageFilters) {
-	if len(filters.FlyerIDs) > 0 {
-		query.Where("fp.flyer_id IN (?)", bun.In(filters.FlyerIDs))
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete flyer page %d: %w", id, err)
 	}
-
-	if len(filters.Status) > 0 {
-		query.Where("fp.extraction_status IN (?)", bun.In(filters.Status))
-	}
-
-	if filters.HasImage != nil {
-		if *filters.HasImage {
-			query.Where("fp.image_url IS NOT NULL AND fp.image_url != ''")
-		} else {
-			query.Where("fp.image_url IS NULL OR fp.image_url = ''")
-		}
-	}
-
-	if len(filters.PageNumbers) > 0 {
-		query.Where("fp.page_number IN (?)", bun.In(filters.PageNumbers))
-	}
-}
-
-func applyFlyerPagePagination(query *bun.SelectQuery, filters FlyerPageFilters) {
-	if filters.Limit > 0 {
-		query.Limit(filters.Limit)
-	}
-	if filters.Offset > 0 {
-		query.Offset(filters.Offset)
-	}
-
-	if filters.OrderBy != "" {
-		orderClause := fmt.Sprintf("fp.%s", filters.OrderBy)
-		if filters.OrderDir == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query.Order(orderClause)
-	} else {
-		query.Order("fp.flyer_id ASC").Order("fp.page_number ASC")
-	}
+	return nil
 }
 
 // Processing operations

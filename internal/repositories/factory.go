@@ -3,6 +3,7 @@ package repositories
 import (
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
+	"github.com/kainuguru/kainuguru-api/internal/store"
 	"github.com/uptrace/bun"
 )
 
@@ -19,7 +20,7 @@ func NewRepositoryFactory(db *bun.DB) *RepositoryFactory {
 }
 
 // StoreRepository returns a store repository implementation.
-func (f *RepositoryFactory) StoreRepository() StoreRepository {
+func (f *RepositoryFactory) StoreRepository() store.Repository {
 	return NewStoreRepository(f.db)
 }
 

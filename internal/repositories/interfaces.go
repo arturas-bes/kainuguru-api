@@ -8,27 +8,6 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
-// StoreRepository defines the interface for store data access
-type StoreRepository interface {
-	// Basic CRUD operations
-	GetByID(ctx context.Context, id int) (*models.Store, error)
-	GetByCode(ctx context.Context, code string) (*models.Store, error)
-	GetAll(ctx context.Context, filters services.StoreFilters) ([]*models.Store, error)
-	Create(ctx context.Context, store *models.Store) error
-	Update(ctx context.Context, store *models.Store) error
-	Delete(ctx context.Context, id int) error
-
-	// Store-specific queries
-	GetActiveStores(ctx context.Context) ([]*models.Store, error)
-	GetStoresByPriority(ctx context.Context) ([]*models.Store, error)
-	GetScrapingEnabledStores(ctx context.Context) ([]*models.Store, error)
-	UpdateLastScrapedAt(ctx context.Context, storeID int, scrapedAt time.Time) error
-
-	// Bulk operations
-	CreateBatch(ctx context.Context, stores []*models.Store) error
-	UpdateBatch(ctx context.Context, stores []*models.Store) error
-}
-
 // FlyerRepository defines the interface for flyer data access
 type FlyerRepository interface {
 	// Basic CRUD operations

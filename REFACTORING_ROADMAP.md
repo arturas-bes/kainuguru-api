@@ -124,23 +124,25 @@ func (r *BaseRepository[T]) GetAll(ctx context.Context, opts ...QueryOption) ([]
 ```
 
 **Tasks:**
-- [ ] Design generic repository interface
-- [ ] Implement BaseRepository with Go 1.18+ generics
-- [ ] Create QueryOption builder pattern
-- [ ] Migrate 15 services to use base repository
-- [ ] Add unit tests for generic repository
-- [ ] Verify all tests still pass
+- [x] Design generic repository interface
+- [x] Implement BaseRepository with Go 1.18+ generics
+- [x] Create QueryOption builder pattern
+- [ ] Migrate 15 services to use base repository (guided by CODE_DUPLICATION_ANALYSIS §Services)
+- [x] Add unit tests for generic repository
+- [x] Verify all tests still pass
+
+**Progress so far:** Base repository helper + query options now live under `internal/repositories/base` with sqlite-backed tests. Store, flyer, shopping list, shopping list item, extraction job, and flyer page services already delegate to typed repositories under `internal/<domain>` with DI factories and regression tests. Remaining services still issue raw Bun queries until characterization coverage is in place.
 
 **Services to Migrate:**
 1. `product_master_service.go`
 2. `shopping_list_item_service.go` ✅ (shares `internal/shoppinglistitem.Repository`, service now repo-backed with regression tests)
-3. `flyer_service.go`
-4. `flyer_page_service.go`
-5. `store_service.go`
-6. `product_service.go`
+3. `flyer_service.go` ✅ (now backed by `internal/flyer.Repository`; service delegates and unit tests cover delegation)
+4. `flyer_page_service.go` ✅ (new `internal/flyerpage` repo contracts + DI-backed service/tests)
+5. `store_service.go` ✅ (now delegates to `internal/store.Repository` via DI + unit tests)
+6. `product_service.go` ✅ (new `internal/product` repo + service delegation tests; CreateBatch/Update now go through the repository)
 7. `shopping_list_service.go` ✅ (migrated to `internal/shoppinglist.Repository`, tests + bootstrap registration in place)
-8. `price_history_service.go`
-9. `extraction_job_service.go`
+8. `price_history_service.go` ✅ (now depends on `internal/pricehistory.Repository`; service delegates via DI with characterization tests)
+9. `extraction_job_service.go` ✅ (now backed by `internal/extractionjob.Repository`; Bun repo/tests + service delegation finished)
 10. And remaining CRUD services...
 
 **Expected Outcome:**
@@ -189,9 +191,9 @@ func NewPaginationHelper[T any](items []*T, params PaginationParams) (*Connectio
 ```
 
 **Tasks:**
-- [x] Create pagination helper package
-- [x] Implement cursor encoding/decoding
-- [x] Implement offset-based pagination
+- [ ] Create pagination helper package
+- [ ] Implement cursor encoding/decoding
+- [ ] Implement offset-based pagination
 - [ ] Update all 8+ resolvers to use helper
 - [ ] Add tests for pagination edge cases
 
@@ -248,9 +250,21 @@ func AuthMiddleware(config AuthMiddlewareConfig) fiber.Handler {
 
 **Tasks:**
 - [x] Create AuthMiddlewareConfig struct
-- [x] Merge AuthMiddleware and OptionalAuthMiddleware
-- [ ] Update server setup to use configuration
+- [x] Merge AuthMiddleware and OptionalAuthMiddleware (both now wrap `NewAuthMiddleware`)
+- [ ] Update server setup to use configuration (`cmd/api/server` still calls the legacy helpers)
 - [ ] Add tests for both required/optional paths
+
+---
+
+### Phase 2 Snapshot
+- ✅ Generic base repository + query options landed with sqlite-backed tests, flyer page/price history/product services now follow the domain-package + repository pattern with service delegation tests.
+- ✅ Store, flyer, shopping list, shopping list item, and extraction job services continue to run on dedicated repositories registered via `internal/bootstrap`.
+- ⚠️ Product master is now fully repository-backed (CRUD, matching, duplicates, stats). Still outstanding: GraphQL pagination helper + snapshots and the auth middleware regression suite.
+
+**Next Focus**
+- Begin the GraphQL pagination helper + golden tests and roll it through the duplicated resolver blocks.
+- Implement the pagination helper + golden tests, then replace the duplicated pagination blocks in every resolver called out in CODE_DUPLICATION_ANALYSIS.
+- Cover `NewAuthMiddleware` required/optional flows with request tests and update the Fiber server wiring to call it directly before starting the roadmap’s error-package work.
 
 ---
 
@@ -478,9 +492,9 @@ func TestProductMasterService_GetByID(t *testing.T) {
 ## Priority Summary
 
 ### CRITICAL (Do Immediately)
-- [ ] Fix context abuse in GraphQL handler (breaks timeouts)
-- [ ] Consolidate repository directories (architectural confusion)
-- [ ] Remove placeholder repository file (dead code)
+- [x] Fix context abuse in GraphQL handler (breaks timeouts)
+- [x] Consolidate repository directories (architectural confusion)
+- [x] Remove placeholder repository file (dead code)
 
 ### HIGH (Do in Phase 1-2)
 - [ ] Generic CRUD repository pattern (eliminates 1,500 LOC duplication)
@@ -488,7 +502,7 @@ func TestProductMasterService_GetByID(t *testing.T) {
 - [ ] Error handling package (971 unwritten patterns)
 
 ### MEDIUM (Do in Phase 2-3)
-- [x] Extract pagination helper (320 LOC duplication)
+- [ ] Extract pagination helper (320 LOC duplication)
 - [ ] Split large service files (hard to maintain)
 - [ ] Consolidate middleware (95% duplication)
 - [ ] Resolve TODOs (clear technical debt tracking)
@@ -568,9 +582,9 @@ Total: 20 working days (~4 weeks)
 ## Implementation Checklist
 
 - [x] Week 1: All critical fixes completed
-- [x] Week 1: All TODOs resolved or tracked
+- [ ] Week 1: All TODOs resolved or tracked
 - [x] Week 2: Generic CRUD repository implemented
-- [x] Week 2: Pagination helper complete
+- [ ] Week 2: Pagination helper complete
 - [ ] Week 2: Middleware consolidated
 - [ ] Week 3: Unit tests for 70% coverage
 - [ ] Week 3: Large files split
@@ -612,7 +626,7 @@ Total: 20 working days (~4 weeks)
 
 ---
 
-**Last Updated:** 2024-11-10
-**Status:** Draft - Awaiting Team Review
+**Last Updated:** 2025-11-12
+**Status:** In Progress
 **Owner:** Engineering Lead
 **Reviewers:** Team Leads, Architects

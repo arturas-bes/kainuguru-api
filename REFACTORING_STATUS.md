@@ -10,17 +10,20 @@
 
 ## Done so far
 1. **Toolchain stabilized** (run instructions above).
-2. **Base repository extracted** under `internal/repositories/base` with tests ensuring GetByID/GetAll semantics and limit/pagination behavior.
-3. **Store service & repository** fully migrated to shared helper (uses `base.Repository[models.Store]`). All CRUD + count now go through the base repo; service only adds business logic (timestamps, validations).
-4. **Flyer service** migrated: `internal/repositories/flyer_repository.go` uses shared helper + custom filters; Flyer service delegates everything to repository.
-5. **Flyer page service** migrated: repository handles pagination/filters, service only does control logic.
-6. **Product service** migrated: introduced `product_repository.go` using base helper and special queries (current/valid/on-sale). Service now depends on repo interface as planned.
-7. **ServiceFactory** now expects repository providers for stores/flyers/flyer pages/products. All entrypoints (API server, CLI tools) new up a `RepositoryFactory` and pass it into `NewServiceFactory`.
-8. **Shopping list service migrated**: introduced `internal/shoppinglist` filters + repository contract, filled in repository implementation (categories/access/share helpers), and rewired `ShoppingListService` to depend solely on that interface. Added unit tests covering default list handling, share settings, archiving, and access validation. All command binaries now import `internal/bootstrap` so repository factories register before services spin up.
-9. **Shopping list item service migrated**: created the `internal/shoppinglistitem` package (filters + repository contract), wired it through the repository factory/bootstrap, and refactored `ShoppingListItemService` to delegate all persistence to the repository. Added regression tests exercising create defaults, single item updates, bulk operations, and access validation.
+2. **GraphQL handler propagates request context**: `internal/handlers/graphql.go` now derives from `c.Context()` and cancellation is asserted in `internal/handlers/graphql_test.go`, satisfying AGENTS §7.1.
+3. **Repository tree consolidated + DI hook**: only `internal/repositories/*` remains and `_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"` wires store/flyer/shopping list/shopping list item/extraction job factories into `internal/services/repository_registry.go` before any service is constructed.
+4. **Store service + repository split**: the new `internal/store` contract fronts `internal/repositories/store_repository.go`, and `internal/services/store_service.go` + `_test.go` prove the service is a thin delegator (filters/counting/timestamps stay intact).
+5. **Flyer service migrated**: `internal/flyer` exposes filters + repository interface, `internal/repositories/flyer_repository.go` centralizes Bun queries, and `internal/services/flyer_service_test.go` locks delegation/error paths.
+6. **Shopping list + shopping list item services migrated**: the domain packages (`internal/shoppinglist`, `internal/shoppinglistitem`) own filters/contracts, repositories live under `internal/repositories/`, and the services/tests enforce defaults, share-code rules, and bulk item semantics.
+7. **Extraction job stack refactored**: `internal/extractionjob` defines filters/interfaces, `internal/repositories/extraction_job_repository.go` implements queue-safe Bun operations with sqlite-backed tests, and `internal/services/extraction_job_service.go` gains DI + logger injection with table-driven tests.
+8. **Generic base repository added**: `internal/repositories/base` now exposes typed CRUD helpers + sqlite-backed characterization tests so future services can stop re-implementing Bun boilerplate.
+9. **Flyer page domain refactor**: introduced `internal/flyerpage` (filters + repository contract), wired a Bun-backed repository built on the new base helper, updated the service to delegate via DI, and added delegation/timestamp tests to lock behavior.
+10. **Price history service migrated**: new `internal/pricehistory` package defines filters + repository contract, `internal/repositories/price_history_repository.go` centralizes the Bun queries, and `internal/services/price_history_service.go` now delegates via DI with unit tests covering delegation/error propagation.
+11. **Product service migrated**: introduced `internal/product` (filters + repository contract), implemented `internal/repositories/product_repository.go` on top of the base helper, refactored `internal/services/product_service.go` to depend on the repository/DI seam, and added delegation/normalization tests.
+12. **Product master repository introduced**: `internal/productmaster` now defines the contract, `internal/repositories/product_master_repository.go` handles CRUD/filtering, the transactional MatchProduct flow, master verification/deactivation/duplicate handling, and the statistics queries. `internal/services/product_master_service.go` + `_test.go` now delegate those responsibilities.
 
-## Next planned steps (pending)
-1. Price history, extraction job, product master services still use direct Bun queries. Next focus:
-   - Define neutral packages for their filter/contracts.
-   - Port repositories to the shared helpers and add targeted characterization tests.
-2. GraphQL resolvers around shopping list items still have duplicated filter conversion logic; consider moving to helpers once remaining services are migrated.
+## Next planned steps (Phase 2 remaining scope)
+1. Continue peeling the remaining product master flows (e.g., master creation from products, advanced matching orchestration) off direct Bun usage by extending the new repository with targeted helpers.
+2. Roll the base repository across the existing store/flyer/shopping list implementations to remove duplicated query plumbing once the remaining high-volume services are characterized.
+3. Extract the GraphQL pagination helper (CODE_DUPLICATION_ANALYSIS §Pagination) and roll it through `internal/graphql/resolvers/query.go` plus related mutation resolvers, guarded by golden snapshot tests to ensure connection shapes/logging stay identical.
+4. Expand middleware coverage by exercising both `Required` and `Optional` paths of `internal/middleware/auth.go` and ensure server wiring calls `NewAuthMiddleware` directly; only after the request path is fully characterized should we resume the roadmap’s error-package consolidation work.
