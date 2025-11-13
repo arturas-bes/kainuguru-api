@@ -38,17 +38,18 @@
 
 ### Coverage Achievement Summary
 - **Baseline**: 18.0% services, 6.4% overall
-- **Current**: 34.1% services (+16.1%), 10.5% overall (+4.1%)
+- **Current**: 37.2% services (+19.2%), 11.3% overall (+4.9%)
 - **Target**: 20% services
-- **Achievement**: 170.5% of target (70.5% above goal)
+- **Achievement**: 186.0% of target (86.0% above goal)
 
-### Services Refactored (6 services, 93 tests added)
+### Services Refactored (7 services, 108 tests added)
 1. **price_history_service**: 2→10 tests (+8, +400%) - 93 LOC
 2. **flyer_page_service**: 3→14 tests (+11, +367%) - 166 LOC
 3. **product_service**: 3→18 tests (+15, +500%) - 249 LOC
 4. **store_service**: 3→14 tests (+11, +367%) - 98 LOC
 5. **flyer_service**: 3→21 tests (+18, +600%) - 151 LOC
 6. **extraction_job_service**: 4→21 tests (+17, +425%) - 288 LOC
+7. **shopping_list_service**: 7→22 tests (+15, +214%) - 280 LOC
 
 ### Test Pattern Established (Characterization Tests)
 All tests follow AGENTS.md zero-risk refactoring:
@@ -94,8 +95,7 @@ All tests follow AGENTS.md zero-risk refactoring:
 
 ### Remaining Services to Test
 **Low-hanging fruit** (simple CRUD, easy wins):
-1. **shopping_list_service**: 280 LOC, 7 tests (needs +8-10 tests for GetByUser, sharing logic)
-2. **shopping_list_item_service**: 534 LOC, 4 tests (needs +12-15 tests for bulk ops, recipe handling)
+1. **shopping_list_item_service**: 534 LOC, 4 tests (needs +12-15 tests for bulk ops, recipe handling)
 
 **Complex services** (require more analysis):
 3. **product_master_service**: 510 LOC, 3 tests (needs +15-20 tests for matching logic, master creation, deactivation)
@@ -128,8 +128,7 @@ All tests follow AGENTS.md zero-risk refactoring:
 - **Memory allocations**: No change (stubs don't allocate)
 
 ## Next planned steps (Phase 3 ongoing)
-1. **Expand shopping_list_service tests** (7→17 tests, target +10 tests for GetByUser, sharing, privacy)
-2. **Expand shopping_list_item_service tests** (4→19 tests, target +15 tests for bulk ops, recipe handling)
-3. **Consider product_master_service tests** (complex matching logic, may need separate analysis)
-4. **Evaluate migration to pkg/errors** (after 40% coverage threshold reached)
-5. **Split large files** (shopping_list_item 534 LOC, product_master 510 LOC) to improve maintainability.
+1. **Expand shopping_list_item_service tests** (4→19 tests, target +15 tests for bulk ops, recipe handling) - **NEXT UP**
+2. **Consider product_master_service tests** (complex matching logic, may need separate analysis)
+3. **Evaluate migration to pkg/errors** (after 40% coverage threshold reached - **CLOSE: 37.2% vs 40% target**)
+4. **Split large files** (shopping_list_item 534 LOC, product_master 510 LOC) to improve maintainability.
