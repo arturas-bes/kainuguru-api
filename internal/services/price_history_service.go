@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/pricehistory"
@@ -31,7 +35,7 @@ func (s *priceHistoryService) GetByProductMasterID(ctx context.Context, productM
 	f := filters
 	priceHistory, err := s.repo.GetByProductMasterID(ctx, productMasterID, storeID, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get price history for product master %d: %w", productMasterID, err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get price history for product master %d", productMasterID)
 	}
 
 	return priceHistory, nil
@@ -41,7 +45,10 @@ func (s *priceHistoryService) GetByProductMasterID(ctx context.Context, productM
 func (s *priceHistoryService) GetCurrentPrice(ctx context.Context, productMasterID int, storeID *int) (*models.PriceHistory, error) {
 	priceHistory, err := s.repo.GetCurrentPrice(ctx, productMasterID, storeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current price for product master %d: %w", productMasterID, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("current price not found for product master %d", productMasterID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get current price for product master %d", productMasterID)
 	}
 
 	return priceHistory, nil
@@ -51,7 +58,10 @@ func (s *priceHistoryService) GetCurrentPrice(ctx context.Context, productMaster
 func (s *priceHistoryService) GetByID(ctx context.Context, id int64) (*models.PriceHistory, error) {
 	priceHistory, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get price history by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("price history not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get price history by ID %d", id)
 	}
 
 	return priceHistory, nil
@@ -60,7 +70,7 @@ func (s *priceHistoryService) GetByID(ctx context.Context, id int64) (*models.Pr
 // Create creates a new price history entry.
 func (s *priceHistoryService) Create(ctx context.Context, priceHistory *models.PriceHistory) error {
 	if err := s.repo.Create(ctx, priceHistory); err != nil {
-		return fmt.Errorf("failed to create price history: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create price history")
 	}
 	return nil
 }
@@ -68,7 +78,7 @@ func (s *priceHistoryService) Create(ctx context.Context, priceHistory *models.P
 // Update updates a price history entry.
 func (s *priceHistoryService) Update(ctx context.Context, priceHistory *models.PriceHistory) error {
 	if err := s.repo.Update(ctx, priceHistory); err != nil {
-		return fmt.Errorf("failed to update price history: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update price history")
 	}
 	return nil
 }
@@ -76,7 +86,7 @@ func (s *priceHistoryService) Update(ctx context.Context, priceHistory *models.P
 // Delete deletes a price history entry.
 func (s *priceHistoryService) Delete(ctx context.Context, id int64) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete price history: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to delete price history")
 	}
 	return nil
 }
@@ -86,7 +96,7 @@ func (s *priceHistoryService) GetPriceHistoryCount(ctx context.Context, productM
 	f := filters
 	count, err := s.repo.GetPriceHistoryCount(ctx, productMasterID, storeID, &f)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count price history: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count price history")
 	}
 
 	return count, nil
