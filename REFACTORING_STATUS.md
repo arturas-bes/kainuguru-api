@@ -30,8 +30,9 @@
 19. **GraphQL pagination snapshots captured**: `internal/graphql/resolvers/pagination_snapshot_test.go` + `testdata/*.json` record golden connection payloads for stores/flyers/products/shopping lists/items/price history.
 20. **GraphQL handler relies solely on middleware context**: the legacy token parsing fallback in `internal/handlers/graphql.go` was removed so `/graphql` now trusts the shared middleware for auth state.
 21. **Extraction job + shopping list item repositories now use the base helper**: both repos delegate CRUD to `internal/repositories/base` with sqlite-backed tests covering filter/order semantics, leaving only domain-specific locking logic outside the helper.
+22. **Shared error-handling package complete**: `pkg/errors` now has comprehensive unit tests (14 test cases covering all error types, wrapping, type checking, and status code mapping), usage examples demonstrating migration patterns, and complete documentation (README.md) with service-layer patterns, migration strategy, and best practices. The package was already implemented with typed errors (validation/authentication/authorization/notfound/conflict/ratelimit/external/internal), HTTP status mapping, error wrapping with `%w` semantics, and GraphQL compatibility—ready for service migration.
 
 ## Next planned steps (Phase 2 remaining scope)
-1. Kick off the shared error-handling package effort so services stop hand-rolling `fmt.Errorf("failed to ...")` everywhere.
-2. Wire the new GraphQL pagination snapshots into CI/regression gates (or at least document the `-update_graphql_snapshots` workflow) so connection changes require explicit approval.
-3. Push toward the Week 3 goals (70% coverage + large-file splits) by prioritizing service unit tests and resolver extraction work.
+1. Wire the new GraphQL pagination snapshots into CI/regression gates (or at least document the `-update_graphql_snapshots` workflow) so connection changes require explicit approval.
+2. Push toward the Week 3 goals (70% coverage + large-file splits) by prioritizing service unit tests and resolver extraction work.
+3. Begin migrating critical services to use `pkg/errors` (starting with product_master, shopping_list_item, auth services per migration strategy).
