@@ -31,8 +31,9 @@
 20. **GraphQL handler relies solely on middleware context**: the legacy token parsing fallback in `internal/handlers/graphql.go` was removed so `/graphql` now trusts the shared middleware for auth state.
 21. **Extraction job + shopping list item repositories now use the base helper**: both repos delegate CRUD to `internal/repositories/base` with sqlite-backed tests covering filter/order semantics, leaving only domain-specific locking logic outside the helper.
 22. **Shared error-handling package complete**: `pkg/errors` now has comprehensive unit tests (14 test cases covering all error types, wrapping, type checking, and status code mapping), usage examples demonstrating migration patterns, and complete documentation (README.md) with service-layer patterns, migration strategy, and best practices. The package was already implemented with typed errors (validation/authentication/authorization/notfound/conflict/ratelimit/external/internal), HTTP status mapping, error wrapping with `%w` semantics, and GraphQL compatibility—ready for service migration.
+23. **GraphQL pagination snapshots integrated into workflow**: Added `make test-snapshots` and `make update-snapshots` Makefile targets, created comprehensive documentation (`docs/SNAPSHOT_TESTING.md`) covering update workflow/CI integration/best practices, and provided CI configuration templates (GitHub Actions + GitLab CI examples) under `docs/ci-examples/` so projects can enforce snapshot stability before merging PRs.
 
-## Next planned steps (Phase 2 remaining scope)
-1. Wire the new GraphQL pagination snapshots into CI/regression gates (or at least document the `-update_graphql_snapshots` workflow) so connection changes require explicit approval.
-2. Push toward the Week 3 goals (70% coverage + large-file splits) by prioritizing service unit tests and resolver extraction work.
-3. Begin migrating critical services to use `pkg/errors` (starting with product_master, shopping_list_item, auth services per migration strategy).
+## Next planned steps (Phase 3 scope)
+1. Push toward the Week 3 goals (70% coverage + large-file splits) by prioritizing service unit tests and resolver extraction work.
+2. Begin migrating critical services to use `pkg/errors` (starting with product_master, shopping_list_item, auth services per migration strategy).
+3. Split large service files (product_master 865 LOC, shopping_list_item 771 LOC) to improve maintainability.
