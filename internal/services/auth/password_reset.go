@@ -232,7 +232,7 @@ func (p *passwordResetService) generateResetToken(ctx context.Context, userID uu
 		Exec(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to save reset token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to save reset token")
 	}
 
 	return token, nil
@@ -267,12 +267,12 @@ func (p *passwordResetService) checkResetRateLimit(ctx context.Context, email st
 		Count(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to check rate limit: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check rate limit")
 	}
 
 	maxResetsPerHour := 3
 	if count >= maxResetsPerHour {
-		return fmt.Errorf("too many password reset requests. Please wait before requesting another")
+		return apperrors.Validation("too many password reset requests. Please wait before requesting another")
 	}
 
 	return nil
@@ -287,10 +287,10 @@ func (p *passwordResetService) getUserByEmail(ctx context.Context, email string)
 		Scan(ctx)
 
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, fmt.Errorf("user not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("user not found")
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get user")
 	}
 
 	return &user, nil
@@ -305,10 +305,10 @@ func (p *passwordResetService) getUserByID(ctx context.Context, userID uuid.UUID
 		Scan(ctx)
 
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, fmt.Errorf("user not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("user not found")
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get user")
 	}
 
 	return &user, nil
@@ -337,7 +337,7 @@ func (p *passwordResetService) GetPasswordResetStats(ctx context.Context, userID
 		Count(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reset stats: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get reset stats")
 	}
 
 	// Get last reset time
@@ -391,7 +391,7 @@ func (p *passwordResetService) CleanupExpiredResetTokens(ctx context.Context) (i
 		Exec(ctx)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired reset tokens: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cleanup expired reset tokens")
 	}
 
 	rowsAffected, _ := result.RowsAffected()

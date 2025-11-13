@@ -2,9 +2,7 @@ package auth
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
-	"errors"
 	"strings"
 	"time"
 
