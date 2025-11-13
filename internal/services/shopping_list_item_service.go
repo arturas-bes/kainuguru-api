@@ -459,22 +459,29 @@ func (s *shoppingListItemService) GetPriceHistory(ctx context.Context, itemID in
 
 func (s *shoppingListItemService) SuggestCategory(ctx context.Context, description string) (string, error) {
 	// Simple category suggestion based on keywords
+	// Order matters: more specific categories first to avoid false matches
 	lower := strings.ToLower(description)
 
-	categories := map[string][]string{
-		"Produce":   {"apple", "banana", "carrot", "tomato", "lettuce", "potato", "onion"},
-		"Dairy":     {"milk", "cheese", "yogurt", "butter", "cream"},
-		"Meat":      {"chicken", "beef", "pork", "fish", "turkey"},
-		"Bakery":    {"bread", "bagel", "croissant", "muffin", "cake"},
-		"Frozen":    {"ice cream", "frozen", "pizza"},
-		"Beverages": {"juice", "soda", "water", "coffee", "tea"},
-		"Snacks":    {"chips", "cookies", "crackers", "candy"},
+	// Define categories in a deterministic order (most specific first)
+	type categoryDef struct {
+		name     string
+		keywords []string
 	}
 
-	for category, keywords := range categories {
-		for _, keyword := range keywords {
+	categories := []categoryDef{
+		{"Snacks", []string{"chips", "cookies", "crackers", "candy"}},
+		{"Frozen", []string{"ice cream", "frozen", "pizza"}},
+		{"Bakery", []string{"bread", "bagel", "croissant", "muffin", "cake"}},
+		{"Beverages", []string{"juice", "soda", "water", "coffee", "tea"}},
+		{"Dairy", []string{"milk", "cheese", "yogurt", "butter", "cream"}},
+		{"Meat", []string{"chicken", "beef", "pork", "fish", "turkey"}},
+		{"Produce", []string{"apple", "banana", "carrot", "tomato", "lettuce", "potato", "onion"}},
+	}
+
+	for _, cat := range categories {
+		for _, keyword := range cat.keywords {
 			if strings.Contains(lower, keyword) {
-				return category, nil
+				return cat.name, nil
 			}
 		}
 	}
