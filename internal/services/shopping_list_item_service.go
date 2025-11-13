@@ -2,24 +2,49 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
 	"github.com/uptrace/bun"
 )
 
+type shoppingListItemRepo interface {
+	GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error)
+	GetByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) ([]*models.ShoppingListItem, error)
+	CountByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) (int, error)
+	Create(ctx context.Context, item *models.ShoppingListItem) error
+	Update(ctx context.Context, item *models.ShoppingListItem) error
+	Delete(ctx context.Context, id int64) error
+	BulkCheck(ctx context.Context, itemIDs []int64, userID uuid.UUID) error
+	BulkUncheck(ctx context.Context, itemIDs []int64) error
+	BulkDelete(ctx context.Context, itemIDs []int64) (int, error)
+	UpdateSortOrder(ctx context.Context, itemID int64, newOrder int) error
+	ReorderItems(ctx context.Context, listID int64, itemOrders []shoppinglistitem.ItemOrder) error
+	GetNextSortOrder(ctx context.Context, listID int64) (int, error)
+	FindDuplicateByDescription(ctx context.Context, listID int64, normalizedDescription string, excludeID *int64) (*models.ShoppingListItem, error)
+	CanUserAccessItem(ctx context.Context, itemID int64, userID uuid.UUID) (bool, error)
+}
+
 type shoppingListItemService struct {
-	db                  *bun.DB
+	repo                shoppingListItemRepo
 	shoppingListService ShoppingListService
 }
 
 // NewShoppingListItemService creates a new shopping list item service instance
 func NewShoppingListItemService(db *bun.DB, shoppingListService ShoppingListService) ShoppingListItemService {
+	return NewShoppingListItemServiceWithRepository(newShoppingListItemRepository(db), shoppingListService)
+}
+
+// NewShoppingListItemServiceWithRepository allows injecting a custom repository implementation (useful for tests).
+func NewShoppingListItemServiceWithRepository(repo shoppingListItemRepo, shoppingListService ShoppingListService) ShoppingListItemService {
 	return &shoppingListItemService{
-		db:                  db,
+		repo:                repo,
 		shoppingListService: shoppingListService,
 	}
 }
@@ -27,118 +52,26 @@ func NewShoppingListItemService(db *bun.DB, shoppingListService ShoppingListServ
 // Basic CRUD operations
 
 func (s *shoppingListItemService) GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error) {
-	item := &models.ShoppingListItem{}
-	err := s.db.NewSelect().
-		Model(item).
-		Where("sli.id = ?", id).
-		Relation("ShoppingList").
-		Relation("User").
-		Relation("ProductMaster").
-		Relation("LinkedProduct").
-		Relation("Store").
-		Relation("Flyer").
-		Scan(ctx)
-
+	item, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shopping list item by ID %d: %w", id, err)
 	}
-
+	if item == nil {
+		return nil, fmt.Errorf("failed to get shopping list item by ID %d: %w", id, sql.ErrNoRows)
+	}
 	return item, nil
 }
 
 func (s *shoppingListItemService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error) {
-	if len(ids) == 0 {
-		return []*models.ShoppingListItem{}, nil
-	}
-
-	var items []*models.ShoppingListItem
-	err := s.db.NewSelect().
-		Model(&items).
-		Where("sli.id IN (?)", bun.In(ids)).
-		Relation("ShoppingList").
-		Relation("User").
-		Relation("ProductMaster").
-		Relation("LinkedProduct").
-		Relation("Store").
-		Relation("Flyer").
-		Order("sli.id ASC").
-		Scan(ctx)
-
+	items, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shopping list items by IDs: %w", err)
 	}
-
 	return items, nil
 }
 
 func (s *shoppingListItemService) GetByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) ([]*models.ShoppingListItem, error) {
-	query := s.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("sli.shopping_list_id = ?", listID).
-		Relation("User").
-		Relation("ProductMaster").
-		Relation("LinkedProduct").
-		Relation("Store").
-		Relation("Flyer")
-
-	// Apply filters
-	if filters.IsChecked != nil {
-		query = query.Where("sli.is_checked = ?", *filters.IsChecked)
-	}
-
-	if len(filters.Categories) > 0 {
-		query = query.Where("sli.category IN (?)", bun.In(filters.Categories))
-	}
-
-	if len(filters.Tags) > 0 {
-		// Items that have any of the specified tags
-		query = query.Where("sli.tags && ?", bun.In(filters.Tags))
-	}
-
-	if filters.HasPrice != nil {
-		if *filters.HasPrice {
-			query = query.Where("sli.estimated_price IS NOT NULL OR sli.actual_price IS NOT NULL")
-		} else {
-			query = query.Where("sli.estimated_price IS NULL AND sli.actual_price IS NULL")
-		}
-	}
-
-	if filters.IsLinked != nil {
-		if *filters.IsLinked {
-			query = query.Where("sli.linked_product_id IS NOT NULL OR sli.product_master_id IS NOT NULL")
-		} else {
-			query = query.Where("sli.linked_product_id IS NULL AND sli.product_master_id IS NULL")
-		}
-	}
-
-	if len(filters.StoreIDs) > 0 {
-		query = query.Where("sli.store_id IN (?)", bun.In(filters.StoreIDs))
-	}
-
-	if filters.CreatedAfter != nil {
-		query = query.Where("sli.created_at >= ?", *filters.CreatedAfter)
-	}
-
-	if filters.CreatedBefore != nil {
-		query = query.Where("sli.created_at <= ?", *filters.CreatedBefore)
-	}
-
-	// Apply pagination
-	if filters.Limit > 0 {
-		query = query.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		query = query.Offset(filters.Offset)
-	}
-
-	// Default ordering: unchecked first, then by sort order, then by creation date
-	query = query.Order("sli.is_checked ASC").
-		Order("sli.sort_order ASC").
-		Order("sli.created_at DESC")
-
-	var items []*models.ShoppingListItem
-	err := query.Scan(ctx, &items)
+	items, err := s.repo.GetByListID(ctx, listID, &filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shopping list items: %w", err)
 	}
@@ -148,53 +81,7 @@ func (s *shoppingListItemService) GetByListID(ctx context.Context, listID int64,
 
 // CountByListID counts shopping list items for a list with filters (for pagination totalCount)
 func (s *shoppingListItemService) CountByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) (int, error) {
-	query := s.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("sli.shopping_list_id = ?", listID)
-
-	// Apply the same filters as GetByListID (except pagination and relations)
-	if filters.IsChecked != nil {
-		query = query.Where("sli.is_checked = ?", *filters.IsChecked)
-	}
-
-	if len(filters.Categories) > 0 {
-		query = query.Where("sli.category IN (?)", bun.In(filters.Categories))
-	}
-
-	if len(filters.Tags) > 0 {
-		query = query.Where("sli.tags && ?", bun.In(filters.Tags))
-	}
-
-	if filters.HasPrice != nil {
-		if *filters.HasPrice {
-			query = query.Where("sli.estimated_price IS NOT NULL OR sli.actual_price IS NOT NULL")
-		} else {
-			query = query.Where("sli.estimated_price IS NULL AND sli.actual_price IS NULL")
-		}
-	}
-
-	if filters.IsLinked != nil {
-		if *filters.IsLinked {
-			query = query.Where("sli.linked_product_id IS NOT NULL OR sli.product_master_id IS NOT NULL")
-		} else {
-			query = query.Where("sli.linked_product_id IS NULL AND sli.product_master_id IS NULL")
-		}
-	}
-
-	if len(filters.StoreIDs) > 0 {
-		query = query.Where("sli.store_id IN (?)", bun.In(filters.StoreIDs))
-	}
-
-	if filters.CreatedAfter != nil {
-		query = query.Where("sli.created_at >= ?", *filters.CreatedAfter)
-	}
-
-	if filters.CreatedBefore != nil {
-		query = query.Where("sli.created_at <= ?", *filters.CreatedBefore)
-	}
-
-	// No pagination for count query
-	count, err := query.Count(ctx)
+	count, err := s.repo.CountByListID(ctx, listID, &filters)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count shopping list items: %w", err)
 	}
@@ -223,18 +110,14 @@ func (s *shoppingListItemService) Create(ctx context.Context, item *models.Shopp
 	}
 
 	// Auto-assign sort order (last in list)
-	maxSortOrder, err := s.getMaxSortOrder(ctx, item.ShoppingListID)
+	nextSortOrder, err := s.repo.GetNextSortOrder(ctx, item.ShoppingListID)
 	if err != nil {
 		return fmt.Errorf("failed to get max sort order: %w", err)
 	}
-	item.SortOrder = maxSortOrder + 1
+	item.SortOrder = nextSortOrder
 
 	// Insert the item
-	_, err = s.db.NewInsert().
-		Model(item).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.Create(ctx, item); err != nil {
 		return fmt.Errorf("failed to create shopping list item: %w", err)
 	}
 
@@ -253,12 +136,7 @@ func (s *shoppingListItemService) Update(ctx context.Context, item *models.Shopp
 	// Normalize description
 	item.NormalizedDescription = normalizeText(item.Description)
 
-	_, err := s.db.NewUpdate().
-		Model(item).
-		WherePK().
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to update shopping list item: %w", err)
 	}
 
@@ -277,12 +155,7 @@ func (s *shoppingListItemService) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("failed to get item for deletion: %w", err)
 	}
 
-	_, err = s.db.NewDelete().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete shopping list item: %w", err)
 	}
 
@@ -297,23 +170,12 @@ func (s *shoppingListItemService) Delete(ctx context.Context, id int64) error {
 // Item operations
 
 func (s *shoppingListItemService) CheckItem(ctx context.Context, itemID int64, userID uuid.UUID) error {
-	now := time.Now()
-
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("is_checked = ?", true).
-		Set("checked_at = ?", now).
-		Set("checked_by_user_id = ?", userID).
-		Set("updated_at = ?", now).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.BulkCheck(ctx, []int64{itemID}, userID); err != nil {
 		return fmt.Errorf("failed to check item: %w", err)
 	}
 
@@ -331,16 +193,7 @@ func (s *shoppingListItemService) UncheckItem(ctx context.Context, itemID int64)
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("is_checked = ?", false).
-		Set("checked_at = NULL").
-		Set("checked_by_user_id = NULL").
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.BulkUncheck(ctx, []int64{itemID}); err != nil {
 		return fmt.Errorf("failed to uncheck item: %w", err)
 	}
 
@@ -353,32 +206,14 @@ func (s *shoppingListItemService) UncheckItem(ctx context.Context, itemID int64)
 }
 
 func (s *shoppingListItemService) ReorderItems(ctx context.Context, listID int64, itemOrders []ItemOrder) error {
-	// Update sort order for each item
-	for _, order := range itemOrders {
-		_, err := s.db.NewUpdate().
-			Model((*models.ShoppingListItem)(nil)).
-			Set("sort_order = ?", order.SortOrder).
-			Set("updated_at = ?", time.Now()).
-			Where("id = ? AND shopping_list_id = ?", order.ItemID, listID).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to reorder item %d: %w", order.ItemID, err)
-		}
+	if err := s.repo.ReorderItems(ctx, listID, itemOrders); err != nil {
+		return fmt.Errorf("failed to reorder items: %w", err)
 	}
-
 	return nil
 }
 
 func (s *shoppingListItemService) UpdateSortOrder(ctx context.Context, itemID int64, newOrder int) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("sort_order = ?", newOrder).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.UpdateSortOrder(ctx, itemID, newOrder); err != nil {
 		return fmt.Errorf("failed to update sort order: %w", err)
 	}
 
@@ -386,14 +221,15 @@ func (s *shoppingListItemService) UpdateSortOrder(ctx context.Context, itemID in
 }
 
 func (s *shoppingListItemService) MoveToCategory(ctx context.Context, itemID int64, category string) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("category = ?", category).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
+	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
+		return fmt.Errorf("failed to get item: %w", err)
+	}
+
+	item.Category = &category
+	item.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to move item to category: %w", err)
 	}
 
@@ -419,14 +255,9 @@ func (s *shoppingListItemService) AddTags(ctx context.Context, itemID int64, tag
 		}
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("tags = ?", item.Tags).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
+	item.UpdatedAt = time.Now()
 
-	if err != nil {
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to add tags: %w", err)
 	}
 
@@ -453,14 +284,10 @@ func (s *shoppingListItemService) RemoveTags(ctx context.Context, itemID int64, 
 		}
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("tags = ?", newTags).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
+	item.Tags = newTags
+	item.UpdatedAt = time.Now()
 
-	if err != nil {
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to remove tags: %w", err)
 	}
 
@@ -472,24 +299,13 @@ func (s *shoppingListItemService) BulkCheck(ctx context.Context, itemIDs []int64
 		return nil
 	}
 
-	now := time.Now()
-
 	// Get first item to find shopping list ID
 	item, err := s.GetByID(ctx, itemIDs[0])
 	if err != nil {
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("is_checked = ?", true).
-		Set("checked_at = ?", now).
-		Set("checked_by_user_id = ?", userID).
-		Set("updated_at = ?", now).
-		Where("id IN (?)", bun.In(itemIDs)).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.BulkCheck(ctx, itemIDs, userID); err != nil {
 		return fmt.Errorf("failed to bulk check items: %w", err)
 	}
 
@@ -512,16 +328,7 @@ func (s *shoppingListItemService) BulkUncheck(ctx context.Context, itemIDs []int
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	_, err = s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("is_checked = ?", false).
-		Set("checked_at = NULL").
-		Set("checked_by_user_id = NULL").
-		Set("updated_at = ?", time.Now()).
-		Where("id IN (?)", bun.In(itemIDs)).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.BulkUncheck(ctx, itemIDs); err != nil {
 		return fmt.Errorf("failed to bulk uncheck items: %w", err)
 	}
 
@@ -544,12 +351,7 @@ func (s *shoppingListItemService) BulkDelete(ctx context.Context, itemIDs []int6
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	_, err = s.db.NewDelete().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("id IN (?)", bun.In(itemIDs)).
-		Exec(ctx)
-
-	if err != nil {
+	if _, err := s.repo.BulkDelete(ctx, itemIDs); err != nil {
 		return fmt.Errorf("failed to bulk delete items: %w", err)
 	}
 
@@ -568,14 +370,15 @@ func (s *shoppingListItemService) SuggestItems(ctx context.Context, query string
 }
 
 func (s *shoppingListItemService) MatchToProduct(ctx context.Context, itemID int64, productID int64) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("linked_product_id = ?", productID).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
+	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
+		return fmt.Errorf("failed to get item: %w", err)
+	}
+
+	item.LinkedProductID = &productID
+	item.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to match item to product: %w", err)
 	}
 
@@ -583,14 +386,15 @@ func (s *shoppingListItemService) MatchToProduct(ctx context.Context, itemID int
 }
 
 func (s *shoppingListItemService) MatchToProductMaster(ctx context.Context, itemID int64, productMasterID int64) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("product_master_id = ?", productMasterID).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
+	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
+		return fmt.Errorf("failed to get item: %w", err)
+	}
+
+	item.ProductMasterID = &productMasterID
+	item.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to match item to product master: %w", err)
 	}
 
@@ -604,22 +408,17 @@ func (s *shoppingListItemService) FindSimilarItems(ctx context.Context, itemID i
 // Price operations
 
 func (s *shoppingListItemService) UpdateEstimatedPrice(ctx context.Context, itemID int64, price float64, source string) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("estimated_price = ?", price).
-		Set("price_source = ?", source).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to update estimated price: %w", err)
-	}
-
-	// Get item to update list statistics
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to get item: %w", err)
+	}
+
+	item.EstimatedPrice = &price
+	item.PriceSource = &source
+	item.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, item); err != nil {
+		return fmt.Errorf("failed to update estimated price: %w", err)
 	}
 
 	// Update parent list statistics
@@ -631,14 +430,15 @@ func (s *shoppingListItemService) UpdateEstimatedPrice(ctx context.Context, item
 }
 
 func (s *shoppingListItemService) UpdateActualPrice(ctx context.Context, itemID int64, price float64) error {
-	_, err := s.db.NewUpdate().
-		Model((*models.ShoppingListItem)(nil)).
-		Set("actual_price = ?", price).
-		Set("updated_at = ?", time.Now()).
-		Where("id = ?", itemID).
-		Exec(ctx)
-
+	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
+		return fmt.Errorf("failed to get item: %w", err)
+	}
+
+	item.ActualPrice = &price
+	item.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, item); err != nil {
 		return fmt.Errorf("failed to update actual price: %w", err)
 	}
 
@@ -656,13 +456,13 @@ func (s *shoppingListItemService) SuggestCategory(ctx context.Context, descripti
 	lower := strings.ToLower(description)
 
 	categories := map[string][]string{
-		"Produce": {"apple", "banana", "carrot", "tomato", "lettuce", "potato", "onion"},
-		"Dairy": {"milk", "cheese", "yogurt", "butter", "cream"},
-		"Meat": {"chicken", "beef", "pork", "fish", "turkey"},
-		"Bakery": {"bread", "bagel", "croissant", "muffin", "cake"},
-		"Frozen": {"ice cream", "frozen", "pizza"},
+		"Produce":   {"apple", "banana", "carrot", "tomato", "lettuce", "potato", "onion"},
+		"Dairy":     {"milk", "cheese", "yogurt", "butter", "cream"},
+		"Meat":      {"chicken", "beef", "pork", "fish", "turkey"},
+		"Bakery":    {"bread", "bagel", "croissant", "muffin", "cake"},
+		"Frozen":    {"ice cream", "frozen", "pizza"},
 		"Beverages": {"juice", "soda", "water", "coffee", "tea"},
-		"Snacks": {"chips", "cookies", "crackers", "candy"},
+		"Snacks":    {"chips", "cookies", "crackers", "candy"},
 	}
 
 	for category, keywords := range categories {
@@ -700,60 +500,23 @@ func (s *shoppingListItemService) ValidateItemAccess(ctx context.Context, itemID
 }
 
 func (s *shoppingListItemService) CanUserAccessItem(ctx context.Context, itemID int64, userID uuid.UUID) (bool, error) {
-	// Check if item belongs to a list owned by the user
-	count, err := s.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Join("INNER JOIN shopping_lists AS sl ON sl.id = sli.shopping_list_id").
-		Where("sli.id = ? AND sl.user_id = ?", itemID, userID).
-		Count(ctx)
-
+	canAccess, err := s.repo.CanUserAccessItem(ctx, itemID, userID)
 	if err != nil {
 		return false, fmt.Errorf("failed to check item access: %w", err)
 	}
 
-	return count > 0, nil
+	return canAccess, nil
 }
 
 func (s *shoppingListItemService) CheckForDuplicates(ctx context.Context, listID int64, description string) (*models.ShoppingListItem, error) {
 	normalized := normalizeText(description)
 
-	var item models.ShoppingListItem
-	err := s.db.NewSelect().
-		Model(&item).
-		Where("sli.shopping_list_id = ? AND sli.normalized_description = ?", listID, normalized).
-		Limit(1).
-		Scan(ctx)
-
+	item, err := s.repo.FindDuplicateByDescription(ctx, listID, normalized, nil)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, nil // No duplicate found
-		}
 		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
 	}
 
-	return &item, nil
-}
-
-// Helper methods
-
-func (s *shoppingListItemService) getMaxSortOrder(ctx context.Context, listID int64) (int, error) {
-	var maxOrder int
-	err := s.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Column("sort_order").
-		Where("shopping_list_id = ?", listID).
-		Order("sort_order DESC").
-		Limit(1).
-		Scan(ctx, &maxOrder)
-
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return 0, nil // No items yet
-		}
-		return 0, fmt.Errorf("failed to get max sort order: %w", err)
-	}
-
-	return maxOrder, nil
+	return item, nil
 }
 
 // normalizeText normalizes text for searching and duplicate detection

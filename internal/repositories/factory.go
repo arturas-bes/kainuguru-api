@@ -1,6 +1,9 @@
 package repositories
 
 import (
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
+	"github.com/kainuguru/kainuguru-api/internal/store"
 	"github.com/uptrace/bun"
 )
 
@@ -16,4 +19,27 @@ func NewRepositoryFactory(db *bun.DB) *RepositoryFactory {
 	}
 }
 
-// Factory methods are defined in individual repository files to avoid duplication
+// StoreRepository returns a store repository implementation.
+func (f *RepositoryFactory) StoreRepository() store.Repository {
+	return NewStoreRepository(f.db)
+}
+
+// SessionRepository returns a session repository implementation.
+func (f *RepositoryFactory) SessionRepository() SessionRepository {
+	return NewSessionRepository(f.db)
+}
+
+// ShoppingListRepository returns a shopping list repository implementation.
+func (f *RepositoryFactory) ShoppingListRepository() shoppinglist.Repository {
+	return NewShoppingListRepository(f.db)
+}
+
+// ShoppingListItemRepository returns a shopping list item repository implementation.
+func (f *RepositoryFactory) ShoppingListItemRepository() shoppinglistitem.Repository {
+	return NewShoppingListItemRepository(f.db)
+}
+
+// UserRepository returns a user repository implementation.
+func (f *RepositoryFactory) UserRepository() UserRepository {
+	return NewUserRepository(f.db)
+}

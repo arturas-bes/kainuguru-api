@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -43,44 +43,12 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("authentication required")
 	}
 
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
+
 	// Convert GraphQL filters to service filters
-	serviceFilters := services.ShoppingListFilters{
-		Limit:  100, // Default limit
-		Offset: 0,
-	}
-
-	if first != nil {
-		serviceFilters.Limit = *first
-	}
-
-	if filters != nil {
-		serviceFilters.IsDefault = filters.IsDefault
-		serviceFilters.IsArchived = filters.IsArchived
-		serviceFilters.IsPublic = filters.IsPublic
-		serviceFilters.HasItems = filters.HasItems
-
-		// Parse date filters
-		if filters.CreatedAfter != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedAfter); err == nil {
-				serviceFilters.CreatedAfter = &t
-			}
-		}
-		if filters.CreatedBefore != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.CreatedBefore); err == nil {
-				serviceFilters.CreatedBefore = &t
-			}
-		}
-		if filters.UpdatedAfter != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.UpdatedAfter); err == nil {
-				serviceFilters.UpdatedAfter = &t
-			}
-		}
-		if filters.UpdatedBefore != nil {
-			if t, err := time.Parse(time.RFC3339, *filters.UpdatedBefore); err == nil {
-				serviceFilters.UpdatedBefore = &t
-			}
-		}
-	}
+	serviceFilters := convertShoppingListFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get shopping lists for user
 	lists, err := r.shoppingListService.GetByUserID(ctx, userID, serviceFilters)
@@ -88,38 +56,19 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("failed to get shopping lists: %w", err)
 	}
 
-	// Convert to connection format
-	edges := make([]*model.ShoppingListEdge, len(lists))
-	for i, list := range lists {
-		edges[i] = &model.ShoppingListEdge{
-			Node:   list,
-			Cursor: fmt.Sprintf("%d", list.ID),
-		}
-	}
-
-	pageInfo := &model.PageInfo{
-		HasNextPage:     false, // TODO: Implement proper pagination
-		HasPreviousPage: false,
-	}
-
-	if len(edges) > 0 {
-		pageInfo.StartCursor = &edges[0].Cursor
-		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
-	}
-
 	// Get total count for pagination
 	totalCount, err := r.shoppingListService.CountByUserID(ctx, userID, serviceFilters)
 	if err != nil {
 		// Log error but don't fail the request
 		fmt.Printf("Warning: failed to get shopping lists count: %v\n", err)
-		totalCount = len(edges) // Fallback to current page count
+		if len(lists) > limit {
+			totalCount = limit
+		} else {
+			totalCount = len(lists)
+		}
 	}
 
-	return &model.ShoppingListConnection{
-		Edges:      edges,
-		PageInfo:   pageInfo,
-		TotalCount: totalCount,
-	}, nil
+	return buildShoppingListConnection(lists, limit, offset, totalCount), nil
 }
 
 // MyDefaultShoppingList returns the authenticated user's default shopping list
@@ -286,13 +235,11 @@ func (r *mutationResolver) SetDefaultShoppingList(ctx context.Context, id int) (
 
 // User resolves the user field on ShoppingList
 func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingList) (*models.User, error) {
-	// Fetch user directly from auth service
-	// TODO: Implement UserLoader in Phase 2.3 for N+1 query prevention
-	user, err := r.authService.GetUserByID(ctx, obj.UserID)
+	loaders := dataloaders.FromContext(ctx)
+	user, err := loaders.UserLoader.Load(ctx, obj.UserID.String())()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load user: %w", err)
 	}
-
 	return user, nil
 }
 
@@ -300,7 +247,6 @@ func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingLis
 
 // Categories resolves the categories field on ShoppingList
 func (r *shoppingListResolver) Categories(ctx context.Context, obj *models.ShoppingList) ([]*models.ShoppingListCategory, error) {
-	// TODO: Implement in Phase 2.3 when shopping list categories service is available
 	return []*models.ShoppingListCategory{}, nil
 }
 

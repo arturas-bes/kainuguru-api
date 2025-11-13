@@ -49,6 +49,10 @@ type AuthService interface {
 	RecordLoginAttempt(ctx context.Context, email string, success bool, metadata *SessionMetadata) error
 	GetLoginAttempts(ctx context.Context, email string, since time.Time) (int, error)
 	IsRateLimited(ctx context.Context, email string) (bool, time.Time, error)
+
+	// Expose underlying services for middleware integration.
+	JWT() JWTService
+	Sessions() SessionService
 }
 
 // PasswordService defines the interface for password operations

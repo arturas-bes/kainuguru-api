@@ -19,83 +19,76 @@ const (
 	ClaimsContextKey  AuthContextKey = "auth_claims"
 )
 
-// AuthMiddleware creates JWT authentication middleware
-func AuthMiddleware(jwtService auth.JWTService, sessionService auth.SessionService) fiber.Handler {
+// AuthMiddlewareConfig controls how authentication middleware behaves.
+type AuthMiddlewareConfig struct {
+	Required       bool
+	JWTService     auth.JWTService
+	SessionService auth.SessionService
+}
+
+// NewAuthMiddleware creates JWT authentication middleware with the provided configuration.
+func NewAuthMiddleware(cfg AuthMiddlewareConfig) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Extract token from Authorization header
 		token := extractToken(c)
 		if token == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error":   "Unauthorized",
-				"message": "Missing or invalid authorization header",
-			})
+			if cfg.Required {
+				return unauthorizedResponse(c, "Missing or invalid authorization header", "")
+			}
+			return c.Next()
 		}
 
-		// Validate token
-		claims, err := jwtService.ValidateAccessToken(token)
+		claims, err := cfg.JWTService.ValidateAccessToken(token)
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error":   "Unauthorized",
-				"message": "Invalid or expired token",
-				"details": err.Error(),
-			})
+			if cfg.Required {
+				return unauthorizedResponse(c, "Invalid or expired token", err.Error())
+			}
+			return c.Next()
 		}
 
-		// Validate session
-		session, err := sessionService.ValidateSession(c.Context(), claims.SessionID)
+		session, err := cfg.SessionService.ValidateSession(c.Context(), claims.SessionID)
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error":   "Unauthorized",
-				"message": "Invalid or expired session",
-				"details": err.Error(),
-			})
+			if cfg.Required {
+				return unauthorizedResponse(c, "Invalid or expired session", err.Error())
+			}
+			return c.Next()
 		}
 
-		// Store authentication data in context
 		ctx := context.WithValue(c.Context(), UserContextKey, claims.UserID)
 		ctx = context.WithValue(ctx, SessionContextKey, session.ID)
 		ctx = context.WithValue(ctx, ClaimsContextKey, claims)
-
 		c.SetUserContext(ctx)
 
 		return c.Next()
 	}
 }
 
-// OptionalAuthMiddleware creates optional JWT authentication middleware
-// This middleware attempts to authenticate but doesn't fail if no token is provided
-func OptionalAuthMiddleware(jwtService auth.JWTService, sessionService auth.SessionService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		// Extract token from Authorization header
-		token := extractToken(c)
-		if token == "" {
-			// No token provided, continue without authentication
-			return c.Next()
-		}
-
-		// Validate token
-		claims, err := jwtService.ValidateAccessToken(token)
-		if err != nil {
-			// Invalid token, continue without authentication
-			return c.Next()
-		}
-
-		// Validate session
-		session, err := sessionService.ValidateSession(c.Context(), claims.SessionID)
-		if err != nil {
-			// Invalid session, continue without authentication
-			return c.Next()
-		}
-
-		// Store authentication data in context
-		ctx := context.WithValue(c.Context(), UserContextKey, claims.UserID)
-		ctx = context.WithValue(ctx, SessionContextKey, session.ID)
-		ctx = context.WithValue(ctx, ClaimsContextKey, claims)
-
-		c.SetUserContext(ctx)
-
-		return c.Next()
+func unauthorizedResponse(c *fiber.Ctx, message, details string) error {
+	payload := fiber.Map{
+		"error":   "Unauthorized",
+		"message": message,
 	}
+	if details != "" {
+		payload["details"] = details
+	}
+	return c.Status(fiber.StatusUnauthorized).JSON(payload)
+}
+
+// AuthMiddleware creates JWT authentication middleware (required).
+func AuthMiddleware(jwtService auth.JWTService, sessionService auth.SessionService) fiber.Handler {
+	return NewAuthMiddleware(AuthMiddlewareConfig{
+		Required:       true,
+		JWTService:     jwtService,
+		SessionService: sessionService,
+	})
+}
+
+// OptionalAuthMiddleware attempts to authenticate but doesn't fail if no/invalid token is provided.
+func OptionalAuthMiddleware(jwtService auth.JWTService, sessionService auth.SessionService) fiber.Handler {
+	return NewAuthMiddleware(AuthMiddlewareConfig{
+		Required:       false,
+		JWTService:     jwtService,
+		SessionService: sessionService,
+	})
 }
 
 // RequireVerifiedEmailMiddleware ensures the user has verified their email

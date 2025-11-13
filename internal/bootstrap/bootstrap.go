@@ -1,0 +1,18 @@
+package bootstrap
+
+import (
+	"github.com/kainuguru/kainuguru-api/internal/repositories"
+	"github.com/kainuguru/kainuguru-api/internal/services"
+)
+
+func init() {
+	services.RegisterStoreRepositoryFactory(repositories.NewStoreRepository)
+	services.RegisterFlyerRepositoryFactory(repositories.NewFlyerRepository)
+	services.RegisterFlyerPageRepositoryFactory(repositories.NewFlyerPageRepository)
+	services.RegisterProductRepositoryFactory(repositories.NewProductRepository)
+	services.RegisterProductMasterRepositoryFactory(repositories.NewProductMasterRepository)
+	services.RegisterShoppingListRepositoryFactory(repositories.NewShoppingListRepository)
+	services.RegisterShoppingListItemRepositoryFactory(repositories.NewShoppingListItemRepository)
+	services.RegisterExtractionJobRepositoryFactory(repositories.NewExtractionJobRepository)
+	services.RegisterPriceHistoryRepositoryFactory(repositories.NewPriceHistoryRepository)
+}

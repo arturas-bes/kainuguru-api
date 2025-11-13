@@ -4,7 +4,9 @@ echo "Testing PDF processing in Docker container..."
 echo "============================================="
 
 # Create a simple test
-docker run --rm -v $(pwd):/host-app -w /host-app kainuguru-api:test sh -c '
+PDF_TEST_IMAGE=${PDF_TEST_IMAGE:-kainuguru-api-api}
+
+docker run --rm -v "$(pwd)":/host-app -w /host-app "$PDF_TEST_IMAGE" sh -c '
 echo "Testing pdftoppm availability..."
 pdftoppm -h | head -1
 

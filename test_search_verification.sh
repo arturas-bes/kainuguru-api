@@ -18,10 +18,15 @@ test_search() {
         -H "Content-Type: application/json" \
         -d "{\"query\":\"query { searchProducts(input: {q: \\\"$query\\\", first: 10}) { products { product { id name brand } searchScore } totalCount } }\"}")
     
-    total=$(echo "$result" | jq -r '.data.searchProducts.totalCount')
-    
-    if [ "$total" = "null" ] || [ -z "$total" ]; then
-        echo "❌ Error: $(echo "$result" | jq -r '.errors[0].message')"
+    error_msg=$(echo "$result" | jq -r '.errors[0].message // empty')
+    total=$(echo "$result" | jq -r '.data.searchProducts.totalCount // empty')
+
+    if [ -n "$error_msg" ]; then
+        echo "❌ Error: $error_msg"
+        exit 1
+    elif [ -z "$total" ]; then
+        echo "❌ Unexpected response: $result"
+        exit 1
     elif [ "$total" -gt 0 ]; then
         echo "✅ Found $total product(s)"
         echo "$result" | jq -r '.data.searchProducts.products[] | "  - \(.product.name) (ID: \(.product.id), Brand: \(.product.brand // "N/A"))"'

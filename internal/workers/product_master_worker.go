@@ -6,21 +6,30 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/productmaster"
+	"github.com/kainuguru/kainuguru-api/internal/repositories"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/uptrace/bun"
 )
 
 type ProductMasterWorker struct {
-	db            *bun.DB
+	repo          productmaster.Repository
 	masterService services.ProductMasterService
 	logger        *slog.Logger
 	batchSize     int
 }
 
 func NewProductMasterWorker(db *bun.DB, masterService services.ProductMasterService) *ProductMasterWorker {
+	return NewProductMasterWorkerWithRepository(repositories.NewProductMasterRepository(db), masterService)
+}
+
+// NewProductMasterWorkerWithRepository allows injecting a custom repository implementation.
+func NewProductMasterWorkerWithRepository(repo productmaster.Repository, masterService services.ProductMasterService) *ProductMasterWorker {
+	if repo == nil {
+		panic("product master repository cannot be nil")
+	}
 	return &ProductMasterWorker{
-		db:            db,
+		repo:          repo,
 		masterService: masterService,
 		logger:        slog.Default().With("worker", "product_master"),
 		batchSize:     100,
@@ -31,15 +40,7 @@ func (w *ProductMasterWorker) ProcessUnmatchedProducts(ctx context.Context) erro
 	w.logger.Info("starting product master matching job")
 	startTime := time.Now()
 
-	var products []*models.Product
-	err := w.db.NewSelect().
-		Model(&products).
-		Where("p.product_master_id IS NULL").
-		Where("p.requires_review = false").
-		Order("p.created_at ASC").
-		Limit(w.batchSize).
-		Scan(ctx)
-
+	products, err := w.repo.GetUnmatchedProducts(ctx, w.batchSize)
 	if err != nil {
 		return fmt.Errorf("failed to fetch unmatched products: %w", err)
 	}
@@ -95,12 +96,7 @@ func (w *ProductMasterWorker) ProcessUnmatchedProducts(ctx context.Context) erro
 				)
 			} else if match.MatchScore >= 0.65 {
 				product.RequiresReview = true
-				_, err = w.db.NewUpdate().
-					Model(product).
-					Column("requires_review").
-					WherePK().
-					Exec(ctx)
-				if err != nil {
+				if err := w.repo.MarkProductForReview(ctx, product.ID); err != nil {
 					w.logger.Error("failed to mark product for review",
 						slog.Int("product_id", product.ID),
 						slog.String("error", err.Error()),
@@ -165,20 +161,7 @@ func (w *ProductMasterWorker) ProcessUnmatchedProducts(ctx context.Context) erro
 func (w *ProductMasterWorker) UpdateMasterConfidence(ctx context.Context) error {
 	w.logger.Info("starting master confidence update job")
 
-	type masterCount struct {
-		MasterID     int64 `bun:"master_id"`
-		ProductCount int   `bun:"product_count"`
-	}
-
-	var counts []masterCount
-	err := w.db.NewSelect().
-		Model((*models.Product)(nil)).
-		Column("product_master_id").
-		ColumnExpr("COUNT(*) as product_count").
-		Where("product_master_id IS NOT NULL").
-		Group("product_master_id").
-		Scan(ctx, &counts)
-
+	counts, err := w.repo.GetMasterProductCounts(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch product counts: %w", err)
 	}
@@ -195,15 +178,7 @@ func (w *ProductMasterWorker) UpdateMasterConfidence(ctx context.Context) error 
 			newConfidence = 0.6
 		}
 
-		result, err := w.db.NewUpdate().
-			Model((*models.ProductMaster)(nil)).
-			Set("confidence_score = ?", newConfidence).
-			Set("match_count = ?", count.ProductCount).
-			Set("updated_at = ?", time.Now()).
-			Where("id = ?", count.MasterID).
-			Where("confidence_score != ?", newConfidence).
-			Exec(ctx)
-
+		rows, err := w.repo.UpdateMasterStatistics(ctx, count.MasterID, newConfidence, count.ProductCount, time.Now())
 		if err != nil {
 			w.logger.Error("failed to update master",
 				slog.Int64("master_id", count.MasterID),
@@ -212,7 +187,6 @@ func (w *ProductMasterWorker) UpdateMasterConfidence(ctx context.Context) error 
 			continue
 		}
 
-		rows, _ := result.RowsAffected()
 		if rows > 0 {
 			updated++
 		}

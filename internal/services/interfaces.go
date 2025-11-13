@@ -5,7 +5,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kainuguru/kainuguru-api/internal/extractionjob"
+	"github.com/kainuguru/kainuguru-api/internal/flyer"
+	"github.com/kainuguru/kainuguru-api/internal/flyerpage"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/pricehistory"
+	"github.com/kainuguru/kainuguru-api/internal/product"
+	"github.com/kainuguru/kainuguru-api/internal/productmaster"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
+	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
+	"github.com/kainuguru/kainuguru-api/internal/store"
 )
 
 // StoreService defines the interface for store-related operations
@@ -15,6 +24,7 @@ type StoreService interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Store, error)
 	GetByCode(ctx context.Context, code string) (*models.Store, error)
 	GetAll(ctx context.Context, filters StoreFilters) ([]*models.Store, error)
+	Count(ctx context.Context, filters StoreFilters) (int, error)
 	Create(ctx context.Context, store *models.Store) error
 	Update(ctx context.Context, store *models.Store) error
 	Delete(ctx context.Context, id int) error
@@ -36,6 +46,7 @@ type FlyerService interface {
 	GetByID(ctx context.Context, id int) (*models.Flyer, error)
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error)
 	GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error)
+	Count(ctx context.Context, filters FlyerFilters) (int, error)
 	Create(ctx context.Context, flyer *models.Flyer) error
 	Update(ctx context.Context, flyer *models.Flyer) error
 	Delete(ctx context.Context, id int) error
@@ -70,6 +81,7 @@ type FlyerPageService interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error)
 	GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error)
 	GetAll(ctx context.Context, filters FlyerPageFilters) ([]*models.FlyerPage, error)
+	Count(ctx context.Context, filters FlyerPageFilters) (int, error)
 	Create(ctx context.Context, page *models.FlyerPage) error
 	CreateBatch(ctx context.Context, pages []*models.FlyerPage) error
 	Update(ctx context.Context, page *models.FlyerPage) error
@@ -97,6 +109,7 @@ type ProductService interface {
 	GetByID(ctx context.Context, id int) (*models.Product, error)
 	GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error)
 	GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error)
+	Count(ctx context.Context, filters ProductFilters) (int, error)
 	Create(ctx context.Context, product *models.Product) error
 	CreateBatch(ctx context.Context, products []*models.Product) error
 	Update(ctx context.Context, product *models.Product) error
@@ -218,94 +231,17 @@ type ExtractionJobService interface {
 }
 
 // Filter structures for service operations
-type StoreFilters struct {
-	IsActive  *bool
-	HasFlyers *bool
-	Codes     []string
-	Limit     int
-	Offset    int
-	OrderBy   string
-	OrderDir  string
-}
+type StoreFilters = store.Filters
 
-type FlyerFilters struct {
-	StoreIDs   []int
-	StoreCode  *string
-	StoreCodes []string
-	Status     []string
-	IsArchived *bool
-	ValidFrom  *time.Time
-	ValidTo    *time.Time
-	ValidOn    *string
-	IsCurrent  *bool
-	IsValid    *bool
-	Limit      int
-	Offset     int
-	OrderBy    string
-	OrderDir   string
-}
+type FlyerFilters = flyer.Filters
 
-type FlyerPageFilters struct {
-	FlyerIDs    []int
-	Status      []string
-	HasImage    *bool
-	HasProducts *bool
-	PageNumbers []int
-	Limit       int
-	Offset      int
-	OrderBy     string
-	OrderDir    string
-}
+type FlyerPageFilters = flyerpage.Filters
 
-type ProductFilters struct {
-	StoreIDs         []int
-	FlyerIDs         []int
-	FlyerPageIDs     []int
-	ProductMasterIDs []int
-	Categories       []string
-	Brands           []string
-	IsOnSale         *bool
-	IsAvailable      *bool
-	RequiresReview   *bool
-	MinPrice         *float64
-	MaxPrice         *float64
-	Currency         string
-	ValidFrom        *time.Time
-	ValidTo          *time.Time
-	Limit            int
-	Offset           int
-	OrderBy          string
-	OrderDir         string
-}
+type ProductFilters = product.Filters
 
-type ProductMasterFilters struct {
-	Status        []string
-	IsVerified    *bool
-	IsActive      *bool
-	Categories    []string
-	Brands        []string
-	MinMatches    *int
-	MinConfidence *float64
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ProductMasterFilters = productmaster.Filters
 
-type ExtractionJobFilters struct {
-	JobTypes        []string
-	Status          []string
-	WorkerIDs       []string
-	Priority        *int
-	ScheduledBefore *time.Time
-	ScheduledAfter  *time.Time
-	CreatedBefore   *time.Time
-	CreatedAfter    *time.Time
-	Limit           int
-	Offset          int
-	OrderBy         string
-	OrderDir        string
-}
+type ExtractionJobFilters = extractionjob.Filters
 
 // Match result with score
 type ProductMasterMatch struct {
@@ -355,6 +291,7 @@ type ShoppingListService interface {
 	GenerateShareCode(ctx context.Context, listID int64) (string, error)
 	DisableSharing(ctx context.Context, listID int64) error
 	GetSharedList(ctx context.Context, shareCode string) (*models.ShoppingList, error)
+	GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
 
 	// List statistics
 	UpdateListStatistics(ctx context.Context, listID int64) error
@@ -471,35 +408,9 @@ type CategoryService interface {
 }
 
 // Filter structures for shopping list operations
-type ShoppingListFilters struct {
-	IsDefault     *bool
-	IsArchived    *bool
-	IsPublic      *bool
-	HasItems      *bool
-	CreatedAfter  *time.Time
-	CreatedBefore *time.Time
-	UpdatedAfter  *time.Time
-	UpdatedBefore *time.Time
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ShoppingListFilters = shoppinglist.Filters
 
-type ShoppingListItemFilters struct {
-	IsChecked     *bool
-	Categories    []string
-	Tags          []string
-	HasPrice      *bool
-	IsLinked      *bool
-	StoreIDs      []int
-	CreatedAfter  *time.Time
-	CreatedBefore *time.Time
-	Limit         int
-	Offset        int
-	OrderBy       string
-	OrderDir      string
-}
+type ShoppingListItemFilters = shoppinglistitem.Filters
 
 type ProductMatchFilters struct {
 	StoreIDs      []int
@@ -542,10 +453,7 @@ type TagFilters struct {
 }
 
 // Helper structures
-type ItemOrder struct {
-	ItemID    int64 `json:"item_id"`
-	SortOrder int   `json:"sort_order"`
-}
+type ItemOrder = shoppinglistitem.ItemOrder
 
 type ItemSuggestion struct {
 	Description    string                `json:"description"`
@@ -645,17 +553,4 @@ type PriceHistoryService interface {
 }
 
 // PriceHistoryFilters defines filters for price history queries
-type PriceHistoryFilters struct {
-	IsOnSale    *bool
-	IsAvailable *bool
-	IsActive    *bool
-	MinPrice    *float64
-	MaxPrice    *float64
-	Source      *string
-	DateFrom    *time.Time
-	DateTo      *time.Time
-	Limit       int
-	Offset      int
-	OrderBy     string
-	OrderDir    string
-}
+type PriceHistoryFilters = pricehistory.Filters

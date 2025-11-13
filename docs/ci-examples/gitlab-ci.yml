@@ -1,0 +1,90 @@
+# Example GitLab CI configuration for Kainuguru API
+# Save this file as: .gitlab-ci.yml
+
+stages:
+  - lint
+  - test
+  - build
+
+variables:
+  POSTGRES_DB: kainuguru_test
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: test_pass
+  DATABASE_URL: "postgres://test_user:test_pass@postgres:5432/kainuguru_test?sslmode=disable"
+  REDIS_URL: "redis://redis:6379"
+  GO_VERSION: "1.21"
+
+.go-cache:
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .go/pkg/mod/
+
+lint:
+  stage: lint
+  image: golang:${GO_VERSION}
+  extends: .go-cache
+  script:
+    - go fmt ./...
+    - go vet ./...
+    - |
+      if [ -n "$(gofmt -l .)" ]; then
+        echo "Go code is not formatted:"
+        gofmt -d .
+        exit 1
+      fi
+
+test:unit:
+  stage: test
+  image: golang:${GO_VERSION}
+  extends: .go-cache
+  services:
+    - postgres:15-alpine
+    - redis:7-alpine
+  before_script:
+    - go mod download
+  script:
+    - go test -v -race -coverprofile=coverage.out ./...
+    - make test-snapshots
+  coverage: '/coverage: \d+.\d+% of statements/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+    paths:
+      - coverage.out
+    expire_in: 1 week
+
+test:snapshots:
+  stage: test
+  image: golang:${GO_VERSION}
+  extends: .go-cache
+  before_script:
+    - go mod download
+  script:
+    - make test-snapshots
+    - |
+      if ! git diff --exit-code internal/graphql/resolvers/testdata/; then
+        echo "❌ Snapshot files have changed!"
+        echo "Run 'make update-snapshots' and commit the changes."
+        exit 1
+      fi
+  only:
+    - merge_requests
+    - main
+    - develop
+
+build:
+  stage: build
+  image: golang:${GO_VERSION}
+  extends: .go-cache
+  before_script:
+    - go mod download
+  script:
+    - make build
+    - ls -lh bin/
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1 day

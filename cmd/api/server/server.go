@@ -58,7 +58,7 @@ func New(cfg *config.Config) (*Server, error) {
 	setupMiddleware(app, cfg, redis)
 
 	// Setup routes
-	setupRoutes(app, db, redis)
+	setupRoutes(app, db, redis, cfg)
 
 	return &Server{
 		app:    app,
@@ -123,12 +123,13 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, redis *cache.RedisClien
 	app.Use(middleware.Logger())
 }
 
-func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
+func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient, cfg *config.Config) {
 	// Health check endpoint
 	app.Get("/health", handlers.Health(db, redis))
 
 	// Initialize service factory
-	serviceFactory := services.NewServiceFactory(db.DB)
+	serviceFactory := services.NewServiceFactoryWithConfig(db.DB, cfg)
+	authService := serviceFactory.AuthService()
 
 	// Configure GraphQL handler with all services
 	graphqlConfig := handlers.GraphQLConfig{
@@ -139,7 +140,7 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 		ProductMasterService:    serviceFactory.ProductMasterService(),
 		ExtractionJobService:    serviceFactory.ExtractionJobService(),
 		SearchService:           serviceFactory.SearchService(),
-		AuthService:             serviceFactory.AuthService(),
+		AuthService:             authService,
 		ShoppingListService:     serviceFactory.ShoppingListService(),
 		ShoppingListItemService: serviceFactory.ShoppingListItemService(),
 		PriceHistoryService:     serviceFactory.PriceHistoryService(),
@@ -147,7 +148,14 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient) {
 	}
 
 	// GraphQL endpoint with full service integration
-	app.All("/graphql", handlers.GraphQLHandler(graphqlConfig))
+	app.All("/graphql",
+		middleware.NewAuthMiddleware(middleware.AuthMiddlewareConfig{
+			Required:       false,
+			JWTService:     authService.JWT(),
+			SessionService: authService.Sessions(),
+		}),
+		handlers.GraphQLHandler(graphqlConfig),
+	)
 
 	// GraphQL playground (development only)
 	app.Get("/playground", handlers.PlaygroundHandler())

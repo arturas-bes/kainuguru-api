@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/kainuguru/kainuguru-api/internal/services/scraper"
 )
 

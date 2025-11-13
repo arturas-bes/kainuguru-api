@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -199,14 +200,27 @@ func (r *RedisClient) DeleteSession(ctx context.Context, sessionID string) error
 
 // Cache management with JSON serialization
 func (r *RedisClient) SetJSON(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-	// TODO: Implement JSON serialization once needed
-	// For now, assume string values or implement later
-	return r.Set(ctx, key, value, expiration)
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal value for key %s: %w", key, err)
+	}
+
+	return r.client.Set(ctx, key, bytes, expiration).Err()
 }
 
 func (r *RedisClient) GetJSON(ctx context.Context, key string, dest interface{}) error {
-	// TODO: Implement JSON deserialization once needed
-	// For now, return basic string value
-	_, err := r.Get(ctx, key)
+	if dest == nil {
+		return fmt.Errorf("destination must be non-nil for key %s", key)
+	}
+
+	bytes, err := r.client.Get(ctx, key).Bytes()
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(bytes, dest); err != nil {
+		return fmt.Errorf("failed to unmarshal cached value for key %s: %w", key, err)
+	}
+
 	return err
 }

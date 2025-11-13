@@ -4,54 +4,57 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
+
+	"github.com/kainuguru/kainuguru-api/pkg/normalize"
 )
 
 // TestStore represents a test store fixture
 type TestStore struct {
 	bun.BaseModel `bun:"table:stores"`
 
-	ID          int       `json:"id" bun:"id,pk,autoincrement"`
-	Code        string    `json:"code" bun:"code,notnull,unique"`
-	Name        string    `json:"name" bun:"name,notnull"`
-	LogoURL     string    `json:"logo_url" bun:"logo_url"`
-	WebsiteURL  string    `json:"website_url" bun:"website_url"`
-	IsActive    bool      `json:"is_active" bun:"is_active,default:true"`
-	CreatedAt   time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
-	UpdatedAt   time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
+	ID         int       `json:"id" bun:"id,pk,autoincrement"`
+	Code       string    `json:"code" bun:"code,notnull,unique"`
+	Name       string    `json:"name" bun:"name,notnull"`
+	LogoURL    string    `json:"logo_url" bun:"logo_url"`
+	WebsiteURL string    `json:"website_url" bun:"website_url"`
+	IsActive   bool      `json:"is_active" bun:"is_active,default:true"`
+	CreatedAt  time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
+	UpdatedAt  time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
 }
 
 // TestFlyer represents a test flyer fixture
 type TestFlyer struct {
 	bun.BaseModel `bun:"table:flyers"`
 
-	ID          int       `json:"id" bun:"id,pk,autoincrement"`
-	StoreID     int       `json:"store_id" bun:"store_id,notnull"`
-	Title       string    `json:"title" bun:"title,notnull"`
-	ValidFrom   time.Time `json:"valid_from" bun:"valid_from,notnull"`
-	ValidTo     time.Time `json:"valid_to" bun:"valid_to,notnull"`
-	IsArchived  bool      `json:"is_archived" bun:"is_archived,default:false"`
-	CreatedAt   time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
+	ID         int       `json:"id" bun:"id,pk,autoincrement"`
+	StoreID    int       `json:"store_id" bun:"store_id,notnull"`
+	Title      string    `json:"title" bun:"title,notnull"`
+	ValidFrom  time.Time `json:"valid_from" bun:"valid_from,notnull"`
+	ValidTo    time.Time `json:"valid_to" bun:"valid_to,notnull"`
+	IsArchived bool      `json:"is_archived" bun:"is_archived,default:false"`
+	CreatedAt  time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
 }
 
 // TestUser represents a test user fixture
 type TestUser struct {
 	bun.BaseModel `bun:"table:users"`
 
-	ID                string    `json:"id" bun:"id,pk,type:uuid,default:gen_random_uuid()"`
-	Email             string    `json:"email" bun:"email,unique,notnull"`
-	PasswordHash      string    `json:"password_hash" bun:"password_hash,notnull"`
-	FirstName         string    `json:"first_name" bun:"first_name,notnull"`
-	LastName          string    `json:"last_name" bun:"last_name,notnull"`
-	IsEmailVerified   bool      `json:"is_email_verified" bun:"is_email_verified,default:false"`
-	EmailVerifiedAt   time.Time `json:"email_verified_at" bun:"email_verified_at,nullzero"`
-	LastLoginAt       time.Time `json:"last_login_at" bun:"last_login_at,nullzero"`
-	CreatedAt         time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
-	UpdatedAt         time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
+	ID              string    `json:"id" bun:"id,pk,type:uuid,default:gen_random_uuid()"`
+	Email           string    `json:"email" bun:"email,unique,notnull"`
+	PasswordHash    string    `json:"password_hash" bun:"password_hash,notnull"`
+	FirstName       string    `json:"first_name" bun:"first_name,notnull"`
+	LastName        string    `json:"last_name" bun:"last_name,notnull"`
+	IsEmailVerified bool      `json:"is_email_verified" bun:"is_email_verified,default:false"`
+	EmailVerifiedAt time.Time `json:"email_verified_at" bun:"email_verified_at,nullzero"`
+	LastLoginAt     time.Time `json:"last_login_at" bun:"last_login_at,nullzero"`
+	CreatedAt       time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
+	UpdatedAt       time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
 }
 
 // TestProduct represents a test product fixture
@@ -268,6 +271,8 @@ func (fm *FixtureManager) LoadProducts(ctx context.Context) error {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	weekAhead := today.AddDate(0, 0, 7)
 
+	normalizer := normalize.NewLithuanianNormalizer()
+
 	// Create products using raw SQL to handle the partitioned table properly
 	for i, p := range fm.products {
 		flyerID := ((i / 5) % len(fm.flyers)) + 1 // Distribute across flyers
@@ -286,7 +291,7 @@ func (fm *FixtureManager) LoadProducts(ctx context.Context) error {
 				true, false, ?
 			) ON CONFLICT DO NOTHING
 		`
-		normalizedName := p.Name // TODO: Add actual normalization
+		normalizedName := fixtureNormalizedProductName(normalizer, p.Name)
 		_, err := fm.db.ExecContext(ctx, query,
 			p.Name, normalizedName, p.Description,
 			p.Price, p.StoreID, flyerID,
@@ -299,6 +304,18 @@ func (fm *FixtureManager) LoadProducts(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func fixtureNormalizedProductName(normalizer *normalize.LithuanianNormalizer, name string) string {
+	if normalizer == nil {
+		normalizer = normalize.NewLithuanianNormalizer()
+	}
+
+	normalized := strings.TrimSpace(normalizer.NormalizeProductName(name))
+	if normalized == "" {
+		return strings.TrimSpace(name)
+	}
+	return normalized
 }
 
 // LoadProductMasters loads test product master fixtures

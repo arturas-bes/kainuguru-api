@@ -241,6 +241,16 @@ func (a *authServiceImpl) Login(ctx context.Context, email, password string, met
 	}, nil
 }
 
+// JWT returns the JWT service used by the auth service.
+func (a *authServiceImpl) JWT() JWTService {
+	return a.jwtService
+}
+
+// Sessions returns the session service used by the auth service.
+func (a *authServiceImpl) Sessions() SessionService {
+	return a.sessionService
+}
+
 // Logout implements user logout
 func (a *authServiceImpl) Logout(ctx context.Context, userID uuid.UUID, sessionID *uuid.UUID) error {
 	if sessionID != nil {

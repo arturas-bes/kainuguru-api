@@ -44,15 +44,12 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 	}
 
 	// Set limit and offset for pagination
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-	}
-	serviceFilters.Limit = limit + 1 // Fetch one extra to determine if there are more
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
-	// TODO: Implement cursor-based pagination with 'after' parameter
-	// For now, we'll use simple offset-based pagination
-	serviceFilters.Offset = 0
+	serviceFilters.Limit = pager.LimitWithExtra() // Fetch one extra to determine if there are more
+	serviceFilters.Offset = offset
 
 	// Get price history from service
 	priceHistory, err := r.priceHistoryService.GetByProductMasterID(ctx, productMasterID, storeID, serviceFilters)
@@ -60,38 +57,7 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 		return nil, fmt.Errorf("failed to get price history: %w", err)
 	}
 
-	// Build connection response
-	hasNextPage := false
-	if len(priceHistory) > limit {
-		hasNextPage = true
-		priceHistory = priceHistory[:limit]
-	}
-
-	edges := make([]*model.PriceHistoryEdge, len(priceHistory))
-	for i, ph := range priceHistory {
-		// Create cursor from ID (simple approach for now)
-		cursor := fmt.Sprintf("%d", ph.ID)
-		edges[i] = &model.PriceHistoryEdge{
-			Node:   ph,
-			Cursor: cursor,
-		}
-	}
-
-	var startCursor, endCursor *string
-	if len(edges) > 0 {
-		startCursor = &edges[0].Cursor
-		endCursor = &edges[len(edges)-1].Cursor
-	}
-
-	connection := &model.PriceHistoryConnection{
-		Edges: edges,
-		PageInfo: &model.PageInfo{
-			HasNextPage:     hasNextPage,
-			HasPreviousPage: false, // TODO: Implement based on 'after' cursor
-			StartCursor:     startCursor,
-			EndCursor:       endCursor,
-		},
-	}
+	connection := buildPriceHistoryConnection(priceHistory, limit, offset, 0)
 
 	// Get total count
 	count, err := r.priceHistoryService.GetPriceHistoryCount(ctx, productMasterID, storeID, serviceFilters)

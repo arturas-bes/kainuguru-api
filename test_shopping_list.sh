@@ -1,44 +1,64 @@
 #!/bin/bash
 
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJrYWludWd1cnUtYXBpIiwiZW1haWwiOiIiLCJleHAiOjE3NjI1MTAxNjEsImlhdCI6MTc2MjQyMzc2MSwiaXNzIjoia2FpbnVndXJ1LWF1dGgiLCJqdGkiOiJiMDI5M2UzYi04ZjNjLTQ1MDAtODM1Yi0yZTI1YmZjODMyNjIiLCJzaWQiOiJmOTk3NzJlNy1iODY2LTQ1M2MtYTI4MS02ZjhkMzhlMWY3ZjQiLCJzdWIiOiJiY2RhY2FiNS1iMTk4LTQ4ODktODhkZC1kNDcxODRiY2JhZjkiLCJ0eXBlIjoiYWNjZXNzIn0.eC3YeNs-fX27zTS9PfVWqS6Qmv0jbk90X2cPkTx_8Sk"
+if [ -z "$API_TOKEN" ]; then
+  echo "Set API_TOKEN environment variable to a valid JWT before running this script."
+  exit 1
+fi
+
+AUTH_HEADER="Authorization: Bearer $API_TOKEN"
+SUFFIX=$(date +%s)
+LIST_NAME_ONE="Weekly Groceries $SUFFIX"
+LIST_NAME_TWO="Monthly Bulk Buy $SUFFIX"
 
 echo "=== Test 1: Create Shopping List ==="
-curl -s -X POST http://localhost:8080/graphql \
+RESPONSE=$(curl -s -X POST http://localhost:8080/graphql \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"query":"mutation { createShoppingList(input: { name: \"Weekly Groceries\", description: \"My weekly shopping list\" }) { id name description isDefault createdAt user { email } } }"}' | jq
+  -H "$AUTH_HEADER" \
+  -d "{\"query\":\"mutation { createShoppingList(input: { name: \\\"$LIST_NAME_ONE\\\", description: \\\"My weekly shopping list\\\" }) { id name description isDefault createdAt user { email } } }\"}")
+echo "$RESPONSE" | jq
+LIST_ONE_ID=$(echo "$RESPONSE" | jq -r '.data.createShoppingList.id')
 
 echo ""
 echo "=== Test 2: Query My Shopping Lists ==="
 curl -s -X POST http://localhost:8080/graphql \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "$AUTH_HEADER" \
   -d '{"query":"query { shoppingLists { edges { node { id name description isDefault itemCount } } } }"}' | jq
 
 echo ""
 echo "=== Test 3: Query My Default Shopping List ==="
 curl -s -X POST http://localhost:8080/graphql \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "$AUTH_HEADER" \
   -d '{"query":"query { myDefaultShoppingList { id name description isDefault itemCount completionPercentage } }"}' | jq
 
 echo ""
 echo "=== Test 4: Update Shopping List ==="
-curl -s -X POST http://localhost:8080/graphql \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"query":"mutation { updateShoppingList(id: 1, input: { name: \"Updated Weekly Groceries\", description: \"Updated description\" }) { id name description } }"}' | jq
+if [ -n "$LIST_ONE_ID" ] && [ "$LIST_ONE_ID" != "null" ]; then
+  curl -s -X POST http://localhost:8080/graphql \
+    -H 'Content-Type: application/json' \
+    -H "$AUTH_HEADER" \
+    -d "{\"query\":\"mutation { updateShoppingList(id: $LIST_ONE_ID, input: { name: \\\"Updated Weekly Groceries\\\", description: \\\"Updated description\\\" }) { id name description } }\"}" | jq
+else
+  echo "Skipping update; could not capture first list ID."
+fi
 
 echo ""
 echo "=== Test 5: Create Second Shopping List ==="
-curl -s -X POST http://localhost:8080/graphql \
+RESPONSE=$(curl -s -X POST http://localhost:8080/graphql \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"query":"mutation { createShoppingList(input: { name: \"Monthly Bulk Buy\", description: \"Monthly shopping\" }) { id name isDefault } }"}' | jq
+  -H "$AUTH_HEADER" \
+  -d "{\"query\":\"mutation { createShoppingList(input: { name: \\\"$LIST_NAME_TWO\\\", description: \\\"Monthly shopping\\\" }) { id name isDefault } }\"}")
+echo "$RESPONSE" | jq
+LIST_TWO_ID=$(echo "$RESPONSE" | jq -r '.data.createShoppingList.id')
 
 echo ""
 echo "=== Test 6: Set Second List as Default ==="
-curl -s -X POST http://localhost:8080/graphql \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"query":"mutation { setDefaultShoppingList(id: 2) { id name isDefault } }"}' | jq
+if [ -n "$LIST_TWO_ID" ] && [ "$LIST_TWO_ID" != "null" ]; then
+  curl -s -X POST http://localhost:8080/graphql \
+    -H 'Content-Type: application/json' \
+    -H "$AUTH_HEADER" \
+    -d "{\"query\":\"mutation { setDefaultShoppingList(id: $LIST_TWO_ID) { id name isDefault } }\"}" | jq
+else
+  echo "Skipping default assignment; second list not created."
+fi

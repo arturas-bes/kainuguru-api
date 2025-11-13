@@ -1,4 +1,4 @@
-.PHONY: help install format run test scrape clean seed-data db-reset build validate-all validate-database validate-graphql validate-auth validate-search validate-shopping validate-pricing validate-performance validate-quick validate-setup
+.PHONY: help install format run test scrape clean seed-data db-reset build validate-all validate-database validate-graphql validate-auth validate-search validate-shopping validate-pricing validate-performance validate-quick validate-setup test-snapshots update-snapshots
 
 # Default target
 help:
@@ -12,6 +12,8 @@ help:
 	@echo "  build        - Build all binaries"
 	@echo "  run          - Run API server locally"
 	@echo "  test         - Run all tests"
+	@echo "  test-snapshots    - Run GraphQL snapshot tests only"
+	@echo "  update-snapshots  - Update GraphQL snapshot golden files"
 	@echo "  clean        - Stop containers and clean up"
 	@echo ""
 	@echo "🔍 VALIDATION FRAMEWORK:"
@@ -87,6 +89,17 @@ test:
 	@echo "🧪 Running all tests..."
 	@go test -v ./... -race
 	@echo "✅ All tests completed!"
+
+test-snapshots:
+	@echo "📸 Running GraphQL snapshot tests..."
+	@go test -v ./internal/graphql/resolvers -run Snapshot
+	@echo "✅ Snapshot tests passed! Connection payloads are stable."
+
+update-snapshots:
+	@echo "🔄 Updating GraphQL snapshot test data..."
+	@go test ./internal/graphql/resolvers -run Snapshot -update_graphql_snapshots
+	@echo "⚠️  Snapshots updated! Review changes with: git diff internal/graphql/resolvers/testdata/"
+	@echo "   Commit only if changes are intentional."
 
 clean:
 	@echo "🧹 Stopping containers and cleaning up..."

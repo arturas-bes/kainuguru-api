@@ -26,9 +26,15 @@ if [[ ! "$OPENAI_API_KEY" =~ ^sk- ]]; then
     echo "Current key starts with: ${OPENAI_API_KEY:0:10}..."
 fi
 
+DB_CONTAINER=$(docker compose ps -q db)
+if [ -z "$DB_CONTAINER" ]; then
+    echo -e "${RED}❌ Database container not running. Start docker compose first.${NC}"
+    exit 1
+fi
+
 echo ""
 echo "1️⃣  Checking database connection..."
-if docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "SELECT 1" > /dev/null 2>&1; then
+if docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c "SELECT 1" > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Database connected${NC}"
 else
     echo -e "${RED}❌ Database not accessible${NC}"
@@ -37,7 +43,7 @@ fi
 
 echo ""
 echo "2️⃣  Checking if stores exist..."
-STORE_COUNT=$(docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM stores;" | tr -d ' ')
+STORE_COUNT=$(docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM stores;" | tr -d ' ')
 if [ "$STORE_COUNT" -gt "0" ]; then
     echo -e "${GREEN}✅ Found $STORE_COUNT stores${NC}"
 else
@@ -46,7 +52,7 @@ fi
 
 echo ""
 echo "3️⃣  Checking if special_discount column exists..."
-if docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "\d products" 2>/dev/null | grep -q "special_discount"; then
+if docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c "\d products" 2>/dev/null | grep -q "special_discount"; then
     echo -e "${GREEN}✅ special_discount column exists${NC}"
 else
     echo -e "${RED}❌ special_discount column missing${NC}"
@@ -56,6 +62,11 @@ fi
 
 echo ""
 echo "4️⃣  Testing enrichment with dry-run..."
+if [ ! -x ./bin/enrich-flyers ]; then
+    mkdir -p ./bin
+    go build -o ./bin/enrich-flyers ./cmd/enrich-flyers
+fi
+
 if ./bin/enrich-flyers --store=iki --dry-run > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Dry-run successful${NC}"
 else
@@ -90,25 +101,25 @@ echo ""
 echo "6️⃣  Checking database for results..."
 
 # Check if products were created
-PRODUCT_COUNT=$(docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products;" | tr -d ' ')
+PRODUCT_COUNT=$(docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products;" | tr -d ' ')
 echo "Total products: $PRODUCT_COUNT"
 
 # Check products with tags
-TAGGED_COUNT=$(docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products WHERE tags IS NOT NULL AND array_length(tags, 1) > 0;" | tr -d ' ')
+TAGGED_COUNT=$(docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products WHERE tags IS NOT NULL AND array_length(tags, 1) > 0;" | tr -d ' ')
 echo "Products with tags: $TAGGED_COUNT"
 
 # Check products with special discounts
-SPECIAL_DISCOUNT_COUNT=$(docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products WHERE special_discount IS NOT NULL;" | tr -d ' ')
+SPECIAL_DISCOUNT_COUNT=$(docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM products WHERE special_discount IS NOT NULL;" | tr -d ' ')
 echo "Products with special discounts: $SPECIAL_DISCOUNT_COUNT"
 
 # Check product masters
-MASTER_COUNT=$(docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM product_masters;" | tr -d ' ')
+MASTER_COUNT=$(docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -t -c "SELECT COUNT(*) FROM product_masters;" | tr -d ' ')
 echo "Product masters: $MASTER_COUNT"
 
 if [ "$PRODUCT_COUNT" -gt "0" ]; then
     echo ""
     echo "7️⃣  Sample products:"
-    docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "
+    docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c "
         SELECT 
             SUBSTRING(name, 1, 40) as name,
             current_price,
@@ -122,7 +133,7 @@ if [ "$PRODUCT_COUNT" -gt "0" ]; then
     if [ "$MASTER_COUNT" -gt "0" ]; then
         echo ""
         echo "8️⃣  Sample product masters (should be generic names):"
-        docker exec kainuguru-api-db-1 psql -U kainuguru -d kainuguru_db -c "
+        docker exec "$DB_CONTAINER" psql -U kainuguru -d kainuguru_db -c "
             SELECT 
                 SUBSTRING(name, 1, 40) as name,
                 COALESCE(brand, 'no brand') as brand,

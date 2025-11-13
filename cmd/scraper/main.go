@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -49,7 +51,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer bunDB.Close()
-	
+
 	db := bunDB.DB // Get the *bun.DB instance
 
 	// Initialize service factory
@@ -249,7 +251,7 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 	// 5. Save PDF to temp file
 	tempDir := "/tmp/kainuguru/pdf"
 	os.MkdirAll(tempDir, 0755) // Ensure temp dir exists
-	
+
 	tempPDFPath := filepath.Join(tempDir, fmt.Sprintf("flyer-%d.pdf", flyer.ID))
 	if err := os.MkdirAll(filepath.Dir(tempPDFPath), 0755); err != nil {
 		flyerService.FailProcessing(ctx, flyer.ID)
@@ -383,7 +385,7 @@ func loadEnvFile(filename string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue

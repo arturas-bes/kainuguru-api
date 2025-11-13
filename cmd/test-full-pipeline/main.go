@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/kainuguru/kainuguru-api/internal/bootstrap"
+
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -129,7 +131,7 @@ func main() {
 	}
 
 	fmt.Printf("   ✓ Downloaded PDF: %.2f MB\n", float64(len(pdfData))/(1024*1024))
-	
+
 	// Save to temp file
 	pdfPath := filepath.Join(outputDir, "iki_flyer.pdf")
 	if err := os.WriteFile(pdfPath, pdfData, 0644); err != nil {
@@ -165,7 +167,7 @@ func main() {
 	pageCount := result.PageCount
 	flyer.PageCount = &pageCount
 	flyerService.Update(ctx, flyer)
-	
+
 	totalSize := int64(0)
 	for i, outputFile := range result.OutputFiles {
 		if stat, err := os.Stat(outputFile); err == nil {
@@ -178,12 +180,12 @@ func main() {
 
 	// Step 6: Save images to storage
 	fmt.Println("💾 STEP 6: Saving images to storage...")
-	
+
 	var flyerPages []*models.FlyerPage
-	
+
 	for i, imagePath := range result.OutputFiles {
 		pageNumber := i + 1
-		
+
 		// Read image data
 		imageData, err := os.ReadFile(imagePath)
 		if err != nil {
@@ -207,20 +209,20 @@ func main() {
 		}
 
 		flyerPages = append(flyerPages, flyerPage)
-		
+
 		if pageNumber <= 3 || pageNumber == len(result.OutputFiles) {
 			fmt.Printf("   ✓ Page %d: %s\n", pageNumber, publicURL)
 		} else if pageNumber == 4 {
 			fmt.Printf("   ... (%d more pages)\n", len(result.OutputFiles)-4)
 		}
 	}
-	
+
 	fmt.Printf("   ✓ Saved %d images to storage\n", len(flyerPages))
 	fmt.Println()
 
 	// Step 7: Create flyer page records in database
 	fmt.Println("💾 STEP 7: Creating flyer page records in database...")
-	
+
 	if len(flyerPages) > 0 {
 		if err := flyerPageService.CreateBatch(ctx, flyerPages); err != nil {
 			log.Fatalf("Failed to create flyer pages: %v", err)
@@ -240,26 +242,26 @@ func main() {
 
 	// Step 9: Verify results
 	fmt.Println("🔍 STEP 9: Verifying results...")
-	
+
 	// Check database
 	verifyFlyer, err := flyerService.GetByID(ctx, flyer.ID)
 	if err != nil {
 		log.Fatalf("Failed to get flyer: %v", err)
 	}
-	fmt.Printf("   ✓ Flyer in DB: ID=%d, Status=%s, Pages=%d\n", 
+	fmt.Printf("   ✓ Flyer in DB: ID=%d, Status=%s, Pages=%d\n",
 		verifyFlyer.ID, verifyFlyer.Status, *verifyFlyer.PageCount)
-	
+
 	// Check pages
 	pages, err := flyerPageService.GetByFlyerID(ctx, flyer.ID)
 	if err != nil {
 		log.Fatalf("Failed to get pages: %v", err)
 	}
 	fmt.Printf("   ✓ Pages in DB: %d records\n", len(pages))
-	
+
 	// Check first page URL
 	if len(pages) > 0 && pages[0].ImageURL != nil {
 		fmt.Printf("   ✓ First page URL: %s\n", *pages[0].ImageURL)
-		
+
 		// Check if file exists
 		firstPagePath := filepath.Join(cfg.Storage.BasePath, flyer.GetImageBasePath(), "page-1.jpg")
 		if _, err := os.Stat(firstPagePath); err == nil {
@@ -268,7 +270,7 @@ func main() {
 			fmt.Printf("   ✗ File not found: %s\n", firstPagePath)
 		}
 	}
-	
+
 	// Check storage limit
 	fmt.Printf("   ✓ Storage folder: %s\n", flyer.GetImageBasePath())
 	fmt.Println()
@@ -299,10 +301,10 @@ func main() {
 	} else {
 		fmt.Printf("   Test files kept in: %s\n", outputDir)
 	}
-	
+
 	fmt.Print("Delete flyer from database (for re-testing)? (y/N): ")
 	fmt.Scanln(&response)
-	
+
 	if strings.ToLower(response) == "y" {
 		// Delete flyer pages first
 		for _, page := range pages {
@@ -341,7 +343,7 @@ func loadEnvFile(filename string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue

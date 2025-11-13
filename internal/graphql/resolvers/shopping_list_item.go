@@ -8,7 +8,6 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/models"
-	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
 // Shopping List Item Mutation Resolvers - Phase 2.3
@@ -28,16 +27,16 @@ func (r *mutationResolver) CreateShoppingListItem(ctx context.Context, input mod
 
 	// Create shopping list item model
 	item := &models.ShoppingListItem{
-		ShoppingListID: int64(input.ShoppingListID),
-		UserID:         userID,
-		Description:    input.Description,
-		Notes:          input.Notes,
-		Quantity:       1, // Default
-		Unit:           input.Unit,
-		UnitType:       input.UnitType,
-		Category:       input.Category,
-		Tags:           input.Tags,
-		EstimatedPrice: input.EstimatedPrice,
+		ShoppingListID:  int64(input.ShoppingListID),
+		UserID:          userID,
+		Description:     input.Description,
+		Notes:           input.Notes,
+		Quantity:        1, // Default
+		Unit:            input.Unit,
+		UnitType:        input.UnitType,
+		Category:        input.Category,
+		Tags:            input.Tags,
+		EstimatedPrice:  input.EstimatedPrice,
 		ProductMasterID: nil,
 		LinkedProductID: nil,
 		StoreID:         nil,
@@ -210,32 +209,12 @@ func (r *mutationResolver) UncheckShoppingListItem(ctx context.Context, id int) 
 
 // Items resolves the items field on ShoppingList (updating stub from Phase 2.2)
 func (r *shoppingListResolver) Items(ctx context.Context, obj *models.ShoppingList, filters *model.ShoppingListItemFilters, first *int, after *string) (*model.ShoppingListItemConnection, error) {
+	pager := newPaginationArgs(first, after, paginationDefaults{defaultLimit: 100, maxLimit: 200})
+	limit := pager.Limit()
+	offset := pager.Offset()
+
 	// Convert GraphQL filters to service filters
-	serviceFilters := services.ShoppingListItemFilters{
-		Limit:  100, // Default limit
-		Offset: 0,
-	}
-
-	if first != nil {
-		serviceFilters.Limit = *first
-	}
-
-	if filters != nil {
-		serviceFilters.IsChecked = filters.IsChecked
-		serviceFilters.Categories = filters.Categories
-		serviceFilters.Tags = filters.Tags
-		serviceFilters.HasPrice = filters.HasPrice
-		serviceFilters.IsLinked = filters.IsLinked
-		serviceFilters.StoreIDs = filters.StoreIDs
-
-		// Parse date filters if provided
-		if filters.CreatedAfter != nil {
-			// TODO: Parse RFC3339 date string
-		}
-		if filters.CreatedBefore != nil {
-			// TODO: Parse RFC3339 date string
-		}
-	}
+	serviceFilters := convertShoppingListItemFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get items for this shopping list
 	items, err := r.shoppingListItemService.GetByListID(ctx, obj.ID, serviceFilters)
@@ -243,51 +222,30 @@ func (r *shoppingListResolver) Items(ctx context.Context, obj *models.ShoppingLi
 		return nil, fmt.Errorf("failed to get shopping list items: %w", err)
 	}
 
-	// Convert to connection format
-	edges := make([]*model.ShoppingListItemEdge, len(items))
-	for i, item := range items {
-		edges[i] = &model.ShoppingListItemEdge{
-			Node:   item,
-			Cursor: fmt.Sprintf("%d", item.ID),
-		}
-	}
-
-	pageInfo := &model.PageInfo{
-		HasNextPage:     false, // TODO: Implement proper pagination
-		HasPreviousPage: false,
-	}
-
-	if len(edges) > 0 {
-		pageInfo.StartCursor = &edges[0].Cursor
-		pageInfo.EndCursor = &edges[len(edges)-1].Cursor
-	}
-
 	// Get total count for pagination
 	totalCount, err := r.shoppingListItemService.CountByListID(ctx, obj.ID, serviceFilters)
 	if err != nil {
 		// Log error but don't fail the request
 		fmt.Printf("Warning: failed to get shopping list items count: %v\n", err)
-		totalCount = len(edges) // Fallback to current page count
+		if len(items) > limit {
+			totalCount = limit
+		} else {
+			totalCount = len(items)
+		}
 	}
 
-	return &model.ShoppingListItemConnection{
-		Edges:      edges,
-		PageInfo:   pageInfo,
-		TotalCount: totalCount,
-	}, nil
+	return buildShoppingListItemConnection(items, limit, offset, totalCount), nil
 }
 
 // ShoppingListItem Type Nested Resolvers - Phase 2.3
 
 // ShoppingList resolves the shoppingList field on ShoppingListItem
 func (r *shoppingListItemResolver) ShoppingList(ctx context.Context, obj *models.ShoppingListItem) (*models.ShoppingList, error) {
-	// Note: ShoppingList loader not implemented yet - using direct service call
-	// TODO: Add ShoppingList DataLoader for batch loading
-	list, err := r.shoppingListService.GetByID(ctx, obj.ShoppingListID)
+	loaders := dataloaders.FromContext(ctx)
+	list, err := loaders.ShoppingListLoader.Load(ctx, obj.ShoppingListID)()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load shopping list: %w", err)
 	}
-
 	return list, nil
 }
 
@@ -326,13 +284,11 @@ func (r *shoppingListItemResolver) LinkedProduct(ctx context.Context, obj *model
 		return nil, nil
 	}
 
-	// Note: Product loader not implemented yet - using direct service call
-	// TODO: Add Product DataLoader for batch loading
-	product, err := r.productService.GetByID(ctx, int(*obj.LinkedProductID))
+	loaders := dataloaders.FromContext(ctx)
+	product, err := loaders.ProductLoader.Load(ctx, int(*obj.LinkedProductID))()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load linked product: %w", err)
 	}
-
 	return product, nil
 }
 

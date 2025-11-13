@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/productmaster"
 	"github.com/kainuguru/kainuguru-api/internal/services/matching"
 	"github.com/kainuguru/kainuguru-api/pkg/normalize"
 	"github.com/uptrace/bun"
@@ -16,6 +17,7 @@ import (
 
 type productMasterService struct {
 	db         *bun.DB
+	repo       productmaster.Repository
 	matcher    *matching.CompositeMatcher
 	normalizer *normalize.LithuanianNormalizer
 	logger     *slog.Logger
@@ -23,8 +25,17 @@ type productMasterService struct {
 
 // NewProductMasterService creates a new product master service instance
 func NewProductMasterService(db *bun.DB) ProductMasterService {
+	return NewProductMasterServiceWithRepository(db, newProductMasterRepository(db))
+}
+
+// NewProductMasterServiceWithRepository allows injecting a custom repository implementation.
+func NewProductMasterServiceWithRepository(db *bun.DB, repo productmaster.Repository) ProductMasterService {
+	if repo == nil {
+		panic("product master repository cannot be nil")
+	}
 	return &productMasterService{
 		db:         db,
+		repo:       repo,
 		matcher:    matching.NewCompositeMatcher(db),
 		normalizer: normalize.NewLithuanianNormalizer(),
 		logger:     slog.Default().With("service", "product_master"),
@@ -33,12 +44,7 @@ func NewProductMasterService(db *bun.DB) ProductMasterService {
 
 // Basic CRUD operations
 func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.ProductMaster, error) {
-	master := &models.ProductMaster{}
-	err := s.db.NewSelect().
-		Model(master).
-		Where("pm.id = ?", id).
-		Scan(ctx)
-
+	master, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product master by ID %d: %w", id, err)
 	}
@@ -47,17 +53,7 @@ func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.P
 }
 
 func (s *productMasterService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ProductMaster, error) {
-	if len(ids) == 0 {
-		return []*models.ProductMaster{}, nil
-	}
-
-	var masters []*models.ProductMaster
-	err := s.db.NewSelect().
-		Model(&masters).
-		Where("pm.id IN (?)", bun.In(ids)).
-		Order("pm.id ASC").
-		Scan(ctx)
-
+	masters, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product masters by IDs: %w", err)
 	}
@@ -66,46 +62,8 @@ func (s *productMasterService) GetByIDs(ctx context.Context, ids []int64) ([]*mo
 }
 
 func (s *productMasterService) GetAll(ctx context.Context, filters ProductMasterFilters) ([]*models.ProductMaster, error) {
-	query := s.db.NewSelect().Model((*models.ProductMaster)(nil))
-
-	// Apply filters
-	if len(filters.Status) > 0 {
-		query = query.Where("pm.status IN (?)", bun.In(filters.Status))
-	}
-
-	if len(filters.Categories) > 0 {
-		query = query.Where("pm.category IN (?)", bun.In(filters.Categories))
-	}
-
-	if len(filters.Brands) > 0 {
-		query = query.Where("pm.brand IN (?)", bun.In(filters.Brands))
-	}
-
-	// Note: isVerified and isActive filters removed - these columns don't exist in DB
-	// The schema uses "status" field instead
-
-	if filters.MinConfidence != nil {
-		query = query.Where("pm.confidence_score >= ?", *filters.MinConfidence)
-	}
-
-	if filters.MinMatches != nil {
-		query = query.Where("pm.match_count >= ?", *filters.MinMatches)
-	}
-
-	// Apply pagination
-	if filters.Limit > 0 {
-		query = query.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		query = query.Offset(filters.Offset)
-	}
-
-	// Default ordering
-	query = query.Order("pm.id DESC")
-
-	var masters []*models.ProductMaster
-	err := query.Scan(ctx, &masters)
+	f := filters
+	masters, err := s.repo.GetAll(ctx, &f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product masters: %w", err)
 	}
@@ -126,11 +84,7 @@ func (s *productMasterService) Create(ctx context.Context, master *models.Produc
 		master.NormalizeName()
 	}
 
-	_, err := s.db.NewInsert().
-		Model(master).
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.Create(ctx, master); err != nil {
 		return fmt.Errorf("failed to create product master: %w", err)
 	}
 
@@ -149,18 +103,9 @@ func (s *productMasterService) Update(ctx context.Context, master *models.Produc
 		master.NormalizeName()
 	}
 
-	result, err := s.db.NewUpdate().
-		Model(master).
-		WherePK().
-		Exec(ctx)
-
+	rowsAffected, err := s.repo.Update(ctx, master)
 	if err != nil {
 		return fmt.Errorf("failed to update product master: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
@@ -176,25 +121,9 @@ func (s *productMasterService) Update(ctx context.Context, master *models.Produc
 }
 
 func (s *productMasterService) Delete(ctx context.Context, id int64) error {
-	master := &models.ProductMaster{
-		ID:        id,
-		Status:    string(models.ProductMasterStatusDeleted),
-		UpdatedAt: time.Now(),
-	}
-
-	result, err := s.db.NewUpdate().
-		Model(master).
-		Column("status", "updated_at").
-		WherePK().
-		Exec(ctx)
-
+	rowsAffected, err := s.repo.SoftDelete(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete product master: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
@@ -212,15 +141,7 @@ func (s *productMasterService) Delete(ctx context.Context, id int64) error {
 func (s *productMasterService) GetByCanonicalName(ctx context.Context, name string) (*models.ProductMaster, error) {
 	normalizedName := s.normalizer.NormalizeForSearch(name)
 
-	master := &models.ProductMaster{}
-	err := s.db.NewSelect().
-		Model(master).
-		Where("pm.normalized_name = ?", normalizedName).
-		Where("pm.status = ?", models.ProductMasterStatusActive).
-		Order("pm.confidence_score DESC").
-		Limit(1).
-		Scan(ctx)
-
+	master, err := s.repo.GetByCanonicalName(ctx, normalizedName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product master by canonical name: %w", err)
 	}
@@ -229,13 +150,7 @@ func (s *productMasterService) GetByCanonicalName(ctx context.Context, name stri
 }
 
 func (s *productMasterService) GetActiveProductMasters(ctx context.Context) ([]*models.ProductMaster, error) {
-	var masters []*models.ProductMaster
-	err := s.db.NewSelect().
-		Model(&masters).
-		Where("pm.status = ?", models.ProductMasterStatusActive).
-		Order("pm.match_count DESC").
-		Scan(ctx)
-
+	masters, err := s.repo.GetActive(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active product masters: %w", err)
 	}
@@ -244,14 +159,7 @@ func (s *productMasterService) GetActiveProductMasters(ctx context.Context) ([]*
 }
 
 func (s *productMasterService) GetVerifiedProductMasters(ctx context.Context) ([]*models.ProductMaster, error) {
-	var masters []*models.ProductMaster
-	err := s.db.NewSelect().
-		Model(&masters).
-		Where("pm.status = ?", models.ProductMasterStatusActive).
-		Where("pm.confidence_score >= ?", 0.8).
-		Order("pm.match_count DESC").
-		Scan(ctx)
-
+	masters, err := s.repo.GetVerified(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verified product masters: %w", err)
 	}
@@ -260,16 +168,7 @@ func (s *productMasterService) GetVerifiedProductMasters(ctx context.Context) ([
 }
 
 func (s *productMasterService) GetProductMastersForReview(ctx context.Context) ([]*models.ProductMaster, error) {
-	var masters []*models.ProductMaster
-	err := s.db.NewSelect().
-		Model(&masters).
-		Where("pm.status = ?", models.ProductMasterStatusActive).
-		Where("pm.confidence_score < ?", 0.8).
-		Where("pm.confidence_score >= ?", 0.3).
-		Order("pm.created_at DESC").
-		Limit(100).
-		Scan(ctx)
-
+	masters, err := s.repo.GetForReview(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product masters for review: %w", err)
 	}
@@ -334,67 +233,7 @@ func (s *productMasterService) FindMatchingMastersWithScores(ctx context.Context
 }
 
 func (s *productMasterService) MatchProduct(ctx context.Context, productID int, masterID int64) error {
-	product := &models.Product{}
-	err := s.db.NewSelect().
-		Model(product).
-		Where("p.id = ?", productID).
-		Scan(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to get product: %w", err)
-	}
-
-	master := &models.ProductMaster{}
-	err = s.db.NewSelect().
-		Model(master).
-		Where("pm.id = ?", masterID).
-		Scan(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to get product master: %w", err)
-	}
-
-	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewUpdate().
-			Model((*models.Product)(nil)).
-			Set("product_master_id = ?", masterID).
-			Set("updated_at = ?", time.Now()).
-			Where("id = ?", productID).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to update product: %w", err)
-		}
-
-		master.IncrementMatchCount()
-		_, err = tx.NewUpdate().
-			Model(master).
-			Column("match_count", "last_seen_date", "updated_at").
-			WherePK().
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to update master: %w", err)
-		}
-
-		_, err = tx.NewInsert().
-			Model(&models.ProductMasterMatch{
-				ProductID:       int64(productID),
-				ProductMasterID: masterID,
-				Confidence:      master.ConfidenceScore,
-				MatchType:       "manual",
-				ReviewStatus:    "approved",
-			}).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to create match record: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
+	if err := s.repo.MatchProduct(ctx, productID, masterID); err != nil {
 		return err
 	}
 
@@ -416,10 +255,10 @@ func (s *productMasterService) FindBestMatch(ctx context.Context, product *model
 	var matches []*ProductMasterMatch
 	for _, result := range matchResults {
 		matches = append(matches, &ProductMasterMatch{
-			Master:      result.Master,
-			MatchScore:  result.Score,
-			Method:      result.Method,
-			Confidence:  result.Confidence,
+			Master:     result.Master,
+			MatchScore: result.Score,
+			Method:     result.Method,
+			Confidence: result.Confidence,
 		})
 	}
 
@@ -429,10 +268,10 @@ func (s *productMasterService) FindBestMatch(ctx context.Context, product *model
 // CreateFromProduct creates a new product master from a product
 func (s *productMasterService) CreateFromProduct(ctx context.Context, product *models.Product) (*models.ProductMaster, error) {
 	now := time.Now()
-	
+
 	// Normalize product name by removing brand
 	genericName := s.normalizeProductName(product.Name, product.Brand)
-	
+
 	master := &models.ProductMaster{
 		Name:            genericName,
 		NormalizedName:  s.normalizer.NormalizeForSearch(genericName),
@@ -452,34 +291,8 @@ func (s *productMasterService) CreateFromProduct(ctx context.Context, product *m
 		master.StandardUnit = product.UnitSize
 	}
 
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewInsert().
-			Model(master).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to create master: %w", err)
-		}
-
-		_, err = tx.NewInsert().
-			Model(&models.ProductMasterMatch{
-				ProductID:       int64(product.ID),
-				ProductMasterID: master.ID,
-				Confidence:      master.ConfidenceScore,
-				MatchType:       "new_master",
-				ReviewStatus:    "pending",
-			}).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to create match record: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+	if err := s.repo.CreateMasterWithMatch(ctx, product, master); err != nil {
+		return nil, fmt.Errorf("failed to create master from product: %w", err)
 	}
 
 	s.logger.Info("created master from product",
@@ -493,22 +306,16 @@ func (s *productMasterService) CreateFromProduct(ctx context.Context, product *m
 }
 
 func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error) {
-	product := &models.Product{}
-	err := s.db.NewSelect().
-		Model(product).
-		Relation("Store").
-		Where("p.id = ?", productID).
-		Scan(ctx)
-
+	product, err := s.repo.GetProduct(ctx, productID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
 	now := time.Now()
-	
+
 	// Normalize product name by removing brand
 	genericName := s.normalizeProductName(product.Name, product.Brand)
-	
+
 	master := &models.ProductMaster{
 		Name:            genericName,
 		NormalizedName:  s.normalizer.NormalizeForSearch(genericName),
@@ -529,45 +336,8 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 		master.StandardUnit = product.UnitSize
 	}
 
-	err = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewInsert().
-			Model(master).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to create master: %w", err)
-		}
-
-		_, err = tx.NewUpdate().
-			Model((*models.Product)(nil)).
-			Set("product_master_id = ?", master.ID).
-			Set("updated_at = ?", now).
-			Where("id = ?", productID).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to link product: %w", err)
-		}
-
-		_, err = tx.NewInsert().
-			Model(&models.ProductMasterMatch{
-				ProductID:       int64(productID),
-				ProductMasterID: master.ID,
-				Confidence:      master.ConfidenceScore,
-				MatchType:       "new_master",
-				ReviewStatus:    "pending",
-			}).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to create match record: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+	if err := s.repo.CreateMasterAndLinkProduct(ctx, product, master); err != nil {
+		return nil, fmt.Errorf("failed to create master: %w", err)
 	}
 
 	s.logger.Info("created master from product",
@@ -581,26 +351,7 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 
 // Verification operations
 func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID int64, verifierID string) error {
-	master := &models.ProductMaster{}
-	err := s.db.NewSelect().
-		Model(master).
-		Where("pm.id = ?", masterID).
-		Scan(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to get product master: %w", err)
-	}
-
-	master.ConfidenceScore = 1.0
-	master.UpdatedAt = time.Now()
-
-	_, err = s.db.NewUpdate().
-		Model(master).
-		Column("confidence_score", "updated_at").
-		WherePK().
-		Exec(ctx)
-
-	if err != nil {
+	if err := s.repo.VerifyMaster(ctx, masterID, 1.0, time.Now()); err != nil {
 		return fmt.Errorf("failed to verify product master: %w", err)
 	}
 
@@ -613,25 +364,9 @@ func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID
 }
 
 func (s *productMasterService) DeactivateProductMaster(ctx context.Context, masterID int64) error {
-	master := &models.ProductMaster{
-		ID:        masterID,
-		Status:    string(models.ProductMasterStatusInactive),
-		UpdatedAt: time.Now(),
-	}
-
-	result, err := s.db.NewUpdate().
-		Model(master).
-		Column("status", "updated_at").
-		WherePK().
-		Exec(ctx)
-
+	rowsAffected, err := s.repo.DeactivateMaster(ctx, masterID, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to deactivate product master: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
@@ -646,46 +381,8 @@ func (s *productMasterService) DeactivateProductMaster(ctx context.Context, mast
 }
 
 func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int64, duplicateOfID int64) error {
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		master := &models.ProductMaster{}
-		err := tx.NewSelect().
-			Model(master).
-			Where("pm.id = ?", masterID).
-			For("UPDATE").
-			Scan(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to get product master: %w", err)
-		}
-
-		master.MarkAsMerged(duplicateOfID)
-
-		_, err = tx.NewUpdate().
-			Model(master).
-			Column("status", "merged_into_id", "updated_at").
-			WherePK().
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to mark as duplicate: %w", err)
-		}
-
-		_, err = tx.NewUpdate().
-			Model((*models.Product)(nil)).
-			Set("product_master_id = ?", duplicateOfID).
-			Set("updated_at = ?", time.Now()).
-			Where("product_master_id = ?", masterID).
-			Exec(ctx)
-
-		if err != nil {
-			return fmt.Errorf("failed to reassign products: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return err
+	if err := s.repo.MarkAsDuplicate(ctx, masterID, duplicateOfID); err != nil {
+		return fmt.Errorf("failed to mark as duplicate: %w", err)
 	}
 
 	s.logger.Info("product master marked as duplicate",
@@ -698,98 +395,46 @@ func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int
 
 // Statistics
 func (s *productMasterService) GetMatchingStatistics(ctx context.Context, masterID int64) (*ProductMasterStats, error) {
-	master := &models.ProductMaster{}
-	err := s.db.NewSelect().
-		Model(master).
-		Where("pm.id = ?", masterID).
-		Scan(ctx)
-
+	stats, err := s.repo.GetMatchingStatistics(ctx, masterID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product master: %w", err)
+		return nil, fmt.Errorf("failed to get matching statistics: %w", err)
 	}
 
-	productCount, err := s.db.NewSelect().
-		Model((*models.Product)(nil)).
-		Where("product_master_id = ?", masterID).
-		Count(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to count products: %w", err)
+	successRate := 100.0
+	if stats.TotalMatches > 0 && stats.ProductCount < stats.TotalMatches {
+		successRate = (float64(stats.ProductCount) / float64(stats.TotalMatches)) * 100
 	}
 
-	stats := &ProductMasterStats{
-		TotalMatches:      master.MatchCount,
-		SuccessfulMatches: productCount,
-		FailedMatches:     0,
-		SuccessRate:       100.0,
-		ConfidenceScore:   master.ConfidenceScore,
-		LastMatchedAt:     master.LastSeenDate,
-	}
-
-	return stats, nil
+	return &ProductMasterStats{
+		TotalMatches:      stats.TotalMatches,
+		SuccessfulMatches: stats.ProductCount,
+		FailedMatches:     stats.TotalMatches - stats.ProductCount,
+		SuccessRate:       successRate,
+		ConfidenceScore:   stats.Confidence,
+		LastMatchedAt:     stats.LastMatchedAt,
+	}, nil
 }
 
 func (s *productMasterService) GetOverallMatchingStats(ctx context.Context) (*OverallMatchingStats, error) {
-	var stats OverallMatchingStats
-
-	totalMasters, err := s.db.NewSelect().
-		Model((*models.ProductMaster)(nil)).
-		Where("status = ?", models.ProductMasterStatusActive).
-		Count(ctx)
-
+	stats, err := s.repo.GetOverallStatistics(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to count masters: %w", err)
+		return nil, fmt.Errorf("failed to get overall stats: %w", err)
 	}
 
-	verifiedMasters, err := s.db.NewSelect().
-		Model((*models.ProductMaster)(nil)).
-		Where("status = ?", models.ProductMasterStatusActive).
-		Where("confidence_score >= ?", 0.8).
-		Count(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to count verified masters: %w", err)
+	result := &OverallMatchingStats{
+		TotalProducts:     stats.TotalProducts,
+		MatchedProducts:   stats.MatchedProducts,
+		UnmatchedProducts: stats.TotalProducts - stats.MatchedProducts,
+		ProductMasters:    stats.TotalMasters,
+		VerifiedMasters:   stats.VerifiedMasters,
+		AverageConfidence: stats.AverageConfidence,
 	}
 
-	totalProducts, err := s.db.NewSelect().
-		Model((*models.Product)(nil)).
-		Count(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to count products: %w", err)
+	if stats.TotalProducts > 0 {
+		result.OverallMatchRate = float64(stats.MatchedProducts) / float64(stats.TotalProducts)
 	}
 
-	matchedProducts, err := s.db.NewSelect().
-		Model((*models.Product)(nil)).
-		Where("product_master_id IS NOT NULL").
-		Count(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to count matched products: %w", err)
-	}
-
-	stats.TotalProducts = totalProducts
-	stats.MatchedProducts = matchedProducts
-	stats.UnmatchedProducts = totalProducts - matchedProducts
-	stats.ProductMasters = totalMasters
-	stats.VerifiedMasters = verifiedMasters
-
-	if totalProducts > 0 {
-		stats.OverallMatchRate = float64(matchedProducts) / float64(totalProducts)
-	}
-
-	if totalMasters > 0 {
-		err = s.db.NewSelect().
-			Model((*models.ProductMaster)(nil)).
-			ColumnExpr("AVG(confidence_score)").
-			Where("status = ?", models.ProductMasterStatusActive).
-			Scan(ctx, &stats.AverageConfidence)
-		if err != nil {
-			s.logger.Error("failed to calculate average confidence", slog.String("error", err.Error()))
-		}
-	}
-
-	return &stats, nil
+	return result, nil
 }
 
 // normalizeProductName removes brand names from product names to create generic product masters
@@ -800,20 +445,20 @@ func (s *productMasterService) GetOverallMatchingStats(ctx context.Context) (*Ov
 // "IKI varškė" -> "Varškė"
 func (s *productMasterService) normalizeProductName(name string, brand *string) string {
 	normalized := name
-	
+
 	// Remove brand from name if present
 	if brand != nil && *brand != "" {
 		brandUpper := strings.ToUpper(*brand)
 		brandLower := strings.ToLower(*brand)
 		brandTitle := strings.Title(strings.ToLower(*brand))
-		
+
 		// Remove all variations of the brand
 		normalized = strings.ReplaceAll(normalized, brandUpper, "")
 		normalized = strings.ReplaceAll(normalized, *brand, "")
 		normalized = strings.ReplaceAll(normalized, brandLower, "")
 		normalized = strings.ReplaceAll(normalized, brandTitle, "")
 	}
-	
+
 	// Define known brands to remove
 	knownBrands := map[string]bool{
 		"IKI": true, "MAXIMA": true, "RIMI": true,
@@ -821,19 +466,19 @@ func (s *productMasterService) normalizeProductName(name string, brand *string) 
 		"NATURA": true, "MAGIJA": true, "SOSTINĖS": true,
 		"CLEVER": true, "TARCZYNSKI": true, "JUBILIEJAUS": true,
 	}
-	
+
 	words := strings.Fields(normalized)
 	filteredWords := []string{}
-	
+
 	for _, word := range words {
 		// Keep word if it's not all uppercase or if it's a measurement
 		isAllUpper := word == strings.ToUpper(word) && len(word) > 1
-		isMeasurement := strings.Contains(strings.ToLower(word), "kg") || 
-						 strings.Contains(strings.ToLower(word), "ml") ||
-						 strings.Contains(strings.ToLower(word), "vnt") ||
-						 strings.Contains(strings.ToLower(word), "l") ||
-						 strings.Contains(strings.ToLower(word), "g")
-		
+		isMeasurement := strings.Contains(strings.ToLower(word), "kg") ||
+			strings.Contains(strings.ToLower(word), "ml") ||
+			strings.Contains(strings.ToLower(word), "vnt") ||
+			strings.Contains(strings.ToLower(word), "l") ||
+			strings.Contains(strings.ToLower(word), "g")
+
 		if !isAllUpper || isMeasurement {
 			// Not all uppercase, keep it
 			filteredWords = append(filteredWords, word)
@@ -846,20 +491,20 @@ func (s *productMasterService) normalizeProductName(name string, brand *string) 
 			// If it's a known brand, skip it (don't add to filteredWords)
 		}
 	}
-	
+
 	normalized = strings.Join(filteredWords, " ")
-	
+
 	// Clean up extra spaces and punctuation
 	normalized = strings.TrimSpace(normalized)
 	normalized = strings.Trim(normalized, ",")
 	normalized = strings.TrimSpace(normalized)
-	
+
 	// Capitalize first letter
 	if len(normalized) > 0 {
 		runes := []rune(normalized)
 		runes[0] = unicode.ToUpper(runes[0])
 		normalized = string(runes)
 	}
-	
+
 	return normalized
 }

@@ -17,6 +17,8 @@ import (
 type ServiceFactory struct {
 	db     *bun.DB
 	config *config.Config
+	// memoized services
+	authService auth.AuthService
 }
 
 // NewServiceFactory creates a new service factory
@@ -72,10 +74,15 @@ func (f *ServiceFactory) SearchService() search.Service {
 
 // AuthService returns an auth service instance
 func (f *ServiceFactory) AuthService() auth.AuthService {
-	if f.config != nil {
-		return NewProductionAuthServiceWithConfig(f.db, f.config)
+	if f.authService != nil {
+		return f.authService
 	}
-	return NewProductionAuthService(f.db)
+	if f.config != nil {
+		f.authService = NewProductionAuthServiceWithConfig(f.db, f.config)
+	} else {
+		f.authService = NewProductionAuthService(f.db)
+	}
+	return f.authService
 }
 
 // EmailService returns an email service instance

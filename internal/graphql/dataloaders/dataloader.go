@@ -16,6 +16,8 @@ type Loaders struct {
 	StoreLoader         *dataloader.Loader[int, *models.Store]
 	FlyerLoader         *dataloader.Loader[int, *models.Flyer]
 	FlyerPageLoader     *dataloader.Loader[int, *models.FlyerPage]
+	ShoppingListLoader  *dataloader.Loader[int64, *models.ShoppingList]
+	ProductLoader       *dataloader.Loader[int, *models.Product]
 	ProductMasterLoader *dataloader.Loader[int64, *models.ProductMaster]
 	UserLoader          *dataloader.Loader[string, *models.User]
 }
@@ -25,6 +27,8 @@ func NewLoaders(
 	storeService services.StoreService,
 	flyerService services.FlyerService,
 	flyerPageService services.FlyerPageService,
+	shoppingListService services.ShoppingListService,
+	productService services.ProductService,
 	productMasterService services.ProductMasterService,
 	authService auth.AuthService,
 ) *Loaders {
@@ -43,6 +47,16 @@ func NewLoaders(
 			batchFlyerPageLoader(flyerPageService),
 			dataloader.WithWait[int, *models.FlyerPage](10*time.Millisecond),
 			dataloader.WithBatchCapacity[int, *models.FlyerPage](100),
+		),
+		ShoppingListLoader: dataloader.NewBatchedLoader(
+			batchShoppingListLoader(shoppingListService),
+			dataloader.WithWait[int64, *models.ShoppingList](10*time.Millisecond),
+			dataloader.WithBatchCapacity[int64, *models.ShoppingList](100),
+		),
+		ProductLoader: dataloader.NewBatchedLoader(
+			batchProductLoader(productService),
+			dataloader.WithWait[int, *models.Product](10*time.Millisecond),
+			dataloader.WithBatchCapacity[int, *models.Product](100),
 		),
 		ProductMasterLoader: dataloader.NewBatchedLoader(
 			batchProductMasterLoader(productMasterService),
@@ -233,4 +247,66 @@ func FromContext(ctx context.Context) *Loaders {
 		panic("dataloaders not found in context - ensure middleware is properly configured")
 	}
 	return loaders
+}
+
+// batchShoppingListLoader creates a batch function for loading shopping lists by IDs
+func batchShoppingListLoader(service services.ShoppingListService) dataloader.BatchFunc[int64, *models.ShoppingList] {
+	return func(ctx context.Context, keys []int64) []*dataloader.Result[*models.ShoppingList] {
+		lists, err := service.GetByIDs(ctx, keys)
+		if err != nil {
+			results := make([]*dataloader.Result[*models.ShoppingList], len(keys))
+			for i := range keys {
+				results[i] = &dataloader.Result[*models.ShoppingList]{Error: err}
+			}
+			return results
+		}
+
+		listMap := make(map[int64]*models.ShoppingList, len(lists))
+		for _, list := range lists {
+			listMap[list.ID] = list
+		}
+
+		results := make([]*dataloader.Result[*models.ShoppingList], len(keys))
+		for i, key := range keys {
+			if list, ok := listMap[key]; ok {
+				results[i] = &dataloader.Result[*models.ShoppingList]{Data: list}
+			} else {
+				results[i] = &dataloader.Result[*models.ShoppingList]{
+					Error: fmt.Errorf("shopping list with ID %d not found", key),
+				}
+			}
+		}
+		return results
+	}
+}
+
+// batchProductLoader creates a batch function for loading products by IDs
+func batchProductLoader(service services.ProductService) dataloader.BatchFunc[int, *models.Product] {
+	return func(ctx context.Context, keys []int) []*dataloader.Result[*models.Product] {
+		products, err := service.GetByIDs(ctx, keys)
+		if err != nil {
+			results := make([]*dataloader.Result[*models.Product], len(keys))
+			for i := range keys {
+				results[i] = &dataloader.Result[*models.Product]{Error: err}
+			}
+			return results
+		}
+
+		productMap := make(map[int]*models.Product, len(products))
+		for _, product := range products {
+			productMap[product.ID] = product
+		}
+
+		results := make([]*dataloader.Result[*models.Product], len(keys))
+		for i, key := range keys {
+			if product, ok := productMap[key]; ok {
+				results[i] = &dataloader.Result[*models.Product]{Data: product}
+			} else {
+				results[i] = &dataloader.Result[*models.Product]{
+					Error: fmt.Errorf("product with ID %d not found", key),
+				}
+			}
+		}
+		return results
+	}
 }

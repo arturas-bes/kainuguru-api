@@ -155,7 +155,7 @@ For each box, read ONLY inside that rectangle and fill or correct fields:
 CRITICAL RULES:
 1. RESPECT PASS-1 FINDINGS: If pass-1 found discount_pct but no price_eur, DO NOT invent a price. Keep price_eur=null.
 2. PERCENT-ONLY IS VALID: Many modules (especially category/brand_line promotions) show only a percent badge without a price. This is correct.
-3. MULTIPLE BADGES: If multiple discount badges are visible, report the STRONGER (higher %) discount. If one has a loyalty heart, set loyalty_required=true.
+3. MULTIPLE BADGES: If multiple discount badges are visible, report the STRONGER (higher percentage) discount. If one has a loyalty heart, set loyalty_required=true.
 4. EXACT TEXT: Keep name_lt EXACTLY as printed. For category promotions, use the printed category headline verbatim (e.g., "Pampers sauskelnėms ir drėgnoms servetėlėms").
 5. NO HALLUCINATION: NEVER guess prices, weights, or brands not printed inside the box. If unreadable or missing: null.
 6. NORMALIZATION: Price format "X,XX €". Percent as integer in discount_pct, printed form in discount_text.
