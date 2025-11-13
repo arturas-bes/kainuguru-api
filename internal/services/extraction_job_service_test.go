@@ -150,7 +150,399 @@ func TestExtractionJobService_CleanupCompletedJobs(t *testing.T) {
 	}
 }
 
-type mockExtractionJobRepository struct {
+func TestExtractionJobService_GetByIDDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		getByIDFunc: func(ctx context.Context, id int64) (*models.ExtractionJob, error) {
+			called = true
+			if id != 42 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return &models.ExtractionJob{ID: 42, JobType: "test"}, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	result, err := service.GetByID(ctx, 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 42 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_GetByIDPropagatesError(t *testing.T) {
+	ctx := context.Background()
+	want := errors.New("not found")
+	repo := &mockExtractionJobRepository{
+		getByIDFunc: func(ctx context.Context, id int64) (*models.ExtractionJob, error) {
+			return nil, want
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	_, err := service.GetByID(ctx, 999)
+	if !errors.Is(err, want) {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+}
+
+func TestExtractionJobService_GetAllDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		getAllFunc: func(ctx context.Context, filters *extractionjob.Filters) ([]*models.ExtractionJob, error) {
+			called = true
+			if filters == nil || filters.Limit != 10 {
+				t.Fatalf("filters not forwarded")
+			}
+			return []*models.ExtractionJob{{ID: 1}, {ID: 2}}, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	result, err := service.GetAll(ctx, ExtractionJobFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(result) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_CreateSetsDefaults(t *testing.T) {
+	ctx := context.Background()
+	fixedTime := time.Unix(1000, 0)
+	repo := &mockExtractionJobRepository{
+		createFunc: func(ctx context.Context, job *models.ExtractionJob) error {
+			if job.Priority != 5 {
+				t.Fatalf("expected default priority 5, got %d", job.Priority)
+			}
+			if job.MaxAttempts != 3 {
+				t.Fatalf("expected default max attempts 3, got %d", job.MaxAttempts)
+			}
+			if job.Status != string(models.JobStatusPending) {
+				t.Fatalf("expected pending status, got %s", job.Status)
+			}
+			if job.ScheduledFor != fixedTime {
+				t.Fatalf("expected scheduled for to be set")
+			}
+			if job.CreatedAt != fixedTime || job.UpdatedAt != fixedTime {
+				t.Fatalf("timestamps not set correctly")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return fixedTime },
+	}
+
+	job := &models.ExtractionJob{JobType: "test", Priority: 0}
+	if err := service.Create(ctx, job); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_CreateRejectsNilJob(t *testing.T) {
+	service := &extractionJobService{repo: &mockExtractionJobRepository{}, logger: slog.Default(), now: time.Now}
+	err := service.Create(context.Background(), nil)
+	if err == nil || err.Error() != "job cannot be nil" {
+		t.Fatalf("expected nil job error, got %v", err)
+	}
+}
+
+func TestExtractionJobService_CreateRejectsEmptyJobType(t *testing.T) {
+	service := &extractionJobService{repo: &mockExtractionJobRepository{}, logger: slog.Default(), now: time.Now}
+	err := service.Create(context.Background(), &models.ExtractionJob{})
+	if err == nil || err.Error() != "job type is required" {
+		t.Fatalf("expected job type error, got %v", err)
+	}
+}
+
+func TestExtractionJobService_UpdateSetsTimestamp(t *testing.T) {
+	ctx := context.Background()
+	fixedTime := time.Unix(2000, 0)
+	repo := &mockExtractionJobRepository{
+		updateFunc: func(ctx context.Context, job *models.ExtractionJob) error {
+			if job.UpdatedAt != fixedTime {
+				t.Fatalf("UpdatedAt not set correctly")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return fixedTime },
+	}
+
+	job := &models.ExtractionJob{ID: 10, JobType: "test"}
+	if err := service.Update(ctx, job); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_DeleteDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		deleteFunc: func(ctx context.Context, id int64) error {
+			called = true
+			if id != 99 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	if err := service.Delete(ctx, 99); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_GetNextJobDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		getNextFunc: func(ctx context.Context, jobTypes []string, workerID string) (*models.ExtractionJob, error) {
+			called = true
+			if len(jobTypes) != 2 || jobTypes[0] != "typeA" || workerID != "worker1" {
+				t.Fatalf("unexpected args: %v %s", jobTypes, workerID)
+			}
+			return &models.ExtractionJob{ID: 50}, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	result, err := service.GetNextJob(ctx, []string{"typeA", "typeB"}, "worker1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 50 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_GetPendingJobsDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		getPendingFunc: func(ctx context.Context, jobTypes []string, limit int) ([]*models.ExtractionJob, error) {
+			called = true
+			if len(jobTypes) != 1 || limit != 0 {
+				t.Fatalf("unexpected args: %v %d", jobTypes, limit)
+			}
+			return []*models.ExtractionJob{{ID: 1}, {ID: 2}}, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	result, err := service.GetPendingJobs(ctx, []string{"typeX"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(result) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_GetProcessingJobsDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		getProcessingFunc: func(ctx context.Context, workerID string) ([]*models.ExtractionJob, error) {
+			called = true
+			if workerID != "worker2" {
+				t.Fatalf("unexpected workerID: %s", workerID)
+			}
+			return []*models.ExtractionJob{{ID: 3}}, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	result, err := service.GetProcessingJobs(ctx, "worker2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(result) != 1 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestExtractionJobService_CompleteJobSetsStatus(t *testing.T) {
+	ctx := context.Background()
+	fixedTime := time.Unix(3000, 0)
+	job := &models.ExtractionJob{ID: 20, Status: string(models.JobStatusProcessing)}
+	repo := &mockExtractionJobRepository{
+		getByIDFunc: func(ctx context.Context, id int64) (*models.ExtractionJob, error) {
+			return job, nil
+		},
+		updateFunc: func(ctx context.Context, j *models.ExtractionJob) error {
+			if j.Status != string(models.JobStatusCompleted) {
+				t.Fatalf("expected completed status, got %s", j.Status)
+			}
+			if j.CompletedAt == nil || *j.CompletedAt != fixedTime {
+				t.Fatalf("CompletedAt not set correctly")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return fixedTime },
+	}
+
+	if err := service.CompleteJob(ctx, 20); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_FailJobSetsStatusAndError(t *testing.T) {
+	ctx := context.Background()
+	fixedTime := time.Unix(4000, 0)
+	job := &models.ExtractionJob{ID: 25, Status: string(models.JobStatusProcessing), ErrorCount: 1}
+	repo := &mockExtractionJobRepository{
+		getByIDFunc: func(ctx context.Context, id int64) (*models.ExtractionJob, error) {
+			return job, nil
+		},
+		updateFunc: func(ctx context.Context, j *models.ExtractionJob) error {
+			if j.Status != string(models.JobStatusFailed) {
+				t.Fatalf("expected failed status, got %s", j.Status)
+			}
+			if j.ErrorMessage == nil || *j.ErrorMessage != "test error" {
+				t.Fatalf("ErrorMessage not set correctly")
+			}
+			if j.ErrorCount != 2 {
+				t.Fatalf("ErrorCount not incremented, got %d", j.ErrorCount)
+			}
+			if j.CompletedAt == nil || *j.CompletedAt != fixedTime {
+				t.Fatalf("CompletedAt not set correctly")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return fixedTime },
+	}
+
+	if err := service.FailJob(ctx, 25, "test error"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_CancelJobSetsStatusAndClearsWorker(t *testing.T) {
+	ctx := context.Background()
+	fixedTime := time.Unix(5000, 0)
+	workerID := "worker-cancel"
+	job := &models.ExtractionJob{ID: 30, Status: string(models.JobStatusProcessing), WorkerID: &workerID}
+	repo := &mockExtractionJobRepository{
+		getByIDFunc: func(ctx context.Context, id int64) (*models.ExtractionJob, error) {
+			return job, nil
+		},
+		updateFunc: func(ctx context.Context, j *models.ExtractionJob) error {
+			if j.Status != string(models.JobStatusCancelled) {
+				t.Fatalf("expected cancelled status, got %s", j.Status)
+			}
+			if j.WorkerID != nil {
+				t.Fatalf("WorkerID should be cleared")
+			}
+			if j.CompletedAt == nil || *j.CompletedAt != fixedTime {
+				t.Fatalf("CompletedAt not set correctly")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return fixedTime },
+	}
+
+	if err := service.CancelJob(ctx, 30); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_CreateExtractPageJobSetsPayload(t *testing.T) {
+	ctx := context.Background()
+	repo := &mockExtractionJobRepository{
+		createFunc: func(ctx context.Context, job *models.ExtractionJob) error {
+			if job.JobType != string(models.JobTypeExtractPage) {
+				t.Fatalf("expected extract_page job, got %s", job.JobType)
+			}
+			if job.Payload == nil {
+				t.Fatalf("payload must be set")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return time.Unix(0, 0) },
+	}
+
+	if err := service.CreateExtractPageJob(ctx, 15, 8); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_CreateMatchProductsJobSetsPayload(t *testing.T) {
+	ctx := context.Background()
+	repo := &mockExtractionJobRepository{
+		createFunc: func(ctx context.Context, job *models.ExtractionJob) error {
+			if job.JobType != string(models.JobTypeMatchProducts) {
+				t.Fatalf("expected match_products job, got %s", job.JobType)
+			}
+			if job.Payload == nil {
+				t.Fatalf("payload must be set")
+			}
+			return nil
+		},
+	}
+	service := &extractionJobService{
+		repo:   repo,
+		logger: slog.Default(),
+		now:    func() time.Time { return time.Unix(0, 0) },
+	}
+
+	if err := service.CreateMatchProductsJob(ctx, 25, 6); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExtractionJobService_CleanupExpiredJobsDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &mockExtractionJobRepository{
+		deleteExpiredFunc: func(ctx context.Context) (int64, error) {
+			called = true
+			return 10, nil
+		},
+	}
+	service := &extractionJobService{repo: repo, logger: slog.Default(), now: time.Now}
+
+	count, err := service.CleanupExpiredJobs(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || count != 10 {
+		t.Fatalf("expected delegation to repository, got count %d", count)
+	}
+}
+
+type mockExtractionJobRepository struct{
 	getByIDFunc         func(ctx context.Context, id int64) (*models.ExtractionJob, error)
 	getAllFunc          func(ctx context.Context, filters *extractionjob.Filters) ([]*models.ExtractionJob, error)
 	createFunc          func(ctx context.Context, job *models.ExtractionJob) error
