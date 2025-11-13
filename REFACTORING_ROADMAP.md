@@ -635,15 +635,21 @@ Total: 20 working days (~4 weeks)
 - [x] Auth service tests characterized (38 tests: 13 delegation, 25 documented; 963 LOC)
 - [ ] Large files split (deferred to Phase 4)
 
-**Phase 4 (Week 4) - IN PROGRESS** 🚧
+**Phase 4 (Week 4) - COMPLETE** ✅
 - [x] Error handling migration started (pilot: price_history_service)
 - [x] Batch 1 complete: flyer_page_service + store_service migrated
-- [x] Migration pattern established and proven across 3 service types
-- [x] **3 services migrated** (357 LOC), 38 tests passing, zero regressions
-- [ ] Continue migrating remaining 5 services to pkg/errors
-- [ ] Documentation complete
-- [ ] Configuration validation
-- [ ] Performance optimization
+- [x] Batch 2 complete: product_service + flyer_service migrated
+- [x] Batch 3 complete: extraction_job_service + shopping_list_service migrated
+- [x] Final batch complete: shopping_list_item_service migrated
+- [x] Migration pattern established and proven across 8 services
+- [x] **ALL 8 services migrated** (1,708 LOC), 145 tests passing, ZERO regressions
+- [x] All services now use pkg/errors with typed errors (NotFound 404, Internal 500)
+- [x] Error wrapping preserves chains with %w semantics
+- [x] HTTP status code mapping and GraphQL compatibility
+- [x] Zero behavior changes (AGENTS.md compliant)
+- [x] Documentation complete (REFACTORING_STATUS.md updated with steps 26-30)
+- [ ] Configuration validation (deferred to Phase 5)
+- [ ] Performance optimization (deferred to Phase 5)
 
 **Final Verification** 📋
 - [ ] All metrics meet targets
@@ -683,7 +689,240 @@ Total: 20 working days (~4 weeks)
 
 ---
 
-**Last Updated:** 2025-11-12
-**Status:** In Progress
+## Phase 5: CONSOLIDATION & POLISH (Week 5+ - ONGOING)
+
+### 5.1 Extended Error Handling Migration
+**Issue:** 406 instances of `fmt.Errorf` remain in 29 untested services
+**Impact:** MEDIUM - Error handling consistency across codebase
+**Effort:** 16-20 hours (depends on service complexity)
+
+**Current State:**
+- ✅ 8 core services migrated (price_history, flyer_page, store, product, flyer, extraction_job, shopping_list, shopping_list_item)
+- ⏳ 29 services remaining with fmt.Errorf patterns
+
+**Services to Migrate (Priority Order):**
+
+**Batch 5 - Auth subsystem (high priority, already has 38 characterization tests):**
+1. `auth/service.go` (552 LOC, 41 fmt.Errorf sites, 3% coverage)
+2. `auth/jwt.go` (20 fmt.Errorf sites)
+3. `auth/session.go` (17 fmt.Errorf sites)
+4. `auth/password_reset.go` (23 fmt.Errorf sites)
+5. `auth/email_verify.go` (17 fmt.Errorf sites)
+6. `auth/password.go` (14 fmt.Errorf sites)
+
+**Batch 6 - Product master (high priority, complex business logic):**
+1. `product_master_service.go` (510 LOC, 24 fmt.Errorf sites, needs tests)
+
+**Batch 7 - Search & matching (medium priority):**
+1. `search/service.go` (495 LOC, 18 fmt.Errorf sites, 25.8% coverage)
+2. `search/validation.go` (36 fmt.Errorf sites)
+3. `matching/product_matcher.go` (1 fmt.Errorf site, 50.5% coverage)
+
+**Batch 8 - Worker infrastructure (medium priority):**
+1. `worker/queue.go` (15 fmt.Errorf sites)
+2. `worker/lock.go` (11 fmt.Errorf sites)
+3. `worker/processor.go` (7 fmt.Errorf sites)
+4. `worker/scheduler.go` (4 fmt.Errorf sites)
+
+**Batch 9 - Supporting services (lower priority):**
+1. `email/smtp_service.go` (386 LOC, 6 fmt.Errorf sites)
+2. `storage/flyer_storage.go` (6 fmt.Errorf sites)
+3. `cache/flyer_cache.go` (17 fmt.Errorf sites)
+4. `cache/extraction_cache.go` (444 LOC, 20 fmt.Errorf sites)
+
+**Deferred (low priority, large complex services with 0% coverage):**
+- `ai/extractor.go` (626 LOC, 2 fmt.Errorf sites)
+- `ai/validator.go` (604 LOC, 4 fmt.Errorf sites)
+- `ai/cost_tracker.go` (560 LOC, 2 fmt.Errorf sites)
+- `enrichment/service.go` (656 LOC, 9 fmt.Errorf sites)
+- `enrichment/utils.go` (382 LOC, 8 fmt.Errorf sites)
+- `archive/archiver.go` (575 LOC, 16 fmt.Errorf sites)
+- `archive/cleaner.go` (577 LOC, 6 fmt.Errorf sites)
+- `scraper/iki_scraper.go` (494 LOC, 1 fmt.Errorf site)
+- `scraper/rimi_scraper.go` (405 LOC)
+- `recommendation/optimizer.go` (435 LOC, 4 fmt.Errorf sites)
+- `recommendation/price_comparison_service.go` (4 fmt.Errorf sites)
+
+**Tasks:**
+- [ ] Batch 5: Migrate auth subsystem (6 files, 132 error sites)
+- [ ] Batch 6: Migrate product_master_service (1 file, 24 error sites)
+- [ ] Batch 7: Migrate search & matching (3 files, 55 error sites)
+- [ ] Batch 8: Migrate worker infrastructure (4 files, 37 error sites)
+- [ ] Batch 9: Migrate supporting services (4 files, 49 error sites)
+- [ ] Document migration metrics (total LOC, tests passing, regressions)
+
+---
+
+### 5.2 Split Large Service Files
+**Issue:** 9 files exceed 500 LOC, hard to maintain and test
+**Impact:** MEDIUM - Maintainability and cognitive load
+**Effort:** 12-16 hours
+
+**Files to Split:**
+
+**1. enrichment/service.go (656 LOC) → 3 files:**
+- `enrichment/service_core.go` - Core interface and factory (~150 LOC)
+- `enrichment/service_product.go` - Product enrichment logic (~250 LOC)
+- `enrichment/service_batch.go` - Batch operations (~250 LOC)
+
+**2. ai/extractor.go (626 LOC) → 3 files:**
+- `ai/extractor_core.go` - Interface and config (~150 LOC)
+- `ai/extractor_text.go` - Text extraction (~250 LOC)
+- `ai/extractor_structure.go` - Structured data extraction (~250 LOC)
+
+**3. ai/validator.go (604 LOC) → 2 files:**
+- `ai/validator_core.go` - Interface and basic validation (~300 LOC)
+- `ai/validator_rules.go` - Complex validation rules (~300 LOC)
+
+**4. archive/cleaner.go (577 LOC) → 2 files:**
+- `archive/cleaner_core.go` - Interface and configuration (~250 LOC)
+- `archive/cleaner_jobs.go` - Cleanup job implementations (~330 LOC)
+
+**5. archive/archiver.go (575 LOC) → 2 files:**
+- `archive/archiver_core.go` - Interface and factory (~250 LOC)
+- `archive/archiver_operations.go` - Archive/restore operations (~330 LOC)
+
+**6. ai/cost_tracker.go (560 LOC) → 2 files:**
+- `ai/cost_tracker_core.go` - Interface and tracking (~300 LOC)
+- `ai/cost_tracker_reporting.go` - Cost reporting and analysis (~260 LOC)
+
+**7. auth/service.go (552 LOC) → Keep as-is (already has comprehensive tests)**
+
+**8. shopping_list_item_service.go (540 LOC) → Keep as-is (already migrated, 26 tests)**
+
+**9. product_master_service.go (510 LOC) → 3 files (after tests added):**
+- `product_master_service_query.go` - CRUD operations (~200 LOC)
+- `product_master_service_matching.go` - Matching logic (~200 LOC)
+- `product_master_service_stats.go` - Statistics and verification (~110 LOC)
+
+**Tasks:**
+- [ ] Split enrichment/service.go (after error migration)
+- [ ] Split ai subsystem (extractor, validator, cost_tracker)
+- [ ] Split archive subsystem (cleaner, archiver)
+- [ ] Split product_master_service.go (after tests + error migration)
+- [ ] Verify all tests pass after each split
+- [ ] Update import statements across codebase
+
+---
+
+### 5.3 Configuration Validation
+**Issue:** No validation of required environment variables at startup
+**Impact:** LOW-MEDIUM - Runtime safety, production debugging
+**Effort:** 4 hours
+
+**Tasks:**
+- [ ] Add validation to config.Load() for required vars
+- [ ] Create config validation functions with clear error messages
+- [ ] Standardize configuration naming consistency
+- [ ] Document all environment variables in .env.example
+- [ ] Add startup check that fails fast if config invalid
+- [ ] Test with missing/invalid environment variables
+
+---
+
+### 5.4 Performance Optimization
+**Issue:** No query complexity limits, potential N+1 queries
+**Impact:** LOW - Performance under load
+**Effort:** 6-8 hours
+
+**Tasks:**
+- [ ] Profile GraphQL queries to identify N+1 issues
+- [ ] Add query complexity analysis middleware
+- [ ] Set reasonable complexity limits (e.g., max depth 10, max cost 1000)
+- [ ] Optimize expensive queries identified in profiling
+- [ ] Add query execution time metrics/logging
+- [ ] Document performance characteristics of critical paths
+
+---
+
+### 5.5 Expand Test Coverage (Stretch Goal: 60%+)
+**Issue:** Many subsystems have 0% coverage
+**Impact:** HIGH - Code reliability and confidence
+**Effort:** 30-40 hours (ongoing)
+
+**Current Coverage:**
+- `internal/services`: 46.6% ✅ (exceeded 40% stretch goal!)
+- `auth`: 3.0% (38 characterization tests exist but only cover delegation)
+- `matching`: 50.5% ✅
+- `search`: 25.8%
+- `ai`: 0.0%
+- `archive`: 0.0%
+- `cache`: 0.0%
+- `email`: 0.0%
+- `enrichment`: 0.0%
+- `scraper`: 0.0%
+- `storage`: 0.0%
+- `worker`: 0.0%
+
+**Priority Services to Test:**
+1. **product_master_service** (510 LOC, 0% coverage) - Critical business logic
+2. **auth subsystem** (convert 25 documented tests to integration tests)
+3. **search/service** (improve from 25.8% to 50%+)
+4. **worker infrastructure** (queue, lock, processor, scheduler)
+5. **email/smtp_service** (basic send/template tests)
+6. **cache services** (flyer_cache, extraction_cache)
+
+**Deferred (requires integration test infrastructure):**
+- AI subsystem (extractor, validator, cost_tracker)
+- Enrichment services
+- Archive services
+- Scraper implementations
+
+---
+
+### 5.6 Additional Quality Improvements
+**Issue:** Various minor quality issues identified
+**Impact:** LOW - Code quality and consistency
+**Effort:** 6-8 hours
+
+**Tasks:**
+- [ ] Add GraphQL input validation middleware
+- [ ] Document service dependencies (dependency diagram)
+- [ ] Add package-level documentation comments
+- [ ] Run golangci-lint and fix critical issues
+- [ ] Standardize error variable naming
+- [ ] Add pre-commit hooks (gofmt, go vet, tests)
+
+---
+
+## Phase 5 Success Metrics
+
+After completing Phase 5, these metrics should improve:
+
+| Metric | Current | Phase 5 Target | Status |
+|--------|---------|----------------|--------|
+| Test Coverage (services) | 46.6% | >50% | 🟡 IN PROGRESS |
+| Test Coverage (overall) | 13.9% | >20% | 🟡 IN PROGRESS |
+| Error handling (services migrated) | 8/37 (22%) | 20/37 (54%) | ⏳ PENDING |
+| Largest File | 656 LOC | <500 LOC | ⏳ PENDING |
+| Code Duplication | ~5% | <5% | ✅ ACHIEVED |
+| fmt.Errorf instances | 406 | <150 | ⏳ PENDING |
+| Services with 0% coverage | 8 subsystems | 4 subsystems | ⏳ PENDING |
+
+---
+
+## Phase 5 Timeline (Estimated)
+
+**Batch 5-7 (Priority migrations): 2 weeks**
+- Week 1: Auth subsystem + product_master (7 files)
+- Week 2: Search/matching + worker infrastructure (7 files)
+
+**File Splitting: 1.5 weeks**
+- Split large files one at a time with test verification
+
+**Configuration + Performance: 0.5 weeks**
+- Configuration validation (0.5 days)
+- Performance optimization (1 day)
+
+**Test Coverage Expansion: Ongoing (2-3 weeks)**
+- Run in parallel with other work
+- Focus on product_master, search, worker, email, cache
+
+**Total Estimate: 4-6 weeks**
+
+---
+
+**Last Updated:** 2025-11-13
+**Status:** Phase 5 Planning Complete, Ready to Begin
 **Owner:** Engineering Lead
 **Reviewers:** Team Leads, Architects
