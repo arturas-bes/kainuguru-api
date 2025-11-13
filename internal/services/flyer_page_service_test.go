@@ -75,6 +75,240 @@ func TestFlyerPageService_CreatePropagatesError(t *testing.T) {
 	}
 }
 
+func TestFlyerPageService_GetByIDDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &flyerPageRepoStub{
+		getByIDFunc: func(ctx context.Context, id int) (*models.FlyerPage, error) {
+			called = true
+			if id != 42 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return &models.FlyerPage{ID: 42, PageNumber: 1}, nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	page, err := svc.GetByID(ctx, 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || page.ID != 42 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestFlyerPageService_GetByIDPropagatesError(t *testing.T) {
+	ctx := context.Background()
+	wantErr := errors.New("not found")
+	repo := &flyerPageRepoStub{
+		getByIDFunc: func(ctx context.Context, id int) (*models.FlyerPage, error) {
+			return nil, wantErr
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	_, err := svc.GetByID(ctx, 999)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+}
+
+func TestFlyerPageService_GetByIDsDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &flyerPageRepoStub{
+		getByIDsFunc: func(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
+			called = true
+			if len(ids) != 2 || ids[0] != 1 || ids[1] != 2 {
+				t.Fatalf("unexpected IDs: %v", ids)
+			}
+			return []*models.FlyerPage{{ID: 1}, {ID: 2}}, nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	pages, err := svc.GetByIDs(ctx, []int{1, 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(pages) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestFlyerPageService_GetByFlyerIDDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &flyerPageRepoStub{
+		getByFlyerIDFunc: func(ctx context.Context, flyerID int) ([]*models.FlyerPage, error) {
+			called = true
+			if flyerID != 10 {
+				t.Fatalf("unexpected flyer ID: %d", flyerID)
+			}
+			return []*models.FlyerPage{{ID: 1, FlyerID: 10}, {ID: 2, FlyerID: 10}}, nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	pages, err := svc.GetByFlyerID(ctx, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(pages) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestFlyerPageService_CountDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	filters := FlyerPageFilters{Limit: 10}
+	repo := &flyerPageRepoStub{
+		countFunc: func(ctx context.Context, f *flyerpage.Filters) (int, error) {
+			called = true
+			if f == nil || f.Limit != 10 {
+				t.Fatalf("filters not forwarded: %+v", f)
+			}
+			return 25, nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	count, err := svc.Count(ctx, filters)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || count != 25 {
+		t.Fatalf("expected count 25, got %d", count)
+	}
+}
+
+func TestFlyerPageService_UpdateSetsTimestamp(t *testing.T) {
+	ctx := context.Background()
+	page := &models.FlyerPage{ID: 1, PageNumber: 1}
+
+	repo := &flyerPageRepoStub{
+		updateFunc: func(ctx context.Context, p *models.FlyerPage) error {
+			if p.UpdatedAt.IsZero() {
+				t.Fatalf("expected UpdatedAt to be set")
+			}
+			return nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	if err := svc.Update(ctx, page); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFlyerPageService_UpdatePropagatesError(t *testing.T) {
+	ctx := context.Background()
+	wantErr := errors.New("update failed")
+	repo := &flyerPageRepoStub{
+		updateFunc: func(ctx context.Context, page *models.FlyerPage) error {
+			return wantErr
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	err := svc.Update(ctx, &models.FlyerPage{ID: 1})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+}
+
+func TestFlyerPageService_DeleteDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	repo := &flyerPageRepoStub{
+		deleteFunc: func(ctx context.Context, id int) error {
+			called = true
+			if id != 99 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	if err := svc.Delete(ctx, 99); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestFlyerPageService_DeletePropagatesError(t *testing.T) {
+	ctx := context.Background()
+	wantErr := errors.New("delete failed")
+	repo := &flyerPageRepoStub{
+		deleteFunc: func(ctx context.Context, id int) error {
+			return wantErr
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	err := svc.Delete(ctx, 1)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+}
+
+func TestFlyerPageService_CreateBatchSetsTimestamps(t *testing.T) {
+	ctx := context.Background()
+	pages := []*models.FlyerPage{
+		{ID: 1, PageNumber: 1},
+		{ID: 2, PageNumber: 2},
+	}
+
+	repo := &flyerPageRepoStub{
+		createBatchFunc: func(ctx context.Context, p []*models.FlyerPage) error {
+			for _, page := range p {
+				if page.CreatedAt.IsZero() || page.UpdatedAt.IsZero() {
+					t.Fatalf("expected timestamps to be set on page %d", page.ID)
+				}
+			}
+			return nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	if err := svc.CreateBatch(ctx, pages); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFlyerPageService_GetPagesByFlyerIDsDelegates(t *testing.T) {
+	ctx := context.Background()
+	called := false
+	flyerIDs := []int{1, 2, 3}
+	repo := &flyerPageRepoStub{
+		getPagesByFlyerIDsFunc: func(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
+			called = true
+			if len(ids) != 3 {
+				t.Fatalf("unexpected flyer IDs length: %d", len(ids))
+			}
+			return []*models.FlyerPage{
+				{ID: 1, FlyerID: 1},
+				{ID: 2, FlyerID: 2},
+				{ID: 3, FlyerID: 3},
+			}, nil
+		},
+	}
+	svc := &flyerPageService{repo: repo}
+
+	pages, err := svc.GetPagesByFlyerIDs(ctx, flyerIDs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(pages) != 3 {
+		t.Fatalf("expected 3 pages, got %d", len(pages))
+	}
+}
+
 type flyerPageRepoStub struct {
 	getByIDFunc            func(ctx context.Context, id int) (*models.FlyerPage, error)
 	getByIDsFunc           func(ctx context.Context, ids []int) ([]*models.FlyerPage, error)
