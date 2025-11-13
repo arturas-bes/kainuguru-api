@@ -2,12 +2,13 @@ package auth
 
 import (
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"strings"
 	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 // passwordService implements PasswordService
@@ -25,12 +26,12 @@ func NewPasswordService(config *AuthConfig) PasswordService {
 // HashPassword hashes a password using bcrypt
 func (p *passwordService) HashPassword(password string) (string, error) {
 	if err := p.ValidatePasswordStrength(password); err != nil {
-		return "", fmt.Errorf("password validation failed: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeValidation, "password validation failed")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), p.config.BcryptCost)
 	if err != nil {
-		return "", fmt.Errorf("failed to hash password: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to hash password")
 	}
 
 	return string(hash), nil
@@ -41,9 +42,9 @@ func (p *passwordService) VerifyPassword(password, hash string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	if err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
-			return fmt.Errorf("invalid password")
+			return apperrors.Authentication("invalid password")
 		}
-		return fmt.Errorf("password verification failed: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "password verification failed")
 	}
 	return nil
 }
@@ -108,12 +109,12 @@ func (p *passwordService) GenerateRandomPassword(length int) string {
 // ValidatePasswordStrength validates password against configured requirements
 func (p *passwordService) ValidatePasswordStrength(password string) error {
 	if len(password) < p.config.PasswordMinLength {
-		return fmt.Errorf("password must be at least %d characters long", p.config.PasswordMinLength)
+		return apperrors.ValidationF("password must be at least %d characters long", p.config.PasswordMinLength)
 	}
 
 	// Check for maximum reasonable length (prevent DoS)
 	if len(password) > 128 {
-		return fmt.Errorf("password must not exceed 128 characters")
+		return apperrors.Validation("password must not exceed 128 characters")
 	}
 
 	var hasLower, hasUpper, hasNumber, hasSymbol bool
@@ -133,19 +134,19 @@ func (p *passwordService) ValidatePasswordStrength(password string) error {
 
 	// Check requirements
 	if p.config.PasswordRequireLower && !hasLower {
-		return fmt.Errorf("password must contain at least one lowercase letter")
+		return apperrors.Validation("password must contain at least one lowercase letter")
 	}
 
 	if p.config.PasswordRequireUpper && !hasUpper {
-		return fmt.Errorf("password must contain at least one uppercase letter")
+		return apperrors.Validation("password must contain at least one uppercase letter")
 	}
 
 	if p.config.PasswordRequireNumber && !hasNumber {
-		return fmt.Errorf("password must contain at least one number")
+		return apperrors.Validation("password must contain at least one number")
 	}
 
 	if p.config.PasswordRequireSymbol && !hasSymbol {
-		return fmt.Errorf("password must contain at least one symbol")
+		return apperrors.Validation("password must contain at least one symbol")
 	}
 
 	// Check for common weak patterns only if any requirements are enabled
@@ -173,7 +174,7 @@ func (p *passwordService) checkWeakPatterns(password string) error {
 
 	for _, weak := range weakPatterns {
 		if strings.Contains(lower, weak) {
-			return fmt.Errorf("password contains common weak pattern")
+			return apperrors.Validation("password contains common weak pattern")
 		}
 	}
 
@@ -185,13 +186,13 @@ func (p *passwordService) checkWeakPatterns(password string) error {
 			count++
 		}
 		if count >= 4 {
-			return fmt.Errorf("password contains too many repeated characters")
+			return apperrors.Validation("password contains too many repeated characters")
 		}
 	}
 
 	// Check for sequential characters
 	if p.hasSequentialChars(password, 4) {
-		return fmt.Errorf("password contains sequential characters")
+		return apperrors.Validation("password contains sequential characters")
 	}
 
 	// Check for keyboard patterns
@@ -202,7 +203,7 @@ func (p *passwordService) checkWeakPatterns(password string) error {
 
 	for _, pattern := range keyboardPatterns {
 		if strings.Contains(lower, pattern) {
-			return fmt.Errorf("password contains keyboard pattern")
+			return apperrors.Validation("password contains keyboard pattern")
 		}
 	}
 

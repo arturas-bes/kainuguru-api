@@ -3,12 +3,15 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/uptrace/bun"
 )
 
@@ -73,18 +76,18 @@ func (p *passwordResetService) RequestPasswordReset(ctx context.Context, email s
 		Exec(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to invalidate existing reset tokens: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to invalidate existing reset tokens: %v", err)
 	}
 
 	// Generate reset token
 	token, err := p.generateResetToken(ctx, user.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate reset token: %w", err)
+		return nil, err
 	}
 
 	// Send reset email
 	if err := p.email.SendPasswordResetEmail(ctx, user, token.Token); err != nil {
-		return nil, fmt.Errorf("failed to send password reset email: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to send password reset email: %v", err)
 	}
 
 	// Log the reset request for security monitoring
@@ -97,7 +100,7 @@ func (p *passwordResetService) RequestPasswordReset(ctx context.Context, email s
 func (p *passwordResetService) ResetPassword(ctx context.Context, input *models.UserPasswordResetConfirmInput) error {
 	// Validate input
 	if input.NewPassword != input.ConfirmPassword {
-		return fmt.Errorf("passwords do not match")
+		return apperrors.Validation("passwords do not match")
 	}
 
 	// Find and validate token
@@ -109,18 +112,18 @@ func (p *passwordResetService) ResetPassword(ctx context.Context, input *models.
 	// Get user
 	user, err := p.getUserByID(ctx, token.UserID)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return err
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		return fmt.Errorf("account is inactive")
+		return apperrors.Authentication("account is inactive")
 	}
 
 	// Hash new password
 	newPasswordHash, err := p.password.HashPassword(input.NewPassword)
 	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to hash new password: %v", err)
 	}
 
 	// Start transaction to update password and invalidate sessions
@@ -134,7 +137,7 @@ func (p *passwordResetService) ResetPassword(ctx context.Context, input *models.
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to update password: %w", err)
+			return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to update password: %v", err)
 		}
 
 		// Mark reset token as used
@@ -145,7 +148,7 @@ func (p *passwordResetService) ResetPassword(ctx context.Context, input *models.
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to mark reset token as used: %w", err)
+			return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to mark reset token as used: %v", err)
 		}
 
 		// Invalidate all existing sessions for security
@@ -157,20 +160,20 @@ func (p *passwordResetService) ResetPassword(ctx context.Context, input *models.
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to invalidate user sessions: %w", err)
+			return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to invalidate user sessions: %v", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to reset password: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to reset password: %v", err)
 	}
 
 	// Send confirmation email
 	if err := p.email.SendPasswordChangedEmail(ctx, user); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to send password changed email: %v\n", err)
+		_ = err
 	}
 
 	// Log successful password reset for security monitoring
@@ -210,7 +213,7 @@ func (p *passwordResetService) generateResetToken(ctx context.Context, userID uu
 	// Generate secure random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, fmt.Errorf("failed to generate random token: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to generate random token: %v", err)
 	}
 
 	tokenString := base64.URLEncoding.EncodeToString(tokenBytes)
@@ -245,10 +248,10 @@ func (p *passwordResetService) findAndValidateResetToken(ctx context.Context, to
 		Scan(ctx)
 
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, fmt.Errorf("invalid or expired reset token")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.Authentication("invalid or expired reset token")
 		}
-		return nil, fmt.Errorf("failed to find reset token: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to find reset token: %v", err)
 	}
 
 	return &token, nil

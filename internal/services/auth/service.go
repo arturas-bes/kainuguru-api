@@ -2,11 +2,14 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/uptrace/bun"
 )
 
@@ -45,25 +48,25 @@ func NewAuthServiceImpl(
 func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput) (*AuthResult, error) {
 	// Validate input
 	if input.Email == "" {
-		return nil, fmt.Errorf("email is required")
+		return nil, apperrors.Validation("email is required")
 	}
 	if input.Password == "" {
-		return nil, fmt.Errorf("password is required")
+		return nil, apperrors.Validation("password is required")
 	}
 	if input.FullName == nil || *input.FullName == "" {
-		return nil, fmt.Errorf("full name is required")
+		return nil, apperrors.Validation("full name is required")
 	}
 
 	// Check if user already exists
 	existingUser, err := a.GetUserByEmail(ctx, input.Email)
 	if err == nil && existingUser != nil {
-		return nil, fmt.Errorf("user with email %s already exists", input.Email)
+		return nil, apperrors.Conflict(fmt.Sprintf("user with email %s already exists", input.Email))
 	}
 
 	// Hash password
 	hashedPassword, err := a.passwordService.HashPassword(input.Password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to hash password")
 	}
 
 	// Create user
@@ -82,7 +85,7 @@ func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput)
 	// Insert user into database
 	_, err = a.db.NewInsert().Model(user).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create user")
 	}
 
 	// Create session
@@ -93,13 +96,13 @@ func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput)
 
 	session, err := a.sessionService.CreateSession(ctx, sessionInput)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create session")
 	}
 
 	// Generate tokens
 	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, session.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
 	}
 
 	// Update session with token hashes
@@ -115,7 +118,7 @@ func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput)
 		WherePK().
 		Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update session with token hashes: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update session with token hashes")
 	}
 
 	// Send welcome email if email service is available
@@ -143,10 +146,10 @@ func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput)
 func (a *authServiceImpl) Login(ctx context.Context, email, password string, metadata *SessionMetadata) (*AuthResult, error) {
 	// Validate input
 	if email == "" {
-		return nil, fmt.Errorf("email is required")
+		return nil, apperrors.Validation("email is required")
 	}
 	if password == "" {
-		return nil, fmt.Errorf("password is required")
+		return nil, apperrors.Validation("password is required")
 	}
 
 	// Record login attempt (before validation to track failed attempts)
@@ -158,35 +161,35 @@ func (a *authServiceImpl) Login(ctx context.Context, email, password string, met
 	// Check rate limiting
 	isLimited, unlockTime, err := a.IsRateLimited(ctx, email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check rate limiting: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check rate limiting")
 	}
 	if isLimited {
-		return nil, fmt.Errorf("too many login attempts, try again after %v", unlockTime.Format(time.RFC3339))
+		return nil, apperrors.RateLimit(fmt.Sprintf("too many login attempts, try again after %v", unlockTime.Format(time.RFC3339)))
 	}
 
 	// Get user
 	user, err := a.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, apperrors.Authentication("invalid credentials")
 	}
 	if user == nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, apperrors.Authentication("invalid credentials")
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		return nil, fmt.Errorf("account is deactivated")
+		return nil, apperrors.Authentication("account is deactivated")
 	}
 
 	// Verify password
 	err = a.passwordService.VerifyPassword(password, user.PasswordHash)
 	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, apperrors.Authentication("invalid credentials")
 	}
 
 	// Check email verification if required
 	if a.config.RequireEmailVerification && !user.EmailVerified {
-		return nil, fmt.Errorf("email not verified")
+		return nil, apperrors.Authentication("email not verified")
 	}
 
 	// Create session
@@ -208,13 +211,13 @@ func (a *authServiceImpl) Login(ctx context.Context, email, password string, met
 
 	session, err := a.sessionService.CreateSession(ctx, sessionInput)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create session")
 	}
 
 	// Generate tokens
 	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, session.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
 	}
 
 	// Update last login
@@ -276,10 +279,10 @@ func (a *authServiceImpl) ValidateToken(ctx context.Context, token string) (*Tok
 	// Validate session is still active
 	session, err := a.sessionService.ValidateSession(ctx, claims.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("session invalid: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "session invalid")
 	}
 	if session == nil {
-		return nil, fmt.Errorf("session not found")
+		return nil, apperrors.NotFound("session not found")
 	}
 
 	// Update session activity
@@ -293,31 +296,34 @@ func (a *authServiceImpl) RefreshToken(ctx context.Context, refreshToken string)
 	// Validate refresh token
 	claims, err := a.jwtService.ValidateRefreshToken(refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("invalid refresh token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeAuthentication, "invalid refresh token")
 	}
 
 	// Get session
 	session, err := a.sessionService.ValidateSession(ctx, claims.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("session invalid: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "session invalid")
 	}
 	if session == nil {
-		return nil, fmt.Errorf("session not found")
+		return nil, apperrors.NotFound("session not found")
 	}
 
 	// Get user
 	user, err := a.GetUserByID(ctx, claims.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("user not found")
+		}
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get user")
 	}
 	if !user.IsActive {
-		return nil, fmt.Errorf("user account deactivated")
+		return nil, apperrors.Authentication("user account deactivated")
 	}
 
 	// Generate new token pair
 	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, session.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
 	}
 
 	// Update session activity
@@ -342,7 +348,7 @@ func (a *authServiceImpl) RevokeToken(ctx context.Context, token string) error {
 	// Extract claims to get session ID
 	claims, err := a.jwtService.ExtractClaims(token)
 	if err != nil {
-		return fmt.Errorf("failed to extract token claims: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to extract token claims")
 	}
 
 	// Invalidate the session
@@ -354,7 +360,10 @@ func (a *authServiceImpl) GetUserByID(ctx context.Context, userID uuid.UUID) (*m
 	user := &models.User{}
 	err := a.db.NewSelect().Model(user).Where("id = ?", userID).Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("user not found with ID %s", userID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get user by ID %s", userID)
 	}
 	return user, nil
 }
@@ -386,7 +395,7 @@ func (a *authServiceImpl) GetByIDs(ctx context.Context, userIDs []string) ([]*mo
 		Where("id IN (?)", bun.In(uuidIDs)).
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get users: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get users")
 	}
 
 	return users, nil
@@ -397,10 +406,10 @@ func (a *authServiceImpl) GetUserByEmail(ctx context.Context, email string) (*mo
 	user := &models.User{}
 	err := a.db.NewSelect().Model(user).Where("email = ?", email).Scan(ctx)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // User not found, not an error
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get user by email %s", email)
 	}
 	return user, nil
 }
@@ -425,7 +434,7 @@ func (a *authServiceImpl) UpdateUser(ctx context.Context, userID uuid.UUID, inpu
 	// Save to database
 	_, err = a.db.NewUpdate().Model(user).WherePK().Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update user: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update user")
 	}
 
 	return user, nil
@@ -439,7 +448,7 @@ func (a *authServiceImpl) DeactivateUser(ctx context.Context, userID uuid.UUID) 
 		Where("id = ?", userID).
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to deactivate user: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to deactivate user")
 	}
 
 	// Invalidate all sessions
@@ -460,23 +469,23 @@ func (a *authServiceImpl) ReactivateUser(ctx context.Context, userID uuid.UUID) 
 // These would need to be implemented based on specific requirements
 
 func (a *authServiceImpl) ChangePassword(ctx context.Context, userID uuid.UUID, input *models.UserPasswordChangeInput) error {
-	return fmt.Errorf("password change not implemented yet")
+	return apperrors.Internal("password change not implemented yet")
 }
 
 func (a *authServiceImpl) RequestPasswordReset(ctx context.Context, email string) (*PasswordResetResult, error) {
-	return nil, fmt.Errorf("password reset not implemented yet")
+	return nil, apperrors.Internal("password reset not implemented yet")
 }
 
 func (a *authServiceImpl) ResetPassword(ctx context.Context, input *models.UserPasswordResetConfirmInput) error {
-	return fmt.Errorf("password reset confirm not implemented yet")
+	return apperrors.Internal("password reset confirm not implemented yet")
 }
 
 func (a *authServiceImpl) SendEmailVerification(ctx context.Context, userID uuid.UUID) error {
-	return fmt.Errorf("email verification not implemented yet")
+	return apperrors.Internal("email verification not implemented yet")
 }
 
 func (a *authServiceImpl) VerifyEmail(ctx context.Context, token string) error {
-	return fmt.Errorf("email verification not implemented yet")
+	return apperrors.Internal("email verification not implemented yet")
 }
 
 func (a *authServiceImpl) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]*models.UserSession, error) {
@@ -517,7 +526,7 @@ func (a *authServiceImpl) RecordLoginAttempt(ctx context.Context, email string, 
 	// Insert into database
 	_, err := a.db.NewInsert().Model(attempt).Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to record login attempt: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to record login attempt")
 	}
 
 	return nil
@@ -530,7 +539,7 @@ func (a *authServiceImpl) GetLoginAttempts(ctx context.Context, email string, si
 		Count(ctx)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to count login attempts: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count login attempts")
 	}
 
 	return count, nil

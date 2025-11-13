@@ -3,12 +3,14 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/uptrace/bun"
 )
 
@@ -49,22 +51,22 @@ func (e *emailVerificationService) SendEmailVerification(ctx context.Context, us
 	// Get user
 	user, err := e.getUserByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return err
 	}
 
 	if user.EmailVerified {
-		return fmt.Errorf("email is already verified")
+		return apperrors.Conflict("email is already verified")
 	}
 
 	// Generate verification token
 	token, err := e.generateVerificationToken(ctx, userID, "verification")
 	if err != nil {
-		return fmt.Errorf("failed to generate verification token: %w", err)
+		return err
 	}
 
 	// Send email
 	if err := e.email.SendVerificationEmail(ctx, user, token.Token); err != nil {
-		return fmt.Errorf("failed to send verification email: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to send verification email: %v", err)
 	}
 
 	return nil
@@ -89,7 +91,7 @@ func (e *emailVerificationService) VerifyEmail(ctx context.Context, tokenString 
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to mark email as verified: %w", err)
+			return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to mark email as verified: %v", err)
 		}
 
 		// Mark token as used
@@ -100,14 +102,14 @@ func (e *emailVerificationService) VerifyEmail(ctx context.Context, tokenString 
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to mark token as used: %w", err)
+			return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to mark token as used: %v", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to verify email: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to verify email: %v", err)
 	}
 
 	return nil
@@ -128,7 +130,7 @@ func (e *emailVerificationService) ResendEmailVerification(ctx context.Context, 
 		Exec(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to invalidate existing tokens: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to invalidate existing tokens: %v", err)
 	}
 
 	// Send new verification
@@ -140,7 +142,7 @@ func (e *emailVerificationService) generateVerificationToken(ctx context.Context
 	// Generate secure random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, fmt.Errorf("failed to generate random token: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to generate random token: %v", err)
 	}
 
 	tokenString := base64.URLEncoding.EncodeToString(tokenBytes)
@@ -160,7 +162,7 @@ func (e *emailVerificationService) generateVerificationToken(ctx context.Context
 		Exec(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to save verification token: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to save verification token: %v", err)
 	}
 
 	return token, nil
@@ -176,10 +178,10 @@ func (e *emailVerificationService) findAndValidateToken(ctx context.Context, tok
 		Scan(ctx)
 
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, fmt.Errorf("invalid or expired token")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.Authentication("invalid or expired token")
 		}
-		return nil, fmt.Errorf("failed to find token: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to find token: %v", err)
 	}
 
 	return &token, nil
@@ -196,12 +198,12 @@ func (e *emailVerificationService) checkVerificationRateLimit(ctx context.Contex
 		Count(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to check rate limit: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to check rate limit: %v", err)
 	}
 
 	maxVerificationsPerHour := 3
 	if count >= maxVerificationsPerHour {
-		return fmt.Errorf("too many verification emails sent. Please wait before requesting another")
+		return apperrors.RateLimit("too many verification emails sent. Please wait before requesting another")
 	}
 
 	return nil
@@ -216,10 +218,10 @@ func (e *emailVerificationService) getUserByID(ctx context.Context, userID uuid.
 		Scan(ctx)
 
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return nil, fmt.Errorf("user not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("user not found")
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get user: %v", err)
 	}
 
 	return &user, nil
@@ -233,7 +235,7 @@ func (e *emailVerificationService) CleanupExpiredTokens(ctx context.Context) (in
 		Exec(ctx)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired tokens: %w", err)
+		return 0, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to cleanup expired tokens: %v", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
