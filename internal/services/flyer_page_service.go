@@ -2,8 +2,12 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/kainuguru/kainuguru-api/internal/flyerpage"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -35,7 +39,10 @@ func NewFlyerPageServiceWithRepository(repo flyerpage.Repository) FlyerPageServi
 func (s *flyerPageService) GetByID(ctx context.Context, id int) (*models.FlyerPage, error) {
 	page, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get flyer page by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("flyer page not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer page by ID %d", id)
 	}
 	return page, nil
 }
@@ -44,7 +51,7 @@ func (s *flyerPageService) GetByID(ctx context.Context, id int) (*models.FlyerPa
 func (s *flyerPageService) GetByIDs(ctx context.Context, ids []int) ([]*models.FlyerPage, error) {
 	pages, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get flyer pages by IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyer pages by IDs")
 	}
 	return pages, nil
 }
@@ -53,7 +60,7 @@ func (s *flyerPageService) GetByIDs(ctx context.Context, ids []int) ([]*models.F
 func (s *flyerPageService) GetPagesByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.FlyerPage, error) {
 	pages, err := s.repo.GetPagesByFlyerIDs(ctx, flyerIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pages by flyer IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get pages by flyer IDs")
 	}
 	return pages, nil
 }
@@ -62,7 +69,7 @@ func (s *flyerPageService) GetPagesByFlyerIDs(ctx context.Context, flyerIDs []in
 func (s *flyerPageService) GetByFlyerID(ctx context.Context, flyerID int) ([]*models.FlyerPage, error) {
 	pages, err := s.repo.GetByFlyerID(ctx, flyerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pages for flyer %d: %w", flyerID, err)
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get pages for flyer %d", flyerID)
 	}
 	return pages, nil
 }
@@ -72,7 +79,7 @@ func (s *flyerPageService) GetAll(ctx context.Context, filters FlyerPageFilters)
 	f := filters
 	pages, err := s.repo.GetAll(ctx, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get flyer pages: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyer pages")
 	}
 
 	return pages, nil
@@ -82,7 +89,7 @@ func (s *flyerPageService) Count(ctx context.Context, filters FlyerPageFilters) 
 	f := filters
 	count, err := s.repo.Count(ctx, &f)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count flyer pages: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count flyer pages")
 	}
 
 	return count, nil
@@ -93,7 +100,7 @@ func (s *flyerPageService) Create(ctx context.Context, page *models.FlyerPage) e
 	page.UpdatedAt = time.Now()
 
 	if err := s.repo.Create(ctx, page); err != nil {
-		return fmt.Errorf("failed to create flyer page: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create flyer page")
 	}
 	return nil
 }
@@ -110,7 +117,7 @@ func (s *flyerPageService) CreateBatch(ctx context.Context, pages []*models.Flye
 	}
 
 	if err := s.repo.CreateBatch(ctx, pages); err != nil {
-		return fmt.Errorf("failed to create flyer pages batch: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create flyer pages batch")
 	}
 	return nil
 }
@@ -119,14 +126,14 @@ func (s *flyerPageService) Update(ctx context.Context, page *models.FlyerPage) e
 	page.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, page); err != nil {
-		return fmt.Errorf("failed to update flyer page %d: %w", page.ID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to update flyer page %d", page.ID)
 	}
 	return nil
 }
 
 func (s *flyerPageService) Delete(ctx context.Context, id int) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete flyer page %d: %w", id, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to delete flyer page %d", id)
 	}
 	return nil
 }
