@@ -2,8 +2,12 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/product"
@@ -33,7 +37,10 @@ func NewProductServiceWithRepository(repo product.Repository) ProductService {
 func (s *productService) GetByID(ctx context.Context, id int) (*models.Product, error) {
 	product, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("product not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get product by ID %d", id)
 	}
 	return product, nil
 }
@@ -42,7 +49,7 @@ func (s *productService) GetByID(ctx context.Context, id int) (*models.Product, 
 func (s *productService) GetByIDs(ctx context.Context, ids []int) ([]*models.Product, error) {
 	products, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get products by IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get products by IDs")
 	}
 	return products, nil
 }
@@ -51,7 +58,7 @@ func (s *productService) GetByIDs(ctx context.Context, ids []int) ([]*models.Pro
 func (s *productService) GetProductsByFlyerIDs(ctx context.Context, flyerIDs []int) ([]*models.Product, error) {
 	products, err := s.repo.GetProductsByFlyerIDs(ctx, flyerIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get products by flyer IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get products by flyer IDs")
 	}
 	return products, nil
 }
@@ -60,7 +67,7 @@ func (s *productService) GetProductsByFlyerIDs(ctx context.Context, flyerIDs []i
 func (s *productService) GetProductsByFlyerPageIDs(ctx context.Context, flyerPageIDs []int) ([]*models.Product, error) {
 	products, err := s.repo.GetProductsByFlyerPageIDs(ctx, flyerPageIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get products by flyer page IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get products by flyer page IDs")
 	}
 	return products, nil
 }
@@ -70,7 +77,7 @@ func (s *productService) GetAll(ctx context.Context, filters ProductFilters) ([]
 	f := filters
 	products, err := s.repo.GetAll(ctx, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get products: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get products")
 	}
 
 	return products, nil
@@ -90,7 +97,7 @@ func (s *productService) CreateBatch(ctx context.Context, products []*models.Pro
 	for _, p := range products {
 		// Validate required fields
 		if err := ValidateProduct(p.Name, p.CurrentPrice); err != nil {
-			return fmt.Errorf("invalid product: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "invalid product")
 		}
 
 		// Normalize name
@@ -126,7 +133,7 @@ func (s *productService) CreateBatch(ctx context.Context, products []*models.Pro
 	}
 
 	if err := s.repo.CreateBatch(ctx, products); err != nil {
-		return fmt.Errorf("failed to insert products batch: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to insert products batch")
 	}
 
 	return nil
@@ -146,7 +153,7 @@ func (s *productService) Update(ctx context.Context, product *models.Product) er
 	}
 
 	if err := s.repo.Update(ctx, product); err != nil {
-		return fmt.Errorf("failed to update product: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update product")
 	}
 
 	return nil
@@ -175,7 +182,7 @@ func (s *productService) GetCurrentProducts(ctx context.Context, storeIDs []int,
 	f := filters
 	products, err := s.repo.GetCurrentProducts(ctx, storeIDs, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current products: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get current products")
 	}
 
 	return products, nil
@@ -186,7 +193,7 @@ func (s *productService) GetValidProducts(ctx context.Context, storeIDs []int, f
 	f := filters
 	products, err := s.repo.GetValidProducts(ctx, storeIDs, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get valid products: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get valid products")
 	}
 
 	return products, nil
@@ -197,7 +204,7 @@ func (s *productService) GetProductsOnSale(ctx context.Context, storeIDs []int, 
 	f := filters
 	products, err := s.repo.GetProductsOnSale(ctx, storeIDs, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get products on sale: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get products on sale")
 	}
 
 	return products, nil
@@ -207,7 +214,7 @@ func (s *productService) Count(ctx context.Context, filters ProductFilters) (int
 	f := filters
 	count, err := s.repo.Count(ctx, &f)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count products: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count products")
 	}
 
 	return count, nil

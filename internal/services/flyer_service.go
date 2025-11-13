@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/kainuguru/kainuguru-api/internal/flyer"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -27,32 +31,60 @@ func NewFlyerServiceWithRepository(repo flyer.Repository) FlyerService {
 }
 
 func (fs *flyerService) GetByID(ctx context.Context, id int) (*models.Flyer, error) {
-	return fs.repo.GetByID(ctx, id)
+	flyer, err := fs.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("flyer not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer by ID %d", id)
+	}
+	return flyer, nil
 }
 
 func (fs *flyerService) GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error) {
-	return fs.repo.GetByIDs(ctx, ids)
+	flyers, err := fs.repo.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyers by IDs")
+	}
+	return flyers, nil
 }
 
 func (fs *flyerService) GetFlyersByStoreIDs(ctx context.Context, storeIDs []int) ([]*models.Flyer, error) {
-	return fs.repo.GetFlyersByStoreIDs(ctx, storeIDs)
+	flyers, err := fs.repo.GetFlyersByStoreIDs(ctx, storeIDs)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyers by store IDs")
+	}
+	return flyers, nil
 }
 
 func (fs *flyerService) GetAll(ctx context.Context, filters FlyerFilters) ([]*models.Flyer, error) {
 	f := filters
-	return fs.repo.GetAll(ctx, &f)
+	flyers, err := fs.repo.GetAll(ctx, &f)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyers")
+	}
+	return flyers, nil
 }
 
 func (fs *flyerService) Create(ctx context.Context, flyer *models.Flyer) error {
-	return fs.repo.Create(ctx, flyer)
+	if err := fs.repo.Create(ctx, flyer); err != nil {
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create flyer")
+	}
+	return nil
 }
 
 func (fs *flyerService) Update(ctx context.Context, flyer *models.Flyer) error {
-	return fs.repo.Update(ctx, flyer)
+	if err := fs.repo.Update(ctx, flyer); err != nil {
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update flyer")
+	}
+	return nil
 }
 
 func (fs *flyerService) Delete(ctx context.Context, id int) error {
-	return fs.repo.Delete(ctx, id)
+	if err := fs.repo.Delete(ctx, id); err != nil {
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to delete flyer %d", id)
+	}
+	return nil
 }
 
 func (fs *flyerService) GetCurrentFlyers(ctx context.Context, storeIDs []int) ([]*models.Flyer, error) {
@@ -84,68 +116,117 @@ func (fs *flyerService) GetFlyersByStore(ctx context.Context, storeID int, filte
 
 func (fs *flyerService) Count(ctx context.Context, filters FlyerFilters) (int, error) {
 	f := filters
-	return fs.repo.Count(ctx, &f)
+	count, err := fs.repo.Count(ctx, &f)
+	if err != nil {
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count flyers")
+	}
+	return count, nil
 }
 
 func (fs *flyerService) GetProcessableFlyers(ctx context.Context) ([]*models.Flyer, error) {
-	return fs.repo.GetProcessable(ctx)
+	flyers, err := fs.repo.GetProcessable(ctx)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get processable flyers")
+	}
+	return flyers, nil
 }
 
 func (fs *flyerService) GetFlyersForProcessing(ctx context.Context, limit int) ([]*models.Flyer, error) {
-	return fs.repo.GetFlyersForProcessing(ctx, limit)
+	flyers, err := fs.repo.GetFlyersForProcessing(ctx, limit)
+	if err != nil {
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyers for processing (limit %d)", limit)
+	}
+	return flyers, nil
 }
 
 func (fs *flyerService) StartProcessing(ctx context.Context, flyerID int) error {
 	f, err := fs.GetByID(ctx, flyerID)
 	if err != nil {
-		return err
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d for processing", flyerID)
 	}
 	if !f.CanBeProcessed() {
-		return fmt.Errorf("flyer %d cannot be processed", flyerID)
+		return apperrors.Internal(fmt.Sprintf("flyer %d cannot be processed", flyerID))
 	}
 	f.StartProcessing()
-	return fs.Update(ctx, f)
+	if err := fs.Update(ctx, f); err != nil {
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to start processing flyer %d", flyerID)
+	}
+	return nil
 }
 
 func (fs *flyerService) CompleteProcessing(ctx context.Context, flyerID int, productsExtracted int) error {
 	f, err := fs.GetByID(ctx, flyerID)
 	if err != nil {
-		return err
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d for completion", flyerID)
 	}
 	f.CompleteProcessing(productsExtracted)
-	return fs.Update(ctx, f)
+	if err := fs.Update(ctx, f); err != nil {
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to complete processing flyer %d", flyerID)
+	}
+	return nil
 }
 
 func (fs *flyerService) FailProcessing(ctx context.Context, flyerID int) error {
 	f, err := fs.GetByID(ctx, flyerID)
 	if err != nil {
-		return err
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d for failure", flyerID)
 	}
 	f.FailProcessing()
-	return fs.Update(ctx, f)
+	if err := fs.Update(ctx, f); err != nil {
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to fail processing flyer %d", flyerID)
+	}
+	return nil
 }
 
 func (fs *flyerService) ArchiveFlyer(ctx context.Context, flyerID int) error {
 	f, err := fs.GetByID(ctx, flyerID)
 	if err != nil {
-		return err
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d for archival", flyerID)
 	}
 	f.Archive()
-	return fs.Update(ctx, f)
+	if err := fs.Update(ctx, f); err != nil {
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to archive flyer %d", flyerID)
+	}
+	return nil
 }
 
 func (fs *flyerService) ArchiveOldFlyers(ctx context.Context) (int, error) {
-	return fs.repo.ArchiveOlderThan(ctx, 7)
+	count, err := fs.repo.ArchiveOlderThan(ctx, 7)
+	if err != nil {
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to archive old flyers")
+	}
+	return count, nil
 }
 
 func (fs *flyerService) GetWithPages(ctx context.Context, flyerID int) (*models.Flyer, error) {
-	return fs.repo.GetWithPages(ctx, flyerID)
+	flyer, err := fs.repo.GetWithPages(ctx, flyerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("flyer not found with ID %d", flyerID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d with pages", flyerID)
+	}
+	return flyer, nil
 }
 
 func (fs *flyerService) GetWithProducts(ctx context.Context, flyerID int) (*models.Flyer, error) {
-	return fs.repo.GetWithProducts(ctx, flyerID)
+	flyer, err := fs.repo.GetWithProducts(ctx, flyerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("flyer not found with ID %d", flyerID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d with products", flyerID)
+	}
+	return flyer, nil
 }
 
 func (fs *flyerService) GetWithStore(ctx context.Context, flyerID int) (*models.Flyer, error) {
-	return fs.repo.GetWithStore(ctx, flyerID)
+	flyer, err := fs.repo.GetWithStore(ctx, flyerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("flyer not found with ID %d", flyerID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get flyer %d with store", flyerID)
+	}
+	return flyer, nil
 }
