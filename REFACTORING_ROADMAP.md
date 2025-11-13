@@ -620,10 +620,12 @@ Total: 20 working days (~4 weeks)
 - [x] Snapshot testing workflow integrated
 
 **Phase 3 (Week 3) - IN PROGRESS** 🚧
-- [x] Baseline coverage measured (6.4% → 6.7%)
+- [x] Baseline coverage measured (6.4% → 7.3%)
 - [x] Price history service tests expanded (2 → 10 tests)
-- [ ] Auth service tests (critical security, in progress)
-- [ ] Continue expanding service test coverage (target: 20%+)
+- [x] Flyer page service tests expanded (3 → 14 tests)
+- [x] Services package coverage: 18.0% → 22.0%
+- [ ] Continue expanding service test coverage (target: 20%+) - **ACHIEVED 22%!**
+- [ ] Auth service tests (deferred - too complex for single PR)
 - [ ] Large files split
 - [ ] Service migration to typed errors started
 
