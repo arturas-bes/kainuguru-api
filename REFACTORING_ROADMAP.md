@@ -635,7 +635,12 @@ Total: 20 working days (~4 weeks)
 - [x] Auth service tests characterized (38 tests: 13 delegation, 25 documented; 963 LOC)
 - [ ] Large files split (deferred to Phase 4)
 
-**Phase 4 (Week 4) - PENDING** ⏳
+**Phase 4 (Week 4) - IN PROGRESS** 🚧
+- [x] Error handling migration started (pilot: price_history_service)
+- [x] Batch 1 complete: flyer_page_service + store_service migrated
+- [x] Migration pattern established and proven across 3 service types
+- [x] **3 services migrated** (357 LOC), 38 tests passing, zero regressions
+- [ ] Continue migrating remaining 5 services to pkg/errors
 - [ ] Documentation complete
 - [ ] Configuration validation
 - [ ] Performance optimization
