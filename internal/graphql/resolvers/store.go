@@ -59,26 +59,12 @@ func (r *storeResolver) UpdatedAt(ctx context.Context, obj *models.Store) (strin
 }
 
 func (r *storeResolver) Flyers(ctx context.Context, obj *models.Store, filters *model.FlyerFilters, first *int, after *string) (*model.FlyerConnection, error) {
-	// Set default limit
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	// Parse cursor
-	offset := 0
-	if after != nil && *after != "" {
-		decodedOffset, err := decodeCursor(*after)
-		if err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert filters and add store ID
-	serviceFilters := convertFlyerFilters(filters, limit+1, offset)
+	serviceFilters := convertFlyerFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get flyers for this store
 	flyers, err := r.flyerService.GetFlyersByStore(ctx, obj.ID, serviceFilters)
@@ -97,26 +83,12 @@ func (r *storeResolver) Flyers(ctx context.Context, obj *models.Store, filters *
 }
 
 func (r *storeResolver) Products(ctx context.Context, obj *models.Store, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
-	// Set default limit
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	// Parse cursor
-	offset := 0
-	if after != nil && *after != "" {
-		decodedOffset, err := decodeCursor(*after)
-		if err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert filters
-	serviceFilters := convertProductFilters(filters, limit+1, offset)
+	serviceFilters := convertProductFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get products for this store
 	products, err := r.productService.GetByStore(ctx, obj.ID, serviceFilters)

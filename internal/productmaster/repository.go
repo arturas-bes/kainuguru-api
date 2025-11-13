@@ -28,6 +28,10 @@ type Repository interface {
 	GetProduct(ctx context.Context, productID int) (*models.Product, error)
 	CreateMasterWithMatch(ctx context.Context, product *models.Product, master *models.ProductMaster) error
 	CreateMasterAndLinkProduct(ctx context.Context, product *models.Product, master *models.ProductMaster) error
+	GetUnmatchedProducts(ctx context.Context, limit int) ([]*models.Product, error)
+	MarkProductForReview(ctx context.Context, productID int) error
+	GetMasterProductCounts(ctx context.Context) ([]MasterProductCount, error)
+	UpdateMasterStatistics(ctx context.Context, masterID int64, confidence float64, matchCount int, updatedAt time.Time) (int64, error)
 }
 
 // ProductMasterStats captures per-master matching metrics.
@@ -46,4 +50,10 @@ type OverallStats struct {
 	TotalProducts     int
 	MatchedProducts   int
 	AverageConfidence float64
+}
+
+// MasterProductCount captures the number of products linked to a master.
+type MasterProductCount struct {
+	MasterID     int64 `bun:"product_master_id"`
+	ProductCount int   `bun:"product_count"`
 }

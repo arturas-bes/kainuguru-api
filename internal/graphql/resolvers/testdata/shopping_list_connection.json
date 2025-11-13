@@ -1,0 +1,30 @@
+{
+  "edges": [
+    {
+      "node": {
+        "id": 1,
+        "user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "name": "Weekly groceries",
+        "description": null,
+        "is_default": true,
+        "is_archived": false,
+        "is_public": false,
+        "share_code": null,
+        "item_count": 0,
+        "completed_item_count": 0,
+        "estimated_total_price": null,
+        "created_at": "2024-04-01T00:00:00Z",
+        "updated_at": "2024-04-02T00:00:00Z",
+        "last_accessed_at": "0001-01-01T00:00:00Z"
+      },
+      "cursor": "b2Zmc2V0OjM="
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": true,
+    "hasPreviousPage": true,
+    "startCursor": "b2Zmc2V0OjM=",
+    "endCursor": "b2Zmc2V0OjM="
+  },
+  "totalCount": 12
+}

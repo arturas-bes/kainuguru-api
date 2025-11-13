@@ -44,22 +44,11 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 	}
 
 	// Set limit and offset for pagination
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
-	offset := 0
-	if after != nil && *after != "" {
-		if decodedOffset, err := decodeCursor(*after); err == nil {
-			offset = decodedOffset
-		}
-	}
-
-	serviceFilters.Limit = limit + 1 // Fetch one extra to determine if there are more
+	serviceFilters.Limit = pager.LimitWithExtra() // Fetch one extra to determine if there are more
 	serviceFilters.Offset = offset
 
 	// Get price history from service
@@ -68,37 +57,7 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 		return nil, fmt.Errorf("failed to get price history: %w", err)
 	}
 
-	// Build connection response
-	hasNextPage := false
-	if len(priceHistory) > limit {
-		hasNextPage = true
-		priceHistory = priceHistory[:limit]
-	}
-
-	edges := make([]*model.PriceHistoryEdge, len(priceHistory))
-	for i, ph := range priceHistory {
-		cursor := encodeCursor(offset + i)
-		edges[i] = &model.PriceHistoryEdge{
-			Node:   ph,
-			Cursor: cursor,
-		}
-	}
-
-	var startCursor, endCursor *string
-	if len(edges) > 0 {
-		startCursor = &edges[0].Cursor
-		endCursor = &edges[len(edges)-1].Cursor
-	}
-
-	connection := &model.PriceHistoryConnection{
-		Edges: edges,
-		PageInfo: &model.PageInfo{
-			HasNextPage:     hasNextPage,
-			HasPreviousPage: offset > 0,
-			StartCursor:     startCursor,
-			EndCursor:       endCursor,
-		},
-	}
+	connection := buildPriceHistoryConnection(priceHistory, limit, offset, 0)
 
 	// Get total count
 	count, err := r.priceHistoryService.GetPriceHistoryCount(ctx, productMasterID, storeID, serviceFilters)

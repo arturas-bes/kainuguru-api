@@ -43,23 +43,12 @@ func (r *queryResolver) ShoppingLists(ctx context.Context, filters *model.Shoppi
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	offset := 0
-	if after != nil && *after != "" {
-		if decodedOffset, err := decodeCursor(*after); err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert GraphQL filters to service filters
-	serviceFilters := convertShoppingListFilters(filters, limit, offset)
+	serviceFilters := convertShoppingListFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get shopping lists for user
 	lists, err := r.shoppingListService.GetByUserID(ctx, userID, serviceFilters)

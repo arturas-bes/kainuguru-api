@@ -8,38 +8,40 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
 	"github.com/uptrace/bun"
 )
 
 // shoppingListRepository implements ShoppingListRepository
 type shoppingListRepository struct {
-	db *bun.DB
+	db   *bun.DB
+	base *base.Repository[models.ShoppingList]
 }
 
 // NewShoppingListRepository creates a new shopping list repository
 func NewShoppingListRepository(db *bun.DB) shoppinglist.Repository {
-	return &shoppingListRepository{db: db}
+	return &shoppingListRepository{
+		db:   db,
+		base: base.NewRepository[models.ShoppingList](db, "sl.id"),
+	}
 }
 
 // Create creates a new shopping list
 func (r *shoppingListRepository) Create(ctx context.Context, list *models.ShoppingList) error {
-	_, err := r.db.NewInsert().Model(list).Exec(ctx)
-	return err
+	return r.base.Create(ctx, list)
 }
 
 // GetByID retrieves a shopping list by ID
 func (r *shoppingListRepository) GetByID(ctx context.Context, id int64) (*models.ShoppingList, error) {
-	list := &models.ShoppingList{}
-	err := r.db.NewSelect().
-		Model(list).
-		Where("id = ?", id).
-		Scan(ctx)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
+	list, err := r.base.GetByID(ctx, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return list, err
+	return list, nil
 }
 
 // GetByIDs retrieves multiple shopping lists by IDs
@@ -48,13 +50,7 @@ func (r *shoppingListRepository) GetByIDs(ctx context.Context, ids []int64) ([]*
 		return []*models.ShoppingList{}, nil
 	}
 
-	var lists []*models.ShoppingList
-	err := r.db.NewSelect().
-		Model(&lists).
-		Where("id IN (?)", bun.In(ids)).
-		Scan(ctx)
-
-	return lists, err
+	return r.base.GetByIDs(ctx, ids)
 }
 
 // GetByUserID retrieves shopping lists for a user with optional filters
@@ -62,59 +58,8 @@ func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UU
 	query := r.db.NewSelect().Model((*models.ShoppingList)(nil)).
 		Where("user_id = ?", userID)
 
-	// Apply filters
-	if filters != nil {
-		if filters.IsDefault != nil {
-			query = query.Where("is_default = ?", *filters.IsDefault)
-		}
-		if filters.IsArchived != nil {
-			query = query.Where("is_archived = ?", *filters.IsArchived)
-		}
-		if filters.IsPublic != nil {
-			query = query.Where("is_public = ?", *filters.IsPublic)
-		}
-		if filters.HasItems != nil {
-			if *filters.HasItems {
-				query = query.Where("item_count > 0")
-			} else {
-				query = query.Where("item_count = 0")
-			}
-		}
-		if filters.CreatedAfter != nil {
-			query = query.Where("created_at >= ?", *filters.CreatedAfter)
-		}
-		if filters.CreatedBefore != nil {
-			query = query.Where("created_at <= ?", *filters.CreatedBefore)
-		}
-		if filters.UpdatedAfter != nil {
-			query = query.Where("updated_at >= ?", *filters.UpdatedAfter)
-		}
-		if filters.UpdatedBefore != nil {
-			query = query.Where("updated_at <= ?", *filters.UpdatedBefore)
-		}
-
-		// Apply ordering
-		orderBy := "updated_at"
-		orderDir := "DESC"
-		if filters.OrderBy != "" {
-			orderBy = filters.OrderBy
-		}
-		if filters.OrderDir != "" {
-			orderDir = filters.OrderDir
-		}
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		// Apply pagination
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		// Default ordering: default list first, then by updated_at DESC
-		query = query.Order("is_default DESC, updated_at DESC")
-	}
+	query = applyShoppingListFilters(query, filters)
+	query = applyShoppingListOrdering(query, filters)
 
 	var lists []*models.ShoppingList
 	err := query.Scan(ctx, &lists)
@@ -123,36 +68,7 @@ func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UU
 
 func (r *shoppingListRepository) CountByUserID(ctx context.Context, userID uuid.UUID, filters *shoppinglist.Filters) (int, error) {
 	query := r.db.NewSelect().Model((*models.ShoppingList)(nil)).Where("user_id = ?", userID)
-	if filters != nil {
-		if filters.IsDefault != nil {
-			query = query.Where("is_default = ?", *filters.IsDefault)
-		}
-		if filters.IsArchived != nil {
-			query = query.Where("is_archived = ?", *filters.IsArchived)
-		}
-		if filters.IsPublic != nil {
-			query = query.Where("is_public = ?", *filters.IsPublic)
-		}
-		if filters.HasItems != nil {
-			if *filters.HasItems {
-				query = query.Where("item_count > 0")
-			} else {
-				query = query.Where("item_count = 0")
-			}
-		}
-		if filters.CreatedAfter != nil {
-			query = query.Where("created_at >= ?", *filters.CreatedAfter)
-		}
-		if filters.CreatedBefore != nil {
-			query = query.Where("created_at <= ?", *filters.CreatedBefore)
-		}
-		if filters.UpdatedAfter != nil {
-			query = query.Where("updated_at >= ?", *filters.UpdatedAfter)
-		}
-		if filters.UpdatedBefore != nil {
-			query = query.Where("updated_at <= ?", *filters.UpdatedBefore)
-		}
-	}
+	query = applyShoppingListFilters(query, filters)
 	return query.Count(ctx)
 }
 
@@ -188,20 +104,12 @@ func (r *shoppingListRepository) UpdateShareSettings(ctx context.Context, listID
 
 // Update updates an existing shopping list
 func (r *shoppingListRepository) Update(ctx context.Context, list *models.ShoppingList) error {
-	_, err := r.db.NewUpdate().
-		Model(list).
-		Where("id = ?", list.ID).
-		Exec(ctx)
-	return err
+	return r.base.Update(ctx, list)
 }
 
 // Delete soft deletes a shopping list (marks as archived)
 func (r *shoppingListRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.NewDelete().
-		Model((*models.ShoppingList)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-	return err
+	return r.base.DeleteByID(ctx, id)
 }
 
 // GetUserDefaultList retrieves the user's default shopping list
@@ -370,14 +278,9 @@ func (r *shoppingListRepository) SearchLists(ctx context.Context, userID uuid.UU
 		Where("user_id = ?", userID).
 		Where("(name ILIKE ? OR description ILIKE ?)", "%"+query+"%", "%"+query+"%")
 
-	// Apply additional filters if provided
-	if filters != nil {
-		if filters.IsArchived != nil {
-			q = q.Where("is_archived = ?", *filters.IsArchived)
-		}
-		if filters.Limit > 0 {
-			q = q.Limit(filters.Limit)
-		}
+	q = applyShoppingListFilters(q, filters)
+	if filters != nil && filters.Limit > 0 {
+		q = q.Limit(filters.Limit)
 	}
 
 	q = q.Order("updated_at DESC")
@@ -398,6 +301,64 @@ func (r *shoppingListRepository) GetListsByDateRange(ctx context.Context, userID
 		Scan(ctx)
 
 	return lists, err
+}
+
+func applyShoppingListFilters(query *bun.SelectQuery, filters *shoppinglist.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return query
+	}
+	if filters.IsDefault != nil {
+		query = query.Where("is_default = ?", *filters.IsDefault)
+	}
+	if filters.IsArchived != nil {
+		query = query.Where("is_archived = ?", *filters.IsArchived)
+	}
+	if filters.IsPublic != nil {
+		query = query.Where("is_public = ?", *filters.IsPublic)
+	}
+	if filters.HasItems != nil {
+		if *filters.HasItems {
+			query = query.Where("item_count > 0")
+		} else {
+			query = query.Where("item_count = 0")
+		}
+	}
+	if filters.CreatedAfter != nil {
+		query = query.Where("created_at >= ?", *filters.CreatedAfter)
+	}
+	if filters.CreatedBefore != nil {
+		query = query.Where("created_at <= ?", *filters.CreatedBefore)
+	}
+	if filters.UpdatedAfter != nil {
+		query = query.Where("updated_at >= ?", *filters.UpdatedAfter)
+	}
+	if filters.UpdatedBefore != nil {
+		query = query.Where("updated_at <= ?", *filters.UpdatedBefore)
+	}
+	return query
+}
+
+func applyShoppingListOrdering(query *bun.SelectQuery, filters *shoppinglist.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return query.Order("is_default DESC, updated_at DESC")
+	}
+	orderBy := "updated_at"
+	if filters.OrderBy != "" {
+		orderBy = filters.OrderBy
+	}
+	orderDir := "DESC"
+	if filters.OrderDir != "" {
+		orderDir = filters.OrderDir
+	}
+	query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
+
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+	return query
 }
 
 // GetRecentlyAccessed retrieves recently accessed lists

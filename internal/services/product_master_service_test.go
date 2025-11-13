@@ -204,6 +204,22 @@ func (s *productMasterRepoStub) GetOverallStatistics(ctx context.Context) (*prod
 	return &productmaster.OverallStats{}, nil
 }
 
+func (s *productMasterRepoStub) GetUnmatchedProducts(ctx context.Context, limit int) ([]*models.Product, error) {
+	return []*models.Product{}, nil
+}
+
+func (s *productMasterRepoStub) MarkProductForReview(ctx context.Context, productID int) error {
+	return nil
+}
+
+func (s *productMasterRepoStub) GetMasterProductCounts(ctx context.Context) ([]productmaster.MasterProductCount, error) {
+	return []productmaster.MasterProductCount{}, nil
+}
+
+func (s *productMasterRepoStub) UpdateMasterStatistics(ctx context.Context, masterID int64, confidence float64, matchCount int, updatedAt time.Time) (int64, error) {
+	return 0, nil
+}
+
 func noopLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 }

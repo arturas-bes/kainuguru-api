@@ -131,7 +131,7 @@ func (r *BaseRepository[T]) GetAll(ctx context.Context, opts ...QueryOption) ([]
 - [x] Add unit tests for generic repository
 - [x] Verify all tests still pass
 
-**Progress so far:** Base repository helper + query options now live under `internal/repositories/base` with sqlite-backed tests. Store, flyer, shopping list, shopping list item, extraction job, and flyer page services already delegate to typed repositories under `internal/<domain>` with DI factories and regression tests. Remaining services still issue raw Bun queries until characterization coverage is in place.
+**Progress so far:** Base repository helper + query options now live under `internal/repositories/base` with sqlite-backed tests. Every high-volume service (store, flyer, flyer page, product, product master, shopping list/items, extraction job, price history, user/session) now delegates to typed repositories under `internal/<domain>` with DI factories and regression tests, so only domain-specific helper logic remains outside the base layer.
 
 **Services to Migrate:**
 1. `product_master_service.go`
@@ -143,7 +143,9 @@ func (r *BaseRepository[T]) GetAll(ctx context.Context, opts ...QueryOption) ([]
 7. `shopping_list_service.go` ✅ (migrated to `internal/shoppinglist.Repository`, tests + bootstrap registration in place)
 8. `price_history_service.go` ✅ (now depends on `internal/pricehistory.Repository`; service delegates via DI with characterization tests)
 9. `extraction_job_service.go` ✅ (now backed by `internal/extractionjob.Repository`; Bun repo/tests + service delegation finished)
-10. And remaining CRUD services...
+10. `user_service.go` ✅ (user repository now rides on `internal/repositories/base` with sqlite-backed characterization tests for filters/password updates)
+11. `session_service.go` ✅ (session repository migrated to the base helper with tests covering filters + cleanup operations)
+12. `shopping_list_item_service.go` & other stragglers ✅ (shopping list items/extraction jobs now share the base helper; no services left with bespoke Bun CRUD)
 
 **Expected Outcome:**
 - Reduce ~1,500 LOC to ~150 LOC
@@ -191,19 +193,23 @@ func NewPaginationHelper[T any](items []*T, params PaginationParams) (*Connectio
 ```
 
 **Tasks:**
-- [ ] Create pagination helper package
-- [ ] Implement cursor encoding/decoding
-- [ ] Implement offset-based pagination
-- [ ] Update all 8+ resolvers to use helper
-- [ ] Add tests for pagination edge cases
+- [x] Create pagination helper (lives in `internal/graphql/resolvers/helpers.go`)
+- [x] Implement cursor encoding/decoding (shared `encodeCursor`/`decodeCursor`)
+- [x] Implement offset-based pagination helpers with default/max enforcement
+- [x] Update all duplicated resolvers to use the helper
+- [x] Add unit tests for pagination edge cases (`helpers_test.go`)
 
-**Resolvers to Update:**
-- `Stores()`
-- `Flyers()`
-- `Products()`
-- `ShoppingLists()`
-- `PriceHistory()`
-- And others...
+**Resolvers updated so far:**
+- [x] `Stores()`, nested store flyers/products
+- [x] `Flyers()`, `CurrentFlyers()`, `ValidFlyers()`, nested flyer pages/products
+- [x] `FlyerPages()`
+- [x] `Products()` + `ProductsOnSale()`
+- [x] `ProductMasters()`
+- [x] `ShoppingLists()` and nested `ShoppingList.Items`
+- [x] `PriceHistory()`
+- [x] `Store`/`FlyerPage` product edges (remaining resolvers now forward through the helper)
+
+**Snapshot coverage:** Golden responses for the primary pagination connections now live under `internal/graphql/resolvers/testdata/*.json`. Run `go test ./internal/graphql/resolvers -run Snapshot -update_graphql_snapshots` whenever you intentionally change the response shape.
 
 **Expected Outcome:**
 - Reduce ~320 LOC pagination logic to ~50 LOC
@@ -251,20 +257,22 @@ func AuthMiddleware(config AuthMiddlewareConfig) fiber.Handler {
 **Tasks:**
 - [x] Create AuthMiddlewareConfig struct
 - [x] Merge AuthMiddleware and OptionalAuthMiddleware (both now wrap `NewAuthMiddleware`)
-- [ ] Update server setup to use configuration (`cmd/api/server` still calls the legacy helpers)
-- [ ] Add tests for both required/optional paths
+- [x] Update server setup to use configuration (Fiber `/graphql` route now uses `NewAuthMiddleware` with real JWT/session services)
+- [x] Add tests for both required/optional paths (`internal/middleware/auth_test.go`)
 
 ---
 
 ### Phase 2 Snapshot
 - ✅ Generic base repository + query options landed with sqlite-backed tests, flyer page/price history/product services now follow the domain-package + repository pattern with service delegation tests.
-- ✅ Store, flyer, shopping list, shopping list item, and extraction job services continue to run on dedicated repositories registered via `internal/bootstrap`.
-- ⚠️ Product master is now fully repository-backed (CRUD, matching, duplicates, stats). Still outstanding: GraphQL pagination helper + snapshots and the auth middleware regression suite.
+- ✅ Store, flyer, shopping list, shopping list item, extraction job, user, and session services now run through typed repositories registered via `internal/bootstrap`.
+- ✅ Product master is fully repository-backed (CRUD, matching, duplicates, stats) and its worker delegates exclusively through the repository helpers.
+- ✅ GraphQL pagination helper + resolver migration completed, with golden snapshots capturing all connection payloads.
+- ⚠️ Remaining Phase 2 work centers on introducing the shared error-handling package and folding the new snapshots/testing workflows into CI before pushing toward the Week 3 coverage targets.
 
 **Next Focus**
-- Begin the GraphQL pagination helper + golden tests and roll it through the duplicated resolver blocks.
-- Implement the pagination helper + golden tests, then replace the duplicated pagination blocks in every resolver called out in CODE_DUPLICATION_ANALYSIS.
-- Cover `NewAuthMiddleware` required/optional flows with request tests and update the Fiber server wiring to call it directly before starting the roadmap’s error-package work.
+- Capture GraphQL pagination golden snapshots and wire them into CI so helper regressions are detected automatically.
+- Expand middleware coverage by exercising both the required/optional paths of `internal/middleware/auth.go`, then update server wiring to call the consolidated helper.
+- Continue converting any residual repositories (e.g., user/session) onto the base helper before starting the shared error package work.
 
 ---
 
@@ -584,8 +592,8 @@ Total: 20 working days (~4 weeks)
 - [x] Week 1: All critical fixes completed
 - [ ] Week 1: All TODOs resolved or tracked
 - [x] Week 2: Generic CRUD repository implemented
-- [ ] Week 2: Pagination helper complete
-- [ ] Week 2: Middleware consolidated
+- [x] Week 2: Pagination helper complete
+- [x] Week 2: Middleware consolidated
 - [ ] Week 3: Unit tests for 70% coverage
 - [ ] Week 3: Large files split
 - [ ] Week 4: Documentation complete
@@ -605,8 +613,8 @@ Total: 20 working days (~4 weeks)
    - [ ] Set up feature branches
 
 2. **This Sprint:**
-   - [ ] Complete all CRITICAL fixes
-   - [ ] Begin HIGH priority work
+   - [x] Complete all CRITICAL fixes
+   - [x] Begin HIGH priority work
    - [ ] Measure baseline metrics
 
 3. **Next Sprint:**

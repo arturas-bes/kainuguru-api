@@ -128,6 +128,52 @@ func TestExtractionJobRepository_CleanupOperations(t *testing.T) {
 	}
 }
 
+func TestExtractionJobRepository_GetAllOrdersAndFilters(t *testing.T) {
+	ctx := context.Background()
+	db, repo, cleanup := setupExtractionJobTestDB(t)
+	defer cleanup()
+
+	now := time.Unix(0, 0)
+	insertTestJob(t, db, &models.ExtractionJob{
+		JobType:      string(models.JobTypeExtractPage),
+		Status:       string(models.JobStatusPending),
+		Priority:     3,
+		ScheduledFor: now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	second := insertTestJob(t, db, &models.ExtractionJob{
+		JobType:      string(models.JobTypeScrapeFlyer),
+		Status:       string(models.JobStatusPending),
+		Priority:     9,
+		ScheduledFor: now,
+		CreatedAt:    now.Add(time.Minute),
+		UpdatedAt:    now.Add(time.Minute),
+	})
+
+	jobs, err := repo.GetAll(ctx, nil)
+	if err != nil {
+		t.Fatalf("GetAll returned error: %v", err)
+	}
+	if len(jobs) != 2 || jobs[0].ID != second.ID {
+		t.Fatalf("expected default ordering by priority desc, got %+v", jobs)
+	}
+
+	filters := &extractionjob.Filters{
+		JobTypes: []string{string(models.JobTypeScrapeFlyer)},
+		OrderBy:  "created_at",
+		OrderDir: "ASC",
+		Limit:    1,
+	}
+	filtered, err := repo.GetAll(ctx, filters)
+	if err != nil {
+		t.Fatalf("filtered GetAll returned error: %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].JobType != string(models.JobTypeScrapeFlyer) {
+		t.Fatalf("expected filtered slice to include only scrape flyer job, got %+v", filtered)
+	}
+}
+
 func setupExtractionJobTestDB(t *testing.T) (*bun.DB, extractionjob.Repository, func()) {
 	t.Helper()
 	sqldb, err := sql.Open(sqliteshim.DriverName(), "file:extraction_jobs_test?mode=memory&cache=shared")

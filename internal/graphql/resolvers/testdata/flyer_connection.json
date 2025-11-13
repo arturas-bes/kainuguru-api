@@ -1,0 +1,25 @@
+{
+  "edges": [
+    {
+      "node": {
+        "id": 100,
+        "store_id": 1,
+        "valid_from": "2024-02-01T00:00:00Z",
+        "valid_to": "2024-02-10T00:00:00Z",
+        "is_archived": false,
+        "status": "pending",
+        "products_extracted": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "cursor": "b2Zmc2V0OjI="
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": true,
+    "hasPreviousPage": true,
+    "startCursor": "b2Zmc2V0OjI=",
+    "endCursor": "b2Zmc2V0OjI="
+  },
+  "totalCount": 10
+}

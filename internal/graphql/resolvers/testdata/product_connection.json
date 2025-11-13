@@ -1,0 +1,32 @@
+{
+  "edges": [
+    {
+      "node": {
+        "id": 1,
+        "flyer_id": 0,
+        "store_id": 0,
+        "name": "Organic Milk",
+        "normalized_name": "",
+        "current_price": 0,
+        "currency": "",
+        "is_on_sale": false,
+        "is_available": false,
+        "extraction_confidence": 0,
+        "extraction_method": "",
+        "requires_review": false,
+        "valid_from": "2024-01-01T00:00:00Z",
+        "valid_to": "2024-01-07T00:00:00Z",
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      "cursor": "b2Zmc2V0OjU="
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": true,
+    "hasPreviousPage": true,
+    "startCursor": "b2Zmc2V0OjU=",
+    "endCursor": "b2Zmc2V0OjU="
+  },
+  "totalCount": 42
+}

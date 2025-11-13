@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglistitem"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -15,28 +16,28 @@ import (
 
 // shoppingListItemRepository implements shoppinglistitem.Repository
 type shoppingListItemRepository struct {
-	db *bun.DB
+	db               *bun.DB
+	base             *base.Repository[models.ShoppingListItem]
+	preloadRelations bool
 }
 
 // NewShoppingListItemRepository creates a new shopping list item repository
 func NewShoppingListItemRepository(db *bun.DB) shoppinglistitem.Repository {
-	return &shoppingListItemRepository{db: db}
+	return &shoppingListItemRepository{
+		db:               db,
+		base:             base.NewRepository[models.ShoppingListItem](db, "sli.id"),
+		preloadRelations: true,
+	}
 }
 
 // Create creates a new shopping list item
 func (r *shoppingListItemRepository) Create(ctx context.Context, item *models.ShoppingListItem) error {
-	_, err := r.db.NewInsert().Model(item).Exec(ctx)
-	return err
+	return r.base.Create(ctx, item)
 }
 
 // GetByID retrieves a shopping list item by ID
 func (r *shoppingListItemRepository) GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error) {
-	item := &models.ShoppingListItem{}
-	err := r.db.NewSelect().
-		Model(item).
-		Where("id = ?", id).
-		Scan(ctx)
-
+	item, err := r.base.GetByID(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -49,75 +50,43 @@ func (r *shoppingListItemRepository) GetByIDs(ctx context.Context, ids []int64) 
 		return []*models.ShoppingListItem{}, nil
 	}
 
-	var items []*models.ShoppingListItem
-	err := r.db.NewSelect().
-		Model(&items).
-		Where("id IN (?)", bun.In(ids)).
-		Order("sort_order ASC").
-		Scan(ctx)
-
-	return items, err
+	return r.base.GetByIDs(ctx, ids, base.WithQuery[models.ShoppingListItem](func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Order("sort_order ASC")
+	}))
 }
 
 // GetByListID retrieves shopping list items for a specific list with optional filters
 func (r *shoppingListItemRepository) GetByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) ([]*models.ShoppingListItem, error) {
-	query := r.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("shopping_list_id = ?", listID).
-		Relation("User").
-		Relation("ProductMaster").
-		Relation("LinkedProduct").
-		Relation("Store").
-		Relation("Flyer")
-
-	query = applyShoppingListItemFilters(query, filters)
-
-	// Match the legacy service ordering: unchecked first, then sort order, then recency.
-	query = query.Order("is_checked ASC").
-		Order("sort_order ASC").
-		Order("created_at DESC")
-
-	if filters != nil {
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
+	return r.base.GetAll(ctx, base.WithQuery[models.ShoppingListItem](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where("shopping_list_id = ?", listID)
+		if r.preloadRelations {
+			q = q.Relation("User").
+				Relation("ProductMaster").
+				Relation("LinkedProduct").
+				Relation("Store").
+				Relation("Flyer")
 		}
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	}
-
-	var items []*models.ShoppingListItem
-	err := query.Scan(ctx, &items)
-	return items, err
+		q = applyShoppingListItemFilters(q, filters)
+		return applyShoppingListItemOrdering(q, filters)
+	}))
 }
 
 // CountByListID counts items in a list matching the provided filters.
 func (r *shoppingListItemRepository) CountByListID(ctx context.Context, listID int64, filters *shoppinglistitem.Filters) (int, error) {
-	query := r.db.NewSelect().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("shopping_list_id = ?", listID)
-
-	query = applyShoppingListItemFilters(query, filters)
-
-	return query.Count(ctx)
+	return r.base.Count(ctx, base.WithQuery[models.ShoppingListItem](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where("shopping_list_id = ?", listID)
+		return applyShoppingListItemFilters(q, filters)
+	}))
 }
 
 // Update updates an existing shopping list item
 func (r *shoppingListItemRepository) Update(ctx context.Context, item *models.ShoppingListItem) error {
-	_, err := r.db.NewUpdate().
-		Model(item).
-		Where("id = ?", item.ID).
-		Exec(ctx)
-	return err
+	return r.base.Update(ctx, item)
 }
 
 // Delete deletes a shopping list item
 func (r *shoppingListItemRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.NewDelete().
-		Model((*models.ShoppingListItem)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-	return err
+	return r.base.DeleteByID(ctx, id)
 }
 
 // BulkCreate creates multiple shopping list items
@@ -593,5 +562,20 @@ func applyShoppingListItemFilters(query *bun.SelectQuery, filters *shoppinglisti
 		query = query.Where("created_at <= ?", *filters.CreatedBefore)
 	}
 
+	return query
+}
+
+func applyShoppingListItemOrdering(query *bun.SelectQuery, filters *shoppinglistitem.Filters) *bun.SelectQuery {
+	query = query.Order("is_checked ASC").
+		Order("sort_order ASC").
+		Order("created_at DESC")
+	if filters != nil {
+		if filters.Limit > 0 {
+			query = query.Limit(filters.Limit)
+		}
+		if filters.Offset > 0 {
+			query = query.Offset(filters.Offset)
+		}
+	}
 	return query
 }

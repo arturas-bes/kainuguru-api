@@ -1,0 +1,44 @@
+{
+  "edges": [
+    {
+      "node": {
+        "id": 1,
+        "shopping_list_id": 1,
+        "user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "description": "Organic apples",
+        "normalized_description": "organic apples",
+        "notes": "Prefer Honeycrisp",
+        "quantity": 6,
+        "unit": "pcs",
+        "unit_type": null,
+        "is_checked": false,
+        "checked_at": null,
+        "checked_by_user_id": null,
+        "sort_order": 0,
+        "product_master_id": null,
+        "linked_product_id": null,
+        "store_id": null,
+        "flyer_id": null,
+        "estimated_price": 3.49,
+        "actual_price": null,
+        "price_source": null,
+        "category": null,
+        "tags": null,
+        "suggestion_source": null,
+        "matching_confidence": null,
+        "availability_status": "available",
+        "availability_checked_at": null,
+        "created_at": "2024-05-01T00:00:00Z",
+        "updated_at": "2024-05-01T00:00:00Z"
+      },
+      "cursor": "b2Zmc2V0OjA="
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": true,
+    "hasPreviousPage": false,
+    "startCursor": "b2Zmc2V0OjA=",
+    "endCursor": "b2Zmc2V0OjA="
+  },
+  "totalCount": 8
+}

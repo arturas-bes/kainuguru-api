@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/uptrace/bun"
 )
 
@@ -46,13 +47,15 @@ type SessionRepository interface {
 
 // sessionRepository implements SessionRepository
 type sessionRepository struct {
-	db *bun.DB
+	db   *bun.DB
+	base *base.Repository[models.UserSession]
 }
 
 // NewSessionRepository creates a new session repository
 func NewSessionRepository(db *bun.DB) SessionRepository {
 	return &sessionRepository{
-		db: db,
+		db:   db,
+		base: base.NewRepository[models.UserSession](db, "us.id"),
 	}
 }
 
@@ -61,11 +64,7 @@ func (r *sessionRepository) Create(ctx context.Context, session *models.UserSess
 	session.CreatedAt = time.Now()
 	session.LastUsedAt = time.Now()
 
-	_, err := r.db.NewInsert().
-		Model(session).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.Create(ctx, session); err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -74,12 +73,7 @@ func (r *sessionRepository) Create(ctx context.Context, session *models.UserSess
 
 // GetByID retrieves a session by ID
 func (r *sessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.UserSession, error) {
-	session := &models.UserSession{}
-	err := r.db.NewSelect().
-		Model(session).
-		Where("us.id = ?", id).
-		Scan(ctx)
-
+	session, err := r.base.GetByID(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("session not found")
@@ -112,12 +106,7 @@ func (r *sessionRepository) GetByTokenHash(ctx context.Context, tokenHash string
 func (r *sessionRepository) Update(ctx context.Context, session *models.UserSession) error {
 	session.LastUsedAt = time.Now()
 
-	_, err := r.db.NewUpdate().
-		Model(session).
-		Where("id = ?", session.ID).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.Update(ctx, session); err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
 	}
 
@@ -126,12 +115,7 @@ func (r *sessionRepository) Update(ctx context.Context, session *models.UserSess
 
 // Delete deletes a session by ID
 func (r *sessionRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.NewDelete().
-		Model((*models.UserSession)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.DeleteByID(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
 
@@ -140,68 +124,11 @@ func (r *sessionRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 // GetUserSessions retrieves sessions for a user with optional filters
 func (r *sessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID, filters *models.SessionFilters) ([]*models.UserSession, error) {
-	query := r.db.NewSelect().
-		Model((*models.UserSession)(nil)).
-		Where("us.user_id = ?", userID)
-
-	// Apply filters
-	if filters != nil {
-		if filters.IsActive != nil {
-			query = query.Where("us.is_active = ?", *filters.IsActive)
-		}
-
-		if filters.DeviceType != nil {
-			query = query.Where("us.device_type = ?", *filters.DeviceType)
-		}
-
-		if filters.IsExpired != nil {
-			if *filters.IsExpired {
-				query = query.Where("us.expires_at < ?", time.Now())
-			} else {
-				query = query.Where("us.expires_at > ?", time.Now())
-			}
-		}
-
-		if filters.IPAddress != nil {
-			query = query.Where("us.ip_address = ?", *filters.IPAddress)
-		}
-
-		if filters.CreatedAfter != nil {
-			query = query.Where("us.created_at > ?", *filters.CreatedAfter)
-		}
-
-		if filters.CreatedBefore != nil {
-			query = query.Where("us.created_at < ?", *filters.CreatedBefore)
-		}
-
-		// Apply ordering
-		orderBy := "us.last_used_at"
-		if filters.OrderBy != "" {
-			orderBy = fmt.Sprintf("us.%s", filters.OrderBy)
-		}
-
-		orderDir := "DESC"
-		if filters.OrderDir == "ASC" {
-			orderDir = "ASC"
-		}
-
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		// Apply pagination
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		// Default ordering
-		query = query.Order("us.last_used_at DESC")
-	}
-
-	var sessions []*models.UserSession
-	err := query.Scan(ctx, &sessions)
+	sessions, err := r.base.GetAll(ctx, base.WithQuery[models.UserSession](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where("us.user_id = ?", userID)
+		q = applySessionFilters(q, filters)
+		return applySessionOrdering(q, filters)
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user sessions: %w", err)
 	}
@@ -530,4 +457,56 @@ type GlobalSessionStats struct {
 	SessionsThisWeek   int           `json:"sessionsThisWeek"`
 	ActiveUsers        int           `json:"activeUsers"`
 	AvgSessionDuration time.Duration `json:"avgSessionDuration"`
+}
+
+func applySessionFilters(query *bun.SelectQuery, filters *models.SessionFilters) *bun.SelectQuery {
+	if filters == nil {
+		return query
+	}
+	now := time.Now()
+	if filters.IsActive != nil {
+		query = query.Where("us.is_active = ?", *filters.IsActive)
+	}
+	if filters.DeviceType != nil {
+		query = query.Where("us.device_type = ?", *filters.DeviceType)
+	}
+	if filters.IsExpired != nil {
+		if *filters.IsExpired {
+			query = query.Where("us.expires_at < ?", now)
+		} else {
+			query = query.Where("us.expires_at > ?", now)
+		}
+	}
+	if filters.IPAddress != nil {
+		query = query.Where("us.ip_address = ?", *filters.IPAddress)
+	}
+	if filters.CreatedAfter != nil {
+		query = query.Where("us.created_at > ?", *filters.CreatedAfter)
+	}
+	if filters.CreatedBefore != nil {
+		query = query.Where("us.created_at < ?", *filters.CreatedBefore)
+	}
+	return query
+}
+
+func applySessionOrdering(query *bun.SelectQuery, filters *models.SessionFilters) *bun.SelectQuery {
+	if filters == nil {
+		return query.Order("us.last_used_at DESC")
+	}
+	orderBy := "us.last_used_at"
+	if filters.OrderBy != "" {
+		orderBy = fmt.Sprintf("us.%s", filters.OrderBy)
+	}
+	orderDir := "DESC"
+	if filters.OrderDir == "ASC" {
+		orderDir = "ASC"
+	}
+	query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+	return query
 }

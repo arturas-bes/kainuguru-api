@@ -209,23 +209,12 @@ func (r *mutationResolver) UncheckShoppingListItem(ctx context.Context, id int) 
 
 // Items resolves the items field on ShoppingList (updating stub from Phase 2.2)
 func (r *shoppingListResolver) Items(ctx context.Context, obj *models.ShoppingList, filters *model.ShoppingListItemFilters, first *int, after *string) (*model.ShoppingListItemConnection, error) {
-	limit := 100
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 200 {
-			limit = 200
-		}
-	}
-
-	offset := 0
-	if after != nil && *after != "" {
-		if decodedOffset, err := decodeCursor(*after); err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newPaginationArgs(first, after, paginationDefaults{defaultLimit: 100, maxLimit: 200})
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert GraphQL filters to service filters
-	serviceFilters := convertShoppingListItemFilters(filters, limit, offset)
+	serviceFilters := convertShoppingListItemFilters(filters, pager.LimitWithExtra(), offset)
 
 	// Get items for this shopping list
 	items, err := r.shoppingListItemService.GetByListID(ctx, obj.ID, serviceFilters)

@@ -34,6 +34,55 @@ func decodeCursor(cursor string) (int, error) {
 	return strconv.Atoi(parts[1])
 }
 
+type paginationDefaults struct {
+	defaultLimit int
+	maxLimit     int
+}
+
+type paginationArgs struct {
+	limit  int
+	offset int
+}
+
+func newPaginationArgs(first *int, after *string, defaults paginationDefaults) paginationArgs {
+	limit := defaults.defaultLimit
+	if first != nil && *first > 0 {
+		limit = *first
+		if defaults.maxLimit > 0 && limit > defaults.maxLimit {
+			limit = defaults.maxLimit
+		}
+	}
+
+	offset := 0
+	if after != nil && *after != "" {
+		if decodedOffset, err := decodeCursor(*after); err == nil {
+			offset = decodedOffset
+		}
+	}
+
+	return paginationArgs{limit: limit, offset: offset}
+}
+
+func newDefaultPagination(first *int, after *string) paginationArgs {
+	return newPaginationArgs(first, after, paginationDefaults{defaultLimit: 20, maxLimit: 100})
+}
+
+func (p paginationArgs) Limit() int {
+	return p.limit
+}
+
+func (p paginationArgs) Offset() int {
+	return p.offset
+}
+
+func (p paginationArgs) LimitWithExtra() int {
+	return p.limit + 1
+}
+
+func (p paginationArgs) HasPreviousPage() bool {
+	return p.offset > 0
+}
+
 func stringPtr(value string) *string {
 	v := value
 	return &v
@@ -112,7 +161,7 @@ func convertFlyerFilters(filters *model.FlyerFilters, limit, offset int) service
 
 func convertShoppingListFilters(filters *model.ShoppingListFilters, limit, offset int) services.ShoppingListFilters {
 	serviceFilters := services.ShoppingListFilters{
-		Limit:  limit + 1,
+		Limit:  limit,
 		Offset: offset,
 	}
 
@@ -134,7 +183,7 @@ func convertShoppingListFilters(filters *model.ShoppingListFilters, limit, offse
 
 func convertShoppingListItemFilters(filters *model.ShoppingListItemFilters, limit, offset int) services.ShoppingListItemFilters {
 	serviceFilters := services.ShoppingListItemFilters{
-		Limit:  limit + 1,
+		Limit:  limit,
 		Offset: offset,
 	}
 
@@ -328,6 +377,39 @@ func buildShoppingListItemConnection(items []*models.ShoppingListItem, limit, of
 	return &model.ShoppingListItemConnection{
 		Edges:      edges,
 		PageInfo:   pageInfo,
+		TotalCount: totalCount,
+	}
+}
+
+func buildPriceHistoryConnection(entries []*models.PriceHistory, limit, offset int, totalCount int) *model.PriceHistoryConnection {
+	hasNextPage := len(entries) > limit
+	if hasNextPage {
+		entries = entries[:limit]
+	}
+
+	edges := make([]*model.PriceHistoryEdge, len(entries))
+	for i, entry := range entries {
+		cursor := encodeCursor(offset + i)
+		edges[i] = &model.PriceHistoryEdge{
+			Node:   entry,
+			Cursor: cursor,
+		}
+	}
+
+	var startCursor, endCursor *string
+	if len(edges) > 0 {
+		startCursor = stringPtr(edges[0].Cursor)
+		endCursor = stringPtr(edges[len(edges)-1].Cursor)
+	}
+
+	return &model.PriceHistoryConnection{
+		Edges: edges,
+		PageInfo: &model.PageInfo{
+			HasNextPage:     hasNextPage,
+			HasPreviousPage: offset > 0,
+			StartCursor:     startCursor,
+			EndCursor:       endCursor,
+		},
 		TotalCount: totalCount,
 	}
 }

@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -356,6 +357,70 @@ func (r *productMasterRepository) GetOverallStatistics(ctx context.Context) (*pr
 	}
 
 	return stats, nil
+}
+
+func (r *productMasterRepository) GetUnmatchedProducts(ctx context.Context, limit int) ([]*models.Product, error) {
+	var products []*models.Product
+	query := r.db.NewSelect().
+		Model(&products).
+		Column("p.id", "p.name", "p.normalized_name", "p.brand", "p.category", "p.requires_review", "p.created_at", "p.updated_at")
+
+	query = query.
+		Where("p.product_master_id IS NULL").
+		Where("p.requires_review = ?", false).
+		Order("p.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if err := query.Scan(ctx); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
+func (r *productMasterRepository) MarkProductForReview(ctx context.Context, productID int) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.Product)(nil)).
+		Set("requires_review = ?", true).
+		Where("id = ?", productID).
+		Exec(ctx)
+	return err
+}
+
+func (r *productMasterRepository) GetMasterProductCounts(ctx context.Context) ([]productmaster.MasterProductCount, error) {
+	var counts []productmaster.MasterProductCount
+	query := r.db.NewSelect().
+		TableExpr("products AS p").
+		ColumnExpr("p.product_master_id AS product_master_id").
+		ColumnExpr("COUNT(*) AS product_count").
+		Where("p.product_master_id IS NOT NULL").
+		Group("p.product_master_id").
+		Order("p.product_master_id ASC")
+
+	if err := query.Scan(ctx, &counts); err != nil {
+		if err == sql.ErrNoRows {
+			return []productmaster.MasterProductCount{}, nil
+		}
+		return nil, err
+	}
+	return counts, nil
+}
+
+func (r *productMasterRepository) UpdateMasterStatistics(ctx context.Context, masterID int64, confidence float64, matchCount int, updatedAt time.Time) (int64, error) {
+	res, err := r.db.NewUpdate().
+		Model((*models.ProductMaster)(nil)).
+		Set("confidence_score = ?", confidence).
+		Set("match_count = ?", matchCount).
+		Set("updated_at = ?", updatedAt).
+		Where("id = ?", masterID).
+		Where("confidence_score != ?", confidence).
+		Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func applyProductMasterFilters(q *bun.SelectQuery, filters *productmaster.Filters) *bun.SelectQuery {

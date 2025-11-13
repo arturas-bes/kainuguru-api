@@ -7,45 +7,40 @@ import (
 	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/kainuguru/kainuguru-api/internal/store"
 	"github.com/uptrace/bun"
 )
 
 type storeRepository struct {
-	db *bun.DB
+	db   *bun.DB
+	base *base.Repository[models.Store]
 }
 
 // NewStoreRepository creates a new store repository instance.
 func NewStoreRepository(db *bun.DB) store.Repository {
-	return &storeRepository{db: db}
+	return &storeRepository{
+		db:   db,
+		base: base.NewRepository[models.Store](db, "s.id"),
+	}
 }
 
 func (r *storeRepository) GetByID(ctx context.Context, id int) (*models.Store, error) {
-	store := &models.Store{}
-	err := r.db.NewSelect().
-		Model(store).
-		Where("s.id = ?", id).
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("store with ID %d not found", id)
+	store, err := r.base.GetByID(ctx, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("store with ID %d not found", id)
+		}
+		return nil, err
 	}
-	return store, err
+	return store, nil
 }
 
 func (r *storeRepository) GetByIDs(ctx context.Context, ids []int) ([]*models.Store, error) {
 	if len(ids) == 0 {
 		return []*models.Store{}, nil
 	}
-
-	var stores []*models.Store
-	err := r.db.NewSelect().
-		Model(&stores).
-		Where("s.id IN (?)", bun.In(ids)).
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return []*models.Store{}, nil
-	}
-	return stores, err
+	return r.base.GetByIDs(ctx, ids)
 }
 
 func (r *storeRepository) GetByCode(ctx context.Context, code string) (*models.Store, error) {
@@ -63,62 +58,16 @@ func (r *storeRepository) GetByCode(ctx context.Context, code string) (*models.S
 }
 
 func (r *storeRepository) GetAll(ctx context.Context, filters *store.Filters) ([]*models.Store, error) {
-	query := r.db.NewSelect().Model((*models.Store)(nil))
-
-	if filters != nil {
-		if filters.IsActive != nil {
-			query = query.Where("s.is_active = ?", *filters.IsActive)
-		}
-		if len(filters.Codes) > 0 {
-			query = query.Where("s.code IN (?)", bun.In(filters.Codes))
-		}
-		if filters.HasFlyers != nil && *filters.HasFlyers {
-			query = query.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
-		} else if filters.HasFlyers != nil && !*filters.HasFlyers {
-			query = query.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
-		}
-
-		orderBy := "s.created_at"
-		if filters.OrderBy != "" {
-			orderBy = fmt.Sprintf("s.%s", filters.OrderBy)
-		}
-		orderDir := "ASC"
-		if filters.OrderDir == "DESC" {
-			orderDir = "DESC"
-		}
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		query = query.Order("s.created_at ASC")
-	}
-
-	var stores []*models.Store
-	err := query.Scan(ctx, &stores)
-	return stores, err
+	return r.base.GetAll(ctx, base.WithQuery[models.Store](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = applyStoreFilters(q, filters)
+		return applyStorePagination(q, filters)
+	}))
 }
 
 func (r *storeRepository) Count(ctx context.Context, filters *store.Filters) (int, error) {
-	query := r.db.NewSelect().Model((*models.Store)(nil))
-	if filters != nil {
-		if filters.IsActive != nil {
-			query = query.Where("s.is_active = ?", *filters.IsActive)
-		}
-		if len(filters.Codes) > 0 {
-			query = query.Where("s.code IN (?)", bun.In(filters.Codes))
-		}
-		if filters.HasFlyers != nil && *filters.HasFlyers {
-			query = query.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
-		} else if filters.HasFlyers != nil && !*filters.HasFlyers {
-			query = query.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
-		}
-	}
-	return query.Count(ctx)
+	return r.base.Count(ctx, base.WithQuery[models.Store](func(q *bun.SelectQuery) *bun.SelectQuery {
+		return applyStoreFilters(q, filters)
+	}))
 }
 
 func (r *storeRepository) Create(ctx context.Context, store *models.Store) error {
@@ -128,10 +77,7 @@ func (r *storeRepository) Create(ctx context.Context, store *models.Store) error
 	if store.UpdatedAt.IsZero() {
 		store.UpdatedAt = time.Now()
 	}
-	_, err := r.db.NewInsert().
-		Model(store).
-		Exec(ctx)
-	return err
+	return r.base.Create(ctx, store)
 }
 
 func (r *storeRepository) Update(ctx context.Context, store *models.Store) error {
@@ -205,6 +151,48 @@ func (r *storeRepository) GetScrapingEnabledStores(ctx context.Context) ([]*mode
 		Order("s.name ASC").
 		Scan(ctx)
 	return stores, err
+}
+
+func applyStoreFilters(q *bun.SelectQuery, filters *store.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return q
+	}
+	if filters.IsActive != nil {
+		q = q.Where("s.is_active = ?", *filters.IsActive)
+	}
+	if len(filters.Codes) > 0 {
+		q = q.Where("s.code IN (?)", bun.In(filters.Codes))
+	}
+	if filters.HasFlyers != nil {
+		if *filters.HasFlyers {
+			q = q.Where("EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
+		} else {
+			q = q.Where("NOT EXISTS (SELECT 1 FROM flyers f WHERE f.store_id = s.id)")
+		}
+	}
+	return q
+}
+
+func applyStorePagination(q *bun.SelectQuery, filters *store.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return q.Order("s.created_at ASC")
+	}
+	orderBy := "s.created_at"
+	if filters.OrderBy != "" {
+		orderBy = fmt.Sprintf("s.%s", filters.OrderBy)
+	}
+	orderDir := "ASC"
+	if filters.OrderDir == "DESC" {
+		orderDir = "DESC"
+	}
+	q = q.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
+	if filters.Limit > 0 {
+		q = q.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		q = q.Offset(filters.Offset)
+	}
+	return q
 }
 
 func (r *storeRepository) UpdateLastScrapedAt(ctx context.Context, storeID int, scrapedAt time.Time) error {

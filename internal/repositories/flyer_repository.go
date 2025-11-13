@@ -8,41 +8,41 @@ import (
 
 	"github.com/kainuguru/kainuguru-api/internal/flyer"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/uptrace/bun"
 )
 
 type flyerRepository struct {
-	db *bun.DB
+	db   *bun.DB
+	base *base.Repository[models.Flyer]
 }
 
 // NewFlyerRepository returns a Bun-backed flyer repository.
 func NewFlyerRepository(db *bun.DB) flyer.Repository {
-	return &flyerRepository{db: db}
+	return &flyerRepository{
+		db:   db,
+		base: base.NewRepository[models.Flyer](db, "f.id"),
+	}
 }
 
 func (r *flyerRepository) GetByID(ctx context.Context, id int) (*models.Flyer, error) {
-	f := &models.Flyer{}
-	err := r.db.NewSelect().
-		Model(f).
-		Relation("Store").
-		Where("f.id = ?", id).
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("flyer with ID %d not found", id)
+	f, err := r.base.GetByID(ctx, id, base.WithQuery[models.Flyer](func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Relation("Store")
+	}))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("flyer with ID %d not found", id)
+		}
+		return nil, err
 	}
-	return f, err
+	return f, nil
 }
 
 func (r *flyerRepository) GetByIDs(ctx context.Context, ids []int) ([]*models.Flyer, error) {
 	if len(ids) == 0 {
 		return []*models.Flyer{}, nil
 	}
-	var flyers []*models.Flyer
-	err := r.db.NewSelect().
-		Model(&flyers).
-		Where("f.id IN (?)", bun.In(ids)).
-		Scan(ctx)
-	return flyers, err
+	return r.base.GetByIDs(ctx, ids)
 }
 
 func (r *flyerRepository) GetFlyersByStoreIDs(ctx context.Context, storeIDs []int) ([]*models.Flyer, error) {
@@ -59,45 +59,17 @@ func (r *flyerRepository) GetFlyersByStoreIDs(ctx context.Context, storeIDs []in
 }
 
 func (r *flyerRepository) GetAll(ctx context.Context, filters *flyer.Filters) ([]*models.Flyer, error) {
-	query := r.db.NewSelect().
-		Model((*models.Flyer)(nil)).
-		Relation("Store")
-
-	if filters != nil {
-		applyFlyerFilters(query, filters)
-		orderBy := "valid_from"
-		if filters.OrderBy != "" {
-			orderBy = filters.OrderBy
-		}
-		orderDir := "DESC"
-		if filters.OrderDir != "" {
-			orderDir = filters.OrderDir
-		}
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		query = query.Order("valid_from DESC")
-	}
-
-	var flyers []*models.Flyer
-	if err := query.Scan(ctx, &flyers); err != nil {
-		return nil, err
-	}
-	return flyers, nil
+	return r.base.GetAll(ctx, base.WithQuery[models.Flyer](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Relation("Store")
+		q = applyFlyerFilters(q, filters)
+		return applyFlyerPagination(q, filters)
+	}))
 }
 
 func (r *flyerRepository) Count(ctx context.Context, filters *flyer.Filters) (int, error) {
-	query := r.db.NewSelect().Model((*models.Flyer)(nil))
-	if filters != nil {
-		applyFlyerFilters(query, filters)
-	}
-	return query.Count(ctx)
+	return r.base.Count(ctx, base.WithQuery[models.Flyer](func(q *bun.SelectQuery) *bun.SelectQuery {
+		return applyFlyerFilters(q, filters)
+	}))
 }
 
 func (r *flyerRepository) Create(ctx context.Context, f *models.Flyer) error {
@@ -225,9 +197,9 @@ func (r *flyerRepository) ArchiveOlderThan(ctx context.Context, cutoffDays int) 
 	return int(rows), nil
 }
 
-func applyFlyerFilters(query *bun.SelectQuery, filters *flyer.Filters) {
+func applyFlyerFilters(query *bun.SelectQuery, filters *flyer.Filters) *bun.SelectQuery {
 	if filters == nil {
-		return
+		return query
 	}
 	if len(filters.StoreIDs) > 0 {
 		query = query.Where("f.store_id IN (?)", bun.In(filters.StoreIDs))
@@ -271,4 +243,28 @@ func applyFlyerFilters(query *bun.SelectQuery, filters *flyer.Filters) {
 			Where("f.valid_from < ?", now.Add(24*time.Hour)).
 			Where("f.valid_to > ?", now)
 	}
+	return query
+}
+
+func applyFlyerPagination(query *bun.SelectQuery, filters *flyer.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return query.Order("valid_from DESC")
+	}
+	orderBy := "valid_from"
+	if filters.OrderBy != "" {
+		orderBy = filters.OrderBy
+	}
+	orderDir := "DESC"
+	if filters.OrderDir != "" {
+		orderDir = filters.OrderDir
+	}
+	query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
+
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+	return query
 }

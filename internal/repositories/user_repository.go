@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/uptrace/bun"
 )
 
@@ -46,13 +47,15 @@ type UserRepository interface {
 
 // userRepository implements UserRepository
 type userRepository struct {
-	db *bun.DB
+	db   *bun.DB
+	base *base.Repository[models.User]
 }
 
 // NewUserRepository creates a new user repository
 func NewUserRepository(db *bun.DB) UserRepository {
 	return &userRepository{
-		db: db,
+		db:   db,
+		base: base.NewRepository[models.User](db, "u.id"),
 	}
 }
 
@@ -61,11 +64,7 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
-	_, err := r.db.NewInsert().
-		Model(user).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.Create(ctx, user); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
@@ -74,12 +73,7 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 
 // GetByID retrieves a user by ID
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
-	user := &models.User{}
-	err := r.db.NewSelect().
-		Model(user).
-		Where("u.id = ?", id).
-		Scan(ctx)
-
+	user, err := r.base.GetByID(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -112,12 +106,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*models.
 func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 	user.UpdatedAt = time.Now()
 
-	_, err := r.db.NewUpdate().
-		Model(user).
-		Where("id = ?", user.ID).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.Update(ctx, user); err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
@@ -126,12 +115,7 @@ func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 
 // Delete deletes a user by ID
 func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.NewDelete().
-		Model((*models.User)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-
-	if err != nil {
+	if err := r.base.DeleteByID(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
@@ -144,12 +128,7 @@ func (r *userRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*mode
 		return []*models.User{}, nil
 	}
 
-	var users []*models.User
-	err := r.db.NewSelect().
-		Model(&users).
-		Where("u.id IN (?)", bun.In(ids)).
-		Scan(ctx)
-
+	users, err := r.base.GetByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users by IDs: %w", err)
 	}
@@ -159,70 +138,10 @@ func (r *userRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*mode
 
 // GetAll retrieves users with optional filtering
 func (r *userRepository) GetAll(ctx context.Context, filters *UserFilters) ([]*models.User, error) {
-	query := r.db.NewSelect().Model((*models.User)(nil))
-
-	// Apply filters
-	if filters != nil {
-		if filters.IsActive != nil {
-			query = query.Where("u.is_active = ?", *filters.IsActive)
-		}
-
-		if filters.IsVerified != nil {
-			query = query.Where("u.email_verified = ?", *filters.IsVerified)
-		}
-
-		if filters.PreferredLanguage != "" {
-			query = query.Where("u.preferred_language = ?", filters.PreferredLanguage)
-		}
-
-		if filters.CreatedAfter != nil {
-			query = query.Where("u.created_at > ?", *filters.CreatedAfter)
-		}
-
-		if filters.CreatedBefore != nil {
-			query = query.Where("u.created_at < ?", *filters.CreatedBefore)
-		}
-
-		if filters.LastLoginAfter != nil {
-			query = query.Where("u.last_login_at > ?", *filters.LastLoginAfter)
-		}
-
-		if filters.HasOAuth != nil {
-			if *filters.HasOAuth {
-				query = query.Where("u.oauth_provider IS NOT NULL")
-			} else {
-				query = query.Where("u.oauth_provider IS NULL")
-			}
-		}
-
-		// Apply ordering
-		orderBy := "u.created_at"
-		if filters.OrderBy != "" {
-			orderBy = fmt.Sprintf("u.%s", filters.OrderBy)
-		}
-
-		orderDir := "DESC"
-		if filters.OrderDir == "ASC" {
-			orderDir = "ASC"
-		}
-
-		query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
-
-		// Apply pagination
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		// Default ordering
-		query = query.Order("u.created_at DESC")
-	}
-
-	var users []*models.User
-	err := query.Scan(ctx, &users)
+	users, err := r.base.GetAll(ctx, base.WithQuery[models.User](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = applyUserFilters(q, filters)
+		return applyUserOrdering(q, filters)
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all users: %w", err)
 	}
@@ -475,4 +394,58 @@ type UserFilters struct {
 	Offset            int        `json:"offset"`
 	OrderBy           string     `json:"orderBy"`
 	OrderDir          string     `json:"orderDir"`
+}
+
+func applyUserFilters(query *bun.SelectQuery, filters *UserFilters) *bun.SelectQuery {
+	if filters == nil {
+		return query
+	}
+	if filters.IsActive != nil {
+		query = query.Where("u.is_active = ?", *filters.IsActive)
+	}
+	if filters.IsVerified != nil {
+		query = query.Where("u.email_verified = ?", *filters.IsVerified)
+	}
+	if filters.PreferredLanguage != "" {
+		query = query.Where("u.preferred_language = ?", filters.PreferredLanguage)
+	}
+	if filters.CreatedAfter != nil {
+		query = query.Where("u.created_at > ?", *filters.CreatedAfter)
+	}
+	if filters.CreatedBefore != nil {
+		query = query.Where("u.created_at < ?", *filters.CreatedBefore)
+	}
+	if filters.LastLoginAfter != nil {
+		query = query.Where("u.last_login_at > ?", *filters.LastLoginAfter)
+	}
+	if filters.HasOAuth != nil {
+		if *filters.HasOAuth {
+			query = query.Where("u.oauth_provider IS NOT NULL")
+		} else {
+			query = query.Where("u.oauth_provider IS NULL")
+		}
+	}
+	return query
+}
+
+func applyUserOrdering(query *bun.SelectQuery, filters *UserFilters) *bun.SelectQuery {
+	if filters == nil {
+		return query.Order("u.created_at DESC")
+	}
+	orderBy := "u.created_at"
+	if filters.OrderBy != "" {
+		orderBy = fmt.Sprintf("u.%s", filters.OrderBy)
+	}
+	orderDir := "DESC"
+	if filters.OrderDir == "ASC" {
+		orderDir = "ASC"
+	}
+	query = query.Order(fmt.Sprintf("%s %s", orderBy, orderDir))
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+	return query
 }

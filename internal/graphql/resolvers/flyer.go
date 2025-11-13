@@ -102,26 +102,12 @@ func (r *flyerResolver) UpdatedAt(ctx context.Context, obj *models.Flyer) (strin
 }
 
 func (r *flyerResolver) FlyerPages(ctx context.Context, obj *models.Flyer, filters *model.FlyerPageFilters, first *int, after *string) (*model.FlyerPageConnection, error) {
-	// Set default limit
-	limit := 50 // Higher default for pages since they're typically all needed
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	// Parse cursor
-	offset := 0
-	if after != nil && *after != "" {
-		decodedOffset, err := decodeCursor(*after)
-		if err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newPaginationArgs(first, after, paginationDefaults{defaultLimit: 50, maxLimit: 100})
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert filters and scope to this flyer
-	serviceFilters := convertFlyerPageFilters(filters, limit+1, offset)
+	serviceFilters := convertFlyerPageFilters(filters, pager.LimitWithExtra(), offset)
 	serviceFilters.FlyerIDs = append(serviceFilters.FlyerIDs, obj.ID)
 
 	// Get pages for this flyer
@@ -141,26 +127,12 @@ func (r *flyerResolver) FlyerPages(ctx context.Context, obj *models.Flyer, filte
 }
 
 func (r *flyerResolver) Products(ctx context.Context, obj *models.Flyer, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
-	// Set default limit
-	limit := 20
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	// Parse cursor
-	offset := 0
-	if after != nil && *after != "" {
-		decodedOffset, err := decodeCursor(*after)
-		if err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newDefaultPagination(first, after)
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert filters
-	serviceFilters := convertProductFilters(filters, limit+1, offset)
+	serviceFilters := convertProductFilters(filters, pager.LimitWithExtra(), offset)
 	serviceFilters.FlyerIDs = append(serviceFilters.FlyerIDs, obj.ID)
 
 	// Get products for this flyer
@@ -261,26 +233,12 @@ func (r *flyerPageResolver) UpdatedAt(ctx context.Context, obj *models.FlyerPage
 }
 
 func (r *flyerPageResolver) Products(ctx context.Context, obj *models.FlyerPage, filters *model.ProductFilters, first *int, after *string) (*model.ProductConnection, error) {
-	// Set default limit
-	limit := 50 // Higher default for page products
-	if first != nil && *first > 0 {
-		limit = *first
-		if limit > 100 {
-			limit = 100
-		}
-	}
-
-	// Parse cursor
-	offset := 0
-	if after != nil && *after != "" {
-		decodedOffset, err := decodeCursor(*after)
-		if err == nil {
-			offset = decodedOffset
-		}
-	}
+	pager := newPaginationArgs(first, after, paginationDefaults{defaultLimit: 50, maxLimit: 100})
+	limit := pager.Limit()
+	offset := pager.Offset()
 
 	// Convert filters and add flyer page ID
-	serviceFilters := convertProductFilters(filters, limit+1, offset)
+	serviceFilters := convertProductFilters(filters, pager.LimitWithExtra(), offset)
 	serviceFilters.FlyerPageIDs = append(serviceFilters.FlyerPageIDs, obj.ID)
 
 	// Get products for this page

@@ -6,14 +6,12 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/generated"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
-	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
@@ -63,30 +61,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 	gqlHandler := handler.NewDefaultServer(schema)
 
 	return func(c *fiber.Ctx) error {
-		baseCtx := c.Context()
 		ctx := deriveGraphQLContext(c)
-
-		// Extract and validate JWT token (optional auth - don't fail if missing)
-		authHeader := c.Get("Authorization")
-		if authHeader != "" {
-			// Check for Bearer token format
-			parts := strings.Split(authHeader, " ")
-			if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
-				token := parts[1]
-
-				// Validate token and get claims
-				claims, err := config.AuthService.(interface {
-					ValidateToken(context.Context, string) (*auth.TokenClaims, error)
-				}).ValidateToken(baseCtx, token)
-
-				if err == nil && claims != nil {
-					// Add auth data to context
-					ctx = context.WithValue(ctx, middleware.UserContextKey, claims.UserID)
-					ctx = context.WithValue(ctx, middleware.SessionContextKey, claims.SessionID)
-					ctx = context.WithValue(ctx, middleware.ClaimsContextKey, claims)
-				}
-			}
-		}
 
 		// Create DataLoaders for this request (prevents N+1 queries)
 		loaders := dataloaders.NewLoaders(

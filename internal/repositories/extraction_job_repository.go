@@ -9,12 +9,14 @@ import (
 
 	"github.com/kainuguru/kainuguru-api/internal/extractionjob"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
 )
 
 type extractionJobRepository struct {
 	db                 *bun.DB
+	base               *base.Repository[models.ExtractionJob]
 	supportsSkipLocked bool
 }
 
@@ -22,77 +24,32 @@ type extractionJobRepository struct {
 func NewExtractionJobRepository(db *bun.DB) extractionjob.Repository {
 	return &extractionJobRepository{
 		db:                 db,
+		base:               base.NewRepository[models.ExtractionJob](db, "ej.id"),
 		supportsSkipLocked: db.Dialect().Name() == dialect.PG,
 	}
 }
 
 func (r *extractionJobRepository) GetByID(ctx context.Context, id int64) (*models.ExtractionJob, error) {
-	job := new(models.ExtractionJob)
-	if err := r.db.NewSelect().
-		Model(job).
-		Where("ej.id = ?", id).
-		Scan(ctx); err != nil {
-		return nil, err
-	}
-	return job, nil
+	return r.base.GetByID(ctx, id)
 }
 
 func (r *extractionJobRepository) GetAll(ctx context.Context, filters *extractionjob.Filters) ([]*models.ExtractionJob, error) {
-	var jobs []*models.ExtractionJob
-	query := r.db.NewSelect().Model(&jobs)
-	query = applyExtractionJobFilters(query, filters)
-
-	if filters != nil {
-		orderBy := filters.OrderBy
-		if orderBy == "" {
-			orderBy = "priority"
-		}
-		orderDir := filters.OrderDir
-		if orderDir == "" {
-			orderDir = "DESC"
-		}
-		query = query.Order(fmt.Sprintf("ej.%s %s", orderBy, orderDir))
-
-		if filters.Limit > 0 {
-			query = query.Limit(filters.Limit)
-		}
-		if filters.Offset > 0 {
-			query = query.Offset(filters.Offset)
-		}
-	} else {
-		query = query.Order("ej.priority DESC").Order("ej.created_at ASC")
-	}
-
-	if err := query.Scan(ctx); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []*models.ExtractionJob{}, nil
-		}
-		return nil, err
-	}
-	return jobs, nil
+	return r.base.GetAll(ctx, base.WithQuery[models.ExtractionJob](func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = applyExtractionJobFilters(q, filters)
+		return applyExtractionJobOrdering(q, filters)
+	}))
 }
 
 func (r *extractionJobRepository) Create(ctx context.Context, job *models.ExtractionJob) error {
-	_, err := r.db.NewInsert().
-		Model(job).
-		Exec(ctx)
-	return err
+	return r.base.Create(ctx, job)
 }
 
 func (r *extractionJobRepository) Update(ctx context.Context, job *models.ExtractionJob) error {
-	_, err := r.db.NewUpdate().
-		Model(job).
-		WherePK().
-		Exec(ctx)
-	return err
+	return r.base.Update(ctx, job)
 }
 
 func (r *extractionJobRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.NewDelete().
-		Model((*models.ExtractionJob)(nil)).
-		Where("id = ?", id).
-		Exec(ctx)
-	return err
+	return r.base.DeleteByID(ctx, id)
 }
 
 func (r *extractionJobRepository) GetNextJob(ctx context.Context, jobTypes []string, workerID string) (*models.ExtractionJob, error) {
@@ -263,6 +220,28 @@ func applyExtractionJobFilters(query *bun.SelectQuery, filters *extractionjob.Fi
 		query = query.Where("ej.created_at >= ?", *filters.CreatedAfter)
 	}
 
+	return query
+}
+
+func applyExtractionJobOrdering(query *bun.SelectQuery, filters *extractionjob.Filters) *bun.SelectQuery {
+	if filters == nil {
+		return query.Order("ej.priority DESC").Order("ej.created_at ASC")
+	}
+	orderBy := filters.OrderBy
+	if orderBy == "" {
+		orderBy = "priority"
+	}
+	orderDir := filters.OrderDir
+	if orderDir == "" {
+		orderDir = "DESC"
+	}
+	query = query.Order(fmt.Sprintf("ej.%s %s", orderBy, orderDir))
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
 	return query
 }
 
