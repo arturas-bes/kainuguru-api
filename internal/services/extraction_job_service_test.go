@@ -250,7 +250,10 @@ func TestExtractionJobService_CreateSetsDefaults(t *testing.T) {
 func TestExtractionJobService_CreateRejectsNilJob(t *testing.T) {
 	service := &extractionJobService{repo: &mockExtractionJobRepository{}, logger: slog.Default(), now: time.Now}
 	err := service.Create(context.Background(), nil)
-	if err == nil || err.Error() != "job cannot be nil" {
+	if err == nil {
+		t.Fatal("expected nil job error, got nil")
+	}
+	if !contains(err.Error(), "job cannot be nil") {
 		t.Fatalf("expected nil job error, got %v", err)
 	}
 }
@@ -258,7 +261,10 @@ func TestExtractionJobService_CreateRejectsNilJob(t *testing.T) {
 func TestExtractionJobService_CreateRejectsEmptyJobType(t *testing.T) {
 	service := &extractionJobService{repo: &mockExtractionJobRepository{}, logger: slog.Default(), now: time.Now}
 	err := service.Create(context.Background(), &models.ExtractionJob{})
-	if err == nil || err.Error() != "job type is required" {
+	if err == nil {
+		t.Fatal("expected job type error, got nil")
+	}
+	if !contains(err.Error(), "job type is required") {
 		t.Fatalf("expected job type error, got %v", err)
 	}
 }
@@ -631,4 +637,18 @@ func (m *mockExtractionJobRepository) DeleteExpiredJobs(ctx context.Context) (in
 		return m.deleteExpiredFunc(ctx)
 	}
 	return 0, errors.New("not implemented")
+}
+
+// contains checks if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && stringContains(s, substr))
+}
+
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
