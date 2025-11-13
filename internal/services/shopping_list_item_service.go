@@ -3,9 +3,12 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -54,10 +57,13 @@ func NewShoppingListItemServiceWithRepository(repo shoppingListItemRepo, shoppin
 func (s *shoppingListItemService) GetByID(ctx context.Context, id int64) (*models.ShoppingListItem, error) {
 	item, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list item by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("shopping list item not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get shopping list item by ID %d", id)
 	}
 	if item == nil {
-		return nil, fmt.Errorf("failed to get shopping list item by ID %d: %w", id, sql.ErrNoRows)
+		return nil, apperrors.NotFound(fmt.Sprintf("shopping list item not found with ID %d", id))
 	}
 	return item, nil
 }
@@ -65,7 +71,7 @@ func (s *shoppingListItemService) GetByID(ctx context.Context, id int64) (*model
 func (s *shoppingListItemService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingListItem, error) {
 	items, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list items by IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping list items by IDs")
 	}
 	return items, nil
 }
@@ -73,7 +79,7 @@ func (s *shoppingListItemService) GetByIDs(ctx context.Context, ids []int64) ([]
 func (s *shoppingListItemService) GetByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) ([]*models.ShoppingListItem, error) {
 	items, err := s.repo.GetByListID(ctx, listID, &filters)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list items: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping list items")
 	}
 
 	return items, nil
@@ -83,7 +89,7 @@ func (s *shoppingListItemService) GetByListID(ctx context.Context, listID int64,
 func (s *shoppingListItemService) CountByListID(ctx context.Context, listID int64, filters ShoppingListItemFilters) (int, error) {
 	count, err := s.repo.CountByListID(ctx, listID, &filters)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count shopping list items: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count shopping list items")
 	}
 
 	return count, nil
@@ -112,13 +118,13 @@ func (s *shoppingListItemService) Create(ctx context.Context, item *models.Shopp
 	// Auto-assign sort order (last in list)
 	nextSortOrder, err := s.repo.GetNextSortOrder(ctx, item.ShoppingListID)
 	if err != nil {
-		return fmt.Errorf("failed to get max sort order: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get max sort order")
 	}
 	item.SortOrder = nextSortOrder
 
 	// Insert the item
 	if err := s.repo.Create(ctx, item); err != nil {
-		return fmt.Errorf("failed to create shopping list item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create shopping list item")
 	}
 
 	// Update parent list statistics
@@ -137,7 +143,7 @@ func (s *shoppingListItemService) Update(ctx context.Context, item *models.Shopp
 	item.NormalizedDescription = normalizeText(item.Description)
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to update shopping list item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update shopping list item")
 	}
 
 	// Update parent list statistics
@@ -152,11 +158,11 @@ func (s *shoppingListItemService) Delete(ctx context.Context, id int64) error {
 	// Get item to find shopping list ID for statistics update
 	item, err := s.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("failed to get item for deletion: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item for deletion")
 	}
 
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete shopping list item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete shopping list item")
 	}
 
 	// Update parent list statistics
@@ -172,11 +178,11 @@ func (s *shoppingListItemService) Delete(ctx context.Context, id int64) error {
 func (s *shoppingListItemService) CheckItem(ctx context.Context, itemID int64, userID uuid.UUID) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	if err := s.repo.BulkCheck(ctx, []int64{itemID}, userID); err != nil {
-		return fmt.Errorf("failed to check item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check item")
 	}
 
 	// Update parent list statistics
@@ -190,11 +196,11 @@ func (s *shoppingListItemService) CheckItem(ctx context.Context, itemID int64, u
 func (s *shoppingListItemService) UncheckItem(ctx context.Context, itemID int64) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	if err := s.repo.BulkUncheck(ctx, []int64{itemID}); err != nil {
-		return fmt.Errorf("failed to uncheck item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to uncheck item")
 	}
 
 	// Update parent list statistics
@@ -207,14 +213,14 @@ func (s *shoppingListItemService) UncheckItem(ctx context.Context, itemID int64)
 
 func (s *shoppingListItemService) ReorderItems(ctx context.Context, listID int64, itemOrders []ItemOrder) error {
 	if err := s.repo.ReorderItems(ctx, listID, itemOrders); err != nil {
-		return fmt.Errorf("failed to reorder items: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to reorder items")
 	}
 	return nil
 }
 
 func (s *shoppingListItemService) UpdateSortOrder(ctx context.Context, itemID int64, newOrder int) error {
 	if err := s.repo.UpdateSortOrder(ctx, itemID, newOrder); err != nil {
-		return fmt.Errorf("failed to update sort order: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update sort order")
 	}
 
 	return nil
@@ -223,14 +229,14 @@ func (s *shoppingListItemService) UpdateSortOrder(ctx context.Context, itemID in
 func (s *shoppingListItemService) MoveToCategory(ctx context.Context, itemID int64, category string) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	item.Category = &category
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to move item to category: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to move item to category")
 	}
 
 	return nil
@@ -240,7 +246,7 @@ func (s *shoppingListItemService) AddTags(ctx context.Context, itemID int64, tag
 	// Get current item to append tags
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	// Merge tags (avoid duplicates)
@@ -258,7 +264,7 @@ func (s *shoppingListItemService) AddTags(ctx context.Context, itemID int64, tag
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to add tags: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to add tags")
 	}
 
 	return nil
@@ -268,7 +274,7 @@ func (s *shoppingListItemService) RemoveTags(ctx context.Context, itemID int64, 
 	// Get current item
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	// Remove specified tags
@@ -288,7 +294,7 @@ func (s *shoppingListItemService) RemoveTags(ctx context.Context, itemID int64, 
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to remove tags: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to remove tags")
 	}
 
 	return nil
@@ -302,11 +308,11 @@ func (s *shoppingListItemService) BulkCheck(ctx context.Context, itemIDs []int64
 	// Get first item to find shopping list ID
 	item, err := s.GetByID(ctx, itemIDs[0])
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	if err := s.repo.BulkCheck(ctx, itemIDs, userID); err != nil {
-		return fmt.Errorf("failed to bulk check items: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to bulk check items")
 	}
 
 	// Update parent list statistics
@@ -325,11 +331,11 @@ func (s *shoppingListItemService) BulkUncheck(ctx context.Context, itemIDs []int
 	// Get first item to find shopping list ID
 	item, err := s.GetByID(ctx, itemIDs[0])
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	if err := s.repo.BulkUncheck(ctx, itemIDs); err != nil {
-		return fmt.Errorf("failed to bulk uncheck items: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to bulk uncheck items")
 	}
 
 	// Update parent list statistics
@@ -348,11 +354,11 @@ func (s *shoppingListItemService) BulkDelete(ctx context.Context, itemIDs []int6
 	// Get first item to find shopping list ID
 	item, err := s.GetByID(ctx, itemIDs[0])
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	if _, err := s.repo.BulkDelete(ctx, itemIDs); err != nil {
-		return fmt.Errorf("failed to bulk delete items: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to bulk delete items")
 	}
 
 	// Update parent list statistics
@@ -366,20 +372,20 @@ func (s *shoppingListItemService) BulkDelete(ctx context.Context, itemIDs []int6
 // Item suggestions and matching - Stubs for now
 
 func (s *shoppingListItemService) SuggestItems(ctx context.Context, query string, userID uuid.UUID, limit int) ([]*ItemSuggestion, error) {
-	return nil, fmt.Errorf("SuggestItems not implemented yet")
+	return nil, apperrors.New(apperrors.ErrorTypeInternal, "SuggestItems not implemented yet")
 }
 
 func (s *shoppingListItemService) MatchToProduct(ctx context.Context, itemID int64, productID int64) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	item.LinkedProductID = &productID
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to match item to product: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to match item to product")
 	}
 
 	return nil
@@ -388,21 +394,21 @@ func (s *shoppingListItemService) MatchToProduct(ctx context.Context, itemID int
 func (s *shoppingListItemService) MatchToProductMaster(ctx context.Context, itemID int64, productMasterID int64) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	item.ProductMasterID = &productMasterID
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to match item to product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to match item to product master")
 	}
 
 	return nil
 }
 
 func (s *shoppingListItemService) FindSimilarItems(ctx context.Context, itemID int64, limit int) ([]*models.ShoppingListItem, error) {
-	return nil, fmt.Errorf("FindSimilarItems not implemented yet")
+	return nil, apperrors.New(apperrors.ErrorTypeInternal, "FindSimilarItems not implemented yet")
 }
 
 // Price operations
@@ -410,7 +416,7 @@ func (s *shoppingListItemService) FindSimilarItems(ctx context.Context, itemID i
 func (s *shoppingListItemService) UpdateEstimatedPrice(ctx context.Context, itemID int64, price float64, source string) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	item.EstimatedPrice = &price
@@ -418,7 +424,7 @@ func (s *shoppingListItemService) UpdateEstimatedPrice(ctx context.Context, item
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to update estimated price: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update estimated price")
 	}
 
 	// Update parent list statistics
@@ -432,21 +438,21 @@ func (s *shoppingListItemService) UpdateEstimatedPrice(ctx context.Context, item
 func (s *shoppingListItemService) UpdateActualPrice(ctx context.Context, itemID int64, price float64) error {
 	item, err := s.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get item")
 	}
 
 	item.ActualPrice = &price
 	item.UpdatedAt = time.Now()
 
 	if err := s.repo.Update(ctx, item); err != nil {
-		return fmt.Errorf("failed to update actual price: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update actual price")
 	}
 
 	return nil
 }
 
 func (s *shoppingListItemService) GetPriceHistory(ctx context.Context, itemID int64) ([]*ItemPriceHistory, error) {
-	return nil, fmt.Errorf("GetPriceHistory not implemented yet")
+	return nil, apperrors.New(apperrors.ErrorTypeInternal, "GetPriceHistory not implemented yet")
 }
 
 // Smart features - Stubs
@@ -477,11 +483,11 @@ func (s *shoppingListItemService) SuggestCategory(ctx context.Context, descripti
 }
 
 func (s *shoppingListItemService) GetFrequentlyBoughtTogether(ctx context.Context, itemID int64, limit int) ([]*models.ShoppingListItem, error) {
-	return nil, fmt.Errorf("GetFrequentlyBoughtTogether not implemented yet")
+	return nil, apperrors.New(apperrors.ErrorTypeInternal, "GetFrequentlyBoughtTogether not implemented yet")
 }
 
 func (s *shoppingListItemService) GetPopularItemsForUser(ctx context.Context, userID uuid.UUID, limit int) ([]*models.ShoppingListItem, error) {
-	return nil, fmt.Errorf("GetPopularItemsForUser not implemented yet")
+	return nil, apperrors.New(apperrors.ErrorTypeInternal, "GetPopularItemsForUser not implemented yet")
 }
 
 // Validation
@@ -493,7 +499,7 @@ func (s *shoppingListItemService) ValidateItemAccess(ctx context.Context, itemID
 	}
 
 	if !hasAccess {
-		return fmt.Errorf("user does not have access to this shopping list item")
+		return apperrors.New(apperrors.ErrorTypeInternal, "user does not have access to this shopping list item")
 	}
 
 	return nil
@@ -502,7 +508,7 @@ func (s *shoppingListItemService) ValidateItemAccess(ctx context.Context, itemID
 func (s *shoppingListItemService) CanUserAccessItem(ctx context.Context, itemID int64, userID uuid.UUID) (bool, error) {
 	canAccess, err := s.repo.CanUserAccessItem(ctx, itemID, userID)
 	if err != nil {
-		return false, fmt.Errorf("failed to check item access: %w", err)
+		return false, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check item access")
 	}
 
 	return canAccess, nil
@@ -513,7 +519,7 @@ func (s *shoppingListItemService) CheckForDuplicates(ctx context.Context, listID
 
 	item, err := s.repo.FindDuplicateByDescription(ctx, listID, normalized, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check for duplicates: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check for duplicates")
 	}
 
 	return item, nil
