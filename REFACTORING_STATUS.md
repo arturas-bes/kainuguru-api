@@ -32,8 +32,10 @@
 21. **Extraction job + shopping list item repositories now use the base helper**: both repos delegate CRUD to `internal/repositories/base` with sqlite-backed tests covering filter/order semantics, leaving only domain-specific locking logic outside the helper.
 22. **Shared error-handling package complete**: `pkg/errors` now has comprehensive unit tests (14 test cases covering all error types, wrapping, type checking, and status code mapping), usage examples demonstrating migration patterns, and complete documentation (README.md) with service-layer patterns, migration strategy, and best practices. The package was already implemented with typed errors (validation/authentication/authorization/notfound/conflict/ratelimit/external/internal), HTTP status mapping, error wrapping with `%w` semantics, and GraphQL compatibility—ready for service migration.
 23. **GraphQL pagination snapshots integrated into workflow**: Added `make test-snapshots` and `make update-snapshots` Makefile targets, created comprehensive documentation (`docs/SNAPSHOT_TESTING.md`) covering update workflow/CI integration/best practices, and provided CI configuration templates (GitHub Actions + GitLab CI examples) under `docs/ci-examples/` so projects can enforce snapshot stability before merging PRs.
+24. **Phase 3 test coverage expansion started**: Baseline coverage measured at 6.4% (internal/services 18.0%). Expanded price_history_service tests from 2 → 10 tests (+400% coverage), achieving 75-100% coverage on all 7 public methods. Overall coverage improved to 6.7% (services package: 19.5%). Established characterization test pattern for incremental coverage improvement.
 
-## Next planned steps (Phase 3 scope)
-1. Push toward the Week 3 goals (70% coverage + large-file splits) by prioritizing service unit tests and resolver extraction work.
-2. Begin migrating critical services to use `pkg/errors` (starting with product_master, shopping_list_item, auth services per migration strategy).
-3. Split large service files (product_master 865 LOC, shopping_list_item 771 LOC) to improve maintainability.
+## Next planned steps (Phase 3 ongoing)
+1. Add characterization tests for auth service (critical security component, currently 0% coverage).
+2. Continue expanding existing service test files to improve overall coverage.
+3. Begin migrating critical services to use `pkg/errors` after test coverage is sufficient.
+4. Split large service files (product_master 865 LOC, shopping_list_item 771 LOC) to improve maintainability.
