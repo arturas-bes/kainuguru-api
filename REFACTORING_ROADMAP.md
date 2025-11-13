@@ -744,7 +744,7 @@ Total: 20 working days (~4 weeks)
 - `recommendation/price_comparison_service.go` (4 fmt.Errorf sites)
 
 **Tasks:**
-- [x] **Batch 5 COMPLETE**: Migrated auth subsystem (6 files, 130 error sites, 2,417 LOC) ✅
+- [x] **Batch 5 COMPLETE**: Migrated auth subsystem (6 files, 130 error sites, 2,204 LOC) ✅
   - service.go: 43 apperrors (Register, Login, RefreshToken, user mgmt, rate limiting)
   - jwt.go: 20 apperrors (token generation/validation)
   - session.go: 17 apperrors (session management)
@@ -753,7 +753,10 @@ Total: 20 working days (~4 weeks)
   - password.go: 14 apperrors (password hashing/validation)
   - Error types: Internal 71, Authentication 29, Validation 15, NotFound 10, Conflict 2, RateLimit 1
   - All 13 auth delegation tests pass, zero regressions
-- [ ] Batch 6: Migrate product_master_service (1 file, 24 error sites)
+- [x] **Batch 6 COMPLETE**: Migrated product_master_service (1 file, 27 error sites, 510 LOC) ✅
+  - product_master_service.go: 27 apperrors (CRUD, matching, master mgmt, statistics)
+  - Error types: Internal 20, NotFound 6, Validation 1
+  - All 3 product_master tests pass, zero regressions
 - [ ] Batch 7: Migrate search & matching (3 files, 55 error sites)
 - [ ] Batch 8: Migrate worker infrastructure (4 files, 37 error sites)
 - [ ] Batch 9: Migrate supporting services (4 files, 49 error sites)
