@@ -3,11 +3,11 @@ package search
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/lib/pq"
 	"github.com/uptrace/bun"
 )
@@ -26,7 +26,7 @@ func NewSearchService(db *bun.DB, logger *slog.Logger) Service {
 
 func (s *searchService) SearchProducts(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {
 	if err := ValidateSearchRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid search request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid search request")
 	}
 
 	// Sanitize the query
@@ -41,7 +41,7 @@ func (s *searchService) SearchProducts(ctx context.Context, req *SearchRequest) 
 
 func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {
 	if err := ValidateSearchRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid search request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid search request")
 	}
 
 	req.Query = SanitizeQuery(req.Query)
@@ -70,7 +70,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	)
 	if err != nil {
 		s.logger.Error("fuzzy search failed", "error", err, "query", req.Query)
-		return nil, fmt.Errorf("fuzzy search failed: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "fuzzy search failed")
 	}
 	defer rows.Close()
 
@@ -110,7 +110,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 			Scan(ctx)
 		if err != nil {
 			s.logger.Error("failed to load products with relations", "error", err)
-			return nil, fmt.Errorf("failed to load products with relations: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to load products with relations")
 		}
 		s.logger.Info("loaded products", "count", len(products))
 
@@ -134,7 +134,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating fuzzy search results: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "error iterating fuzzy search results")
 	}
 
 	// Get total count for pagination
@@ -170,7 +170,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 
 func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {
 	if err := ValidateSearchRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid search request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid search request")
 	}
 
 	req.Query = SanitizeQuery(req.Query)
@@ -197,7 +197,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	)
 	if err != nil {
 		s.logger.Error("hybrid search failed", "error", err, "query", req.Query)
-		return nil, fmt.Errorf("hybrid search failed: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "hybrid search failed")
 	}
 	defer rows.Close()
 
@@ -236,7 +236,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 			Relation("FlyerPage").
 			Scan(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load products with relations: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to load products with relations")
 		}
 
 		// Set currency for all products (not stored in DB)
@@ -259,7 +259,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating hybrid search results: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "error iterating hybrid search results")
 	}
 
 	// Get total count
@@ -295,7 +295,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 
 func (s *searchService) GetSearchSuggestions(ctx context.Context, req *SuggestionRequest) (*SuggestionResponse, error) {
 	if err := ValidateSuggestionRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid suggestion request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid suggestion request")
 	}
 
 	req.PartialQuery = SanitizeQuery(req.PartialQuery)
@@ -308,7 +308,7 @@ func (s *searchService) GetSearchSuggestions(ctx context.Context, req *Suggestio
 	rows, err := s.db.QueryContext(ctx, query, req.PartialQuery, req.Limit)
 	if err != nil {
 		s.logger.Error("search suggestions failed", "error", err, "query", req.PartialQuery)
-		return nil, fmt.Errorf("search suggestions failed: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "search suggestions failed")
 	}
 	defer rows.Close()
 
@@ -331,7 +331,7 @@ func (s *searchService) GetSearchSuggestions(ctx context.Context, req *Suggestio
 
 func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarProductsRequest) (*SimilarProductsResponse, error) {
 	if err := ValidateSimilarProductsRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid similar products request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid similar products request")
 	}
 
 	query := `
@@ -342,7 +342,7 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 	rows, err := s.db.QueryContext(ctx, query, req.ProductID, req.Limit)
 	if err != nil {
 		s.logger.Error("similar products search failed", "error", err, "product_id", req.ProductID)
-		return nil, fmt.Errorf("similar products search failed: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "similar products search failed")
 	}
 	defer rows.Close()
 
@@ -376,7 +376,7 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 			Relation("FlyerPage").
 			Scan(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load products with relations: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to load products with relations")
 		}
 	}
 
@@ -398,7 +398,7 @@ func (s *searchService) FindSimilarProducts(ctx context.Context, req *SimilarPro
 
 func (s *searchService) SuggestQueryCorrections(ctx context.Context, req *CorrectionRequest) (*CorrectionResponse, error) {
 	if err := ValidateCorrectionRequest(req); err != nil {
-		return nil, fmt.Errorf("invalid correction request: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid correction request")
 	}
 
 	req.Query = SanitizeQuery(req.Query)
@@ -411,7 +411,7 @@ func (s *searchService) SuggestQueryCorrections(ctx context.Context, req *Correc
 	rows, err := s.db.QueryContext(ctx, query, req.Query, req.Limit)
 	if err != nil {
 		s.logger.Error("query corrections failed", "error", err, "query", req.Query)
-		return nil, fmt.Errorf("query corrections failed: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "query corrections failed")
 	}
 	defer rows.Close()
 
@@ -455,7 +455,7 @@ func (s *searchService) GetSearchHealth(ctx context.Context) (*SearchHealthStatu
 
 	rows, err := s.db.QueryContext(ctx, indexQuery)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check index status: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check index status")
 	}
 	defer rows.Close()
 
@@ -487,7 +487,7 @@ func (s *searchService) RefreshSearchSuggestions(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, query)
 	if err != nil {
 		s.logger.Error("failed to refresh search suggestions", "error", err)
-		return fmt.Errorf("failed to refresh search suggestions: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to refresh search suggestions")
 	}
 
 	s.logger.Info("search suggestions refreshed successfully")

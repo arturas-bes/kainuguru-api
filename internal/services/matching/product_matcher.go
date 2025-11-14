@@ -2,11 +2,11 @@ package matching
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strings"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/kainuguru/kainuguru-api/pkg/normalize"
 	"github.com/uptrace/bun"
 )
@@ -66,7 +66,7 @@ func (m *CompositeMatcher) FindBestMatches(ctx context.Context, product *models.
 
 	err := query.Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch master candidates: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to fetch master candidates")
 	}
 
 	var results []*MatchResult
