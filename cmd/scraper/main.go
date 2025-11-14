@@ -34,9 +34,12 @@ func main() {
 	fmt.Println("🤖 Kainuguru Scraper Worker Starting...")
 	fmt.Println("======================================")
 
-	// Load .env file into OS environment first
-	if err := loadEnvFile(".env"); err != nil {
-		log.Warn().Err(err).Msg("Could not load .env file, will use OS environment variables")
+	// Load .env file only if running locally (not in Docker)
+	// Docker containers get environment variables from docker-compose.yml
+	if _, err := os.Stat("/.dockerenv"); os.IsNotExist(err) {
+		if err := loadEnvFile(".env"); err != nil {
+			log.Warn().Err(err).Msg("Could not load .env file, will use OS environment variables")
+		}
 	}
 
 	// Load configuration

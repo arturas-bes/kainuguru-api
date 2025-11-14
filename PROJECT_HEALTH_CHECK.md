@@ -91,13 +91,13 @@ Across all migrated services (477 error sites):
 ### Current State
 - ✅ **Database**: Running and healthy (postgres:15-alpine)
 - ✅ **Redis**: Running and healthy (redis:7-alpine)
-- ⚠️ **API**: Connection configuration issue (pre-existing, not caused by refactoring)
-- ⚠️ **Scraper**: Dependent on API
+- ✅ **API**: Running successfully on port 8080
+- ✅ **Scraper**: Running and executing scraping cycles
 
-### Known Issues (Pre-Existing)
-- Docker API container attempting to connect to `[::1]:5439` instead of `db:5432`
-- This is a configuration issue unrelated to error handling migration
-- Binary runs successfully when dependencies are available
+### Fixed Issues
+- ✅ Fixed Docker connectivity issue where containers loaded `.env` file values instead of docker-compose environment variables
+- ✅ Updated `docker-compose.yml` to hardcode service names (db, redis) instead of using ${DB_HOST}
+- ✅ Updated `cmd/scraper/main.go` to skip loading `.env` when running in Docker (checks for `/.dockerenv`)
 
 ## Verification Checklist
 
