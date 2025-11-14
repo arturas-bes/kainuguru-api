@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jordan-wright/email"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 )
 
@@ -41,7 +42,7 @@ func NewSMTPService(config *SMTPConfig) (Service, error) {
 
 	// Load email templates
 	if err := service.loadTemplates(); err != nil {
-		return nil, fmt.Errorf("failed to load email templates: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to load email templates")
 	}
 
 	return service, nil
@@ -313,12 +314,12 @@ func (s *smtpEmailService) SendLoginAlertEmail(ctx context.Context, user *models
 func (s *smtpEmailService) sendTemplateEmail(ctx context.Context, to, subject, templateName string, data map[string]interface{}) error {
 	tmpl, exists := s.templates[templateName]
 	if !exists {
-		return fmt.Errorf("template %s not found", templateName)
+		return apperrors.NotFound(fmt.Sprintf("template %s not found", templateName))
 	}
 
 	var body bytes.Buffer
 	if err := tmpl.Execute(&body, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to execute template")
 	}
 
 	return s.sendEmail(ctx, to, subject, body.String())
@@ -360,14 +361,14 @@ func (s *smtpEmailService) sendEmail(ctx context.Context, to, subject, htmlBody 
 				slog.String("to", to),
 				slog.String("error", err.Error()),
 			)
-			return fmt.Errorf("failed to send email: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to send email")
 		}
 		s.logger.Info("email sent successfully", slog.String("to", to))
 		return nil
 	case <-time.After(30 * time.Second):
-		return fmt.Errorf("email send timeout after 30 seconds")
+		return apperrors.Internal("email send timeout after 30 seconds")
 	case <-ctx.Done():
-		return fmt.Errorf("email send cancelled: %w", ctx.Err())
+		return apperrors.Wrap(ctx.Err(), apperrors.ErrorTypeInternal, "email send cancelled")
 	}
 }
 

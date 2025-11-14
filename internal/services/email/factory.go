@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 )
 
@@ -23,11 +24,11 @@ func NewEmailServiceFromConfig(cfg *config.Config) (Service, error) {
 		}
 
 		if smtpConfig.Host == "" {
-			return nil, fmt.Errorf("SMTP host is required when using SMTP provider")
+			return nil, apperrors.Validation("SMTP host is required when using SMTP provider")
 		}
 
 		if smtpConfig.From == "" {
-			return nil, fmt.Errorf("from email is required when using SMTP provider")
+			return nil, apperrors.Validation("from email is required when using SMTP provider")
 		}
 
 		return NewSMTPService(smtpConfig)
@@ -37,6 +38,6 @@ func NewEmailServiceFromConfig(cfg *config.Config) (Service, error) {
 		return NewMockService(), nil
 
 	default:
-		return nil, fmt.Errorf("unknown email provider: %s (supported: smtp, mock)", provider)
+		return nil, apperrors.NotFound(fmt.Sprintf("unknown email provider: %s (supported: smtp, mock)", provider))
 	}
 }

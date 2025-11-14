@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +45,7 @@ func (s *fileSystemStorage) SaveFlyerPage(ctx context.Context, flyer *models.Fly
 
 	// Create directories if they don't exist
 	if err := os.MkdirAll(fullPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create directory")
 	}
 
 	// Create file
@@ -53,14 +54,14 @@ func (s *fileSystemStorage) SaveFlyerPage(ctx context.Context, flyer *models.Fly
 
 	file, err := os.Create(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create file: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create file")
 	}
 	defer file.Close()
 
 	// Copy image data
 	written, err := io.Copy(file, imageData)
 	if err != nil {
-		return "", fmt.Errorf("failed to write image data: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to write image data")
 	}
 
 	log.Info().
@@ -95,7 +96,7 @@ func (s *fileSystemStorage) GetFlyerPagePath(flyer *models.Flyer, pageNumber int
 func (s *fileSystemStorage) DeleteFlyer(ctx context.Context, flyer *models.Flyer) error {
 	flyerPath := filepath.Join(s.basePath, flyer.GetImageBasePath())
 	if err := os.RemoveAll(flyerPath); err != nil {
-		return fmt.Errorf("failed to delete flyer directory: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete flyer directory")
 	}
 
 	log.Info().
@@ -117,7 +118,7 @@ func (s *fileSystemStorage) EnforceStorageLimit(ctx context.Context, storeCode s
 			// Store directory doesn't exist yet, that's fine
 			return nil
 		}
-		return fmt.Errorf("failed to read store directory: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to read store directory")
 	}
 
 	// Filter only directories and sort by date (folder name starts with date)
@@ -158,7 +159,7 @@ func (s *fileSystemStorage) EnforceStorageLimit(ctx context.Context, storeCode s
 func (s *fileSystemStorage) EnsureDirectoryExists(path string) error {
 	fullPath := filepath.Join(s.basePath, path)
 	if err := os.MkdirAll(fullPath, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create directory")
 	}
 	return nil
 }
