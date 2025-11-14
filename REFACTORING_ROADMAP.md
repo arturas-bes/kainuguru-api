@@ -770,8 +770,15 @@ Total: 20 working days (~4 weeks)
   - worker/scheduler.go: 4 apperrors (scheduled job management)
   - Error types: Internal 26, Conflict 5, Validation 3, Authentication 2, NotFound 1
   - No tests exist (0% coverage), build passes, zero regressions
-- [ ] Batch 9: Migrate supporting services (4 files, 49 error sites)
-- [ ] Document migration metrics (total LOC, tests passing, regressions)
+- [x] **Batch 9 COMPLETE**: Migrated supporting services (5 files, 52 error sites, 1,250 LOC) ✅
+  - email/smtp_service.go: 6 apperrors (SMTP email with templates)
+  - email/factory.go: 3 apperrors (email service factory)
+  - storage/flyer_storage.go: 6 apperrors (file system storage)
+  - cache/flyer_cache.go: 17 apperrors (Redis flyer cache)
+  - cache/extraction_cache.go: 20 apperrors (Redis extraction cache)
+  - Error types: Internal 48, Validation 2, NotFound 2
+  - No tests exist (0% coverage), build passes, zero regressions
+- [x] Document migration metrics (total LOC, tests passing, regressions)
 
 ---
 
@@ -944,9 +951,9 @@ After completing Phase 5, these metrics should improve:
 
 ---
 
-**Last Updated:** 2025-11-14 10:15 UTC
-**Status:** Phase 5 IN PROGRESS - Batches 5-8 Complete, Starting Batch 9
-**Current Focus:** Worker infrastructure complete (4 files, 37 error sites) - Next: Supporting services (4 files, 49 error sites)
+**Last Updated:** 2025-11-14 11:30 UTC
+**Status:** Phase 5 COMPLETE - All Priority Batches Done (Batches 5-9)
+**Current Focus:** Supporting services complete (5 files, 52 error sites) - 70.3% of services now use typed errors
 **Owner:** Engineering Lead
 **Reviewers:** Team Leads, Architects
 
@@ -979,13 +986,17 @@ After completing Phase 5, these metrics should improve:
     - worker/queue.go, lock.go, processor.go, scheduler.go
     - Error types: Internal 26, Conflict 5, Validation 3, Authentication 2, NotFound 1
     - No tests exist, build passes, zero regressions
+11. ✅ **Batch 9 COMPLETE**: Supporting services migration (5 files, 52 error sites, 1,250 LOC)
+    - email/smtp_service.go, factory.go, storage/flyer_storage.go, cache files
+    - Error types: Internal 48, Validation 2, NotFound 2
+    - No tests exist, build passes, zero regressions
 
-### Current Metrics (After Batch 8)
-- **Total services migrated**: 22 (8 Phase 4 + 6 auth + 1 product_master + 3 search/matching + 4 worker)
-- **Total LOC migrated**: 6,920
-- **Total error sites**: 425 apperrors calls
+### Current Metrics (After Batch 9)
+- **Total services migrated**: 26 (8 Phase 4 + 6 auth + 1 product_master + 3 search/matching + 4 worker + 4 supporting)
+- **Total LOC migrated**: 8,170
+- **Total error sites**: 477 apperrors calls
 - **Tests passing**: 193 (145 core + 13 auth + 3 product_master + 32 search/matching)
 - **Regressions**: 0
-- **fmt.Errorf remaining**: ~155 sites in ~15 services
-- **Services with typed errors**: 22/37 (59.5%)
+- **fmt.Errorf remaining**: ~103 sites in ~11 services (deferred subsystems)
+- **Services with typed errors**: 26/37 (70.3%)
 - **Error types in use**: 8 (Validation, Authentication, Authorization, NotFound, Conflict, RateLimit, Internal, External)
