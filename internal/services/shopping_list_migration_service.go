@@ -2,12 +2,12 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/uptrace/bun"
 )
 
@@ -82,7 +82,7 @@ func (s *shoppingListMigrationService) MigrateExpiredItems(ctx context.Context) 
 		Scan(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to query expired items: %w", err)
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "failed to query expired items")
 	}
 
 	result.TotalProcessed = len(items)
@@ -152,7 +152,7 @@ func (s *shoppingListMigrationService) MigrateItemsByListID(ctx context.Context,
 	// Get all items without product master
 	items, err := s.shoppingListItemService.GetByListID(ctx, listID, ShoppingListItemFilters{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get items for list %d: %w", listID, err)
+		return nil, errors.Wrapf(err, errors.ErrorTypeInternal, "failed to get items for list %d", listID)
 	}
 
 	// Filter items that need migration
@@ -208,7 +208,7 @@ func (s *shoppingListMigrationService) MigrateItem(ctx context.Context, itemID i
 	// Get the item
 	item, err := s.shoppingListItemService.GetByID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("failed to get item: %w", err)
+		return errors.Wrap(err, errors.ErrorTypeInternal, "failed to get item")
 	}
 
 	// Skip if already has product master
@@ -219,7 +219,7 @@ func (s *shoppingListMigrationService) MigrateItem(ctx context.Context, itemID i
 	// Find replacement product master
 	master, confidence, err := s.FindReplacementProduct(ctx, item)
 	if err != nil {
-		return fmt.Errorf("failed to find replacement: %w", err)
+		return errors.Wrap(err, errors.ErrorTypeInternal, "failed to find replacement")
 	}
 
 	// If no match found, log and return
@@ -243,7 +243,7 @@ func (s *shoppingListMigrationService) MigrateItem(ctx context.Context, itemID i
 			Exec(ctx)
 
 		if err != nil {
-			return fmt.Errorf("failed to update item: %w", err)
+			return errors.Wrap(err, errors.ErrorTypeInternal, "failed to update item")
 		}
 
 		return nil
@@ -281,7 +281,7 @@ func (s *shoppingListMigrationService) FindReplacementProduct(ctx context.Contex
 	// Use the matching service to find masters
 	masters, err := s.productMasterService.FindMatchingMasters(ctx, searchQuery, "", "")
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to search masters: %w", err)
+		return nil, 0, errors.Wrap(err, errors.ErrorTypeInternal, "failed to search masters")
 	}
 
 	if len(masters) == 0 {
