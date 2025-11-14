@@ -1000,3 +1000,12 @@ After completing Phase 5, these metrics should improve:
 - **fmt.Errorf remaining**: ~103 sites in ~11 services (deferred subsystems)
 - **Services with typed errors**: 26/37 (70.3%)
 - **Error types in use**: 8 (Validation, Authentication, Authorization, NotFound, Conflict, RateLimit, Internal, External)
+
+### Infrastructure Improvements
+12. ✅ **Docker Connectivity Fixed**: Resolved database connection issues in containers
+    - Problem: Containers loading `.env` file (localhost:5439) instead of using docker-compose environment variables (db:5432)
+    - Solution 1: Hardcoded `DB_HOST=db`, `DB_PORT=5432`, `REDIS_HOST=redis`, `REDIS_PORT=6379` in docker-compose.yml
+    - Solution 2: Modified `cmd/scraper/main.go` to skip loading `.env` when running in Docker (checks for `/.dockerenv`)
+    - Result: All containers (api, scraper, db, redis) now running successfully
+    - Verification: API listening on port 8080, scraper completed scraping cycle, zero connection errors
+    - Zero impact on refactoring work: All 193 tests still passing, all 26 migrated services functional
