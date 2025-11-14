@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type JobHandler func(ctx context.Context, job *Job) error
@@ -73,7 +74,7 @@ func (wp *WorkerProcessor) Start(ctx context.Context) error {
 	wp.mu.Lock()
 	if wp.running {
 		wp.mu.Unlock()
-		return fmt.Errorf("worker processor is already running")
+		return apperrors.Conflict("worker processor is already running")
 	}
 	wp.running = true
 	wp.mu.Unlock()
@@ -97,7 +98,7 @@ func (wp *WorkerProcessor) Stop() error {
 	wp.mu.Lock()
 	if !wp.running {
 		wp.mu.Unlock()
-		return fmt.Errorf("worker processor is not running")
+		return apperrors.Conflict("worker processor is not running")
 	}
 	wp.running = false
 	wp.mu.Unlock()
@@ -155,7 +156,7 @@ func (wp *WorkerProcessor) processJobWithLock(ctx context.Context, job *Job, wor
 	// Try to acquire distributed lock
 	acquired, err := wp.acquireLock(ctx, lockKey, lockValue, lockTTL)
 	if err != nil {
-		return fmt.Errorf("failed to acquire lock: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to acquire lock")
 	}
 
 	if !acquired {
@@ -186,9 +187,9 @@ func (wp *WorkerProcessor) processJob(ctx context.Context, job *Job, workerID in
 		errorMsg := fmt.Sprintf("no handler registered for job type %s", job.Type)
 		err := wp.queue.Fail(ctx, job, errorMsg)
 		if err != nil {
-			return fmt.Errorf("failed to mark job as failed: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to mark job as failed")
 		}
-		return fmt.Errorf("%s", errorMsg)
+		return apperrors.Validation(errorMsg)
 	}
 
 	// Create context with timeout
@@ -201,7 +202,7 @@ func (wp *WorkerProcessor) processJob(ctx context.Context, job *Job, workerID in
 		log.Printf("Worker %d: Job %s failed: %v", workerID, job.ID, err)
 		failErr := wp.queue.Fail(ctx, job, err.Error())
 		if failErr != nil {
-			return fmt.Errorf("failed to mark job as failed: %w", failErr)
+			return apperrors.Wrap(failErr, apperrors.ErrorTypeInternal, "failed to mark job as failed")
 		}
 		return err
 	}
@@ -209,7 +210,7 @@ func (wp *WorkerProcessor) processJob(ctx context.Context, job *Job, workerID in
 	// Mark job as completed
 	err = wp.queue.Complete(ctx, job)
 	if err != nil {
-		return fmt.Errorf("failed to mark job as completed: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to mark job as completed")
 	}
 
 	log.Printf("Worker %d: Job %s completed successfully", workerID, job.ID)
