@@ -14,12 +14,12 @@ import (
 // Stub implementations for dependencies
 
 type fakePasswordService struct {
-	hashPasswordFn              func(password string) (string, error)
-	verifyPasswordFn            func(password, hash string) error
-	validatePasswordStrengthFn  func(password string) error
-	generateRandomPasswordFn    func(length int) string
-	estimatePasswordStrengthFn  func(password string) int
-	isPasswordCompromisedFn     func(password string) bool
+	hashPasswordFn             func(password string) (string, error)
+	verifyPasswordFn           func(password, hash string) error
+	validatePasswordStrengthFn func(password string) error
+	generateRandomPasswordFn   func(length int) string
+	estimatePasswordStrengthFn func(password string) int
+	isPasswordCompromisedFn    func(password string) bool
 }
 
 func (f *fakePasswordService) HashPassword(password string) (string, error) {
@@ -71,14 +71,14 @@ func (f *fakePasswordService) IsPasswordCompromised(password string) bool {
 }
 
 type fakeJWTService struct {
-	generateTokenPairFn       func(userID uuid.UUID, sessionID uuid.UUID) (*TokenPair, error)
-	validateAccessTokenFn     func(token string) (*TokenClaims, error)
-	validateRefreshTokenFn    func(token string) (*TokenClaims, error)
-	getTokenHashFn            func(token string) string
-	extractClaimsFn           func(token string) (*TokenClaims, error)
-	validateTokenStructureFn  func(tokenString string) error
-	getTokenExpiryFn          func(tokenString string) (time.Time, error)
-	isTokenExpiredFn          func(tokenString string) (bool, error)
+	generateTokenPairFn      func(userID uuid.UUID, sessionID uuid.UUID) (*TokenPair, error)
+	validateAccessTokenFn    func(token string) (*TokenClaims, error)
+	validateRefreshTokenFn   func(token string) (*TokenClaims, error)
+	getTokenHashFn           func(token string) string
+	extractClaimsFn          func(token string) (*TokenClaims, error)
+	validateTokenStructureFn func(tokenString string) error
+	getTokenExpiryFn         func(tokenString string) (time.Time, error)
+	isTokenExpiredFn         func(tokenString string) (bool, error)
 }
 
 func (f *fakeJWTService) GenerateTokenPair(userID uuid.UUID, sessionID uuid.UUID) (*TokenPair, error) {
@@ -156,17 +156,17 @@ func (f *fakeJWTService) IsTokenExpired(tokenString string) (bool, error) {
 }
 
 type fakeSessionService struct {
-	createSessionFn              func(ctx context.Context, input *models.SessionCreateInput) (*models.UserSession, error)
-	getSessionFn                 func(ctx context.Context, sessionID uuid.UUID) (*models.UserSession, error)
-	getSessionByTokenHashFn      func(ctx context.Context, tokenHash string) (*models.UserSession, error)
-	updateSessionActivityFn      func(ctx context.Context, sessionID uuid.UUID) error
-	invalidateSessionFn          func(ctx context.Context, sessionID uuid.UUID) error
-	invalidateUserSessionsFn     func(ctx context.Context, userID uuid.UUID) error
-	cleanupExpiredSessionsFn     func(ctx context.Context) (int64, error)
-	getUserSessionsFn            func(ctx context.Context, userID uuid.UUID, filters *models.SessionFilters) ([]*models.UserSession, error)
-	validateSessionFn            func(ctx context.Context, sessionID uuid.UUID) (*models.UserSession, error)
-	getActiveSessionCountFn      func(ctx context.Context, userID uuid.UUID) (int, error)
-	getSessionStatsFn            func(ctx context.Context, userID uuid.UUID) (*SessionStats, error)
+	createSessionFn          func(ctx context.Context, input *models.SessionCreateInput) (*models.UserSession, error)
+	getSessionFn             func(ctx context.Context, sessionID uuid.UUID) (*models.UserSession, error)
+	getSessionByTokenHashFn  func(ctx context.Context, tokenHash string) (*models.UserSession, error)
+	updateSessionActivityFn  func(ctx context.Context, sessionID uuid.UUID) error
+	invalidateSessionFn      func(ctx context.Context, sessionID uuid.UUID) error
+	invalidateUserSessionsFn func(ctx context.Context, userID uuid.UUID) error
+	cleanupExpiredSessionsFn func(ctx context.Context) (int64, error)
+	getUserSessionsFn        func(ctx context.Context, userID uuid.UUID, filters *models.SessionFilters) ([]*models.UserSession, error)
+	validateSessionFn        func(ctx context.Context, sessionID uuid.UUID) (*models.UserSession, error)
+	getActiveSessionCountFn  func(ctx context.Context, userID uuid.UUID) (int, error)
+	getSessionStatsFn        func(ctx context.Context, userID uuid.UUID) (*SessionStats, error)
 }
 
 func (f *fakeSessionService) CreateSession(ctx context.Context, input *models.SessionCreateInput) (*models.UserSession, error) {
@@ -253,10 +253,10 @@ func (f *fakeSessionService) GetSessionStats(ctx context.Context, userID uuid.UU
 }
 
 type fakeEmailService struct {
-	sendWelcomeEmailFn           func(ctx context.Context, user *models.User) error
-	sendEmailVerificationFn      func(ctx context.Context, user *models.User, token string) error
-	sendPasswordResetEmailFn     func(ctx context.Context, user *models.User, token string) error
-	sendPasswordChangedAlertFn   func(ctx context.Context, user *models.User) error
+	sendWelcomeEmailFn         func(ctx context.Context, user *models.User) error
+	sendEmailVerificationFn    func(ctx context.Context, user *models.User, token string) error
+	sendPasswordResetEmailFn   func(ctx context.Context, user *models.User, token string) error
+	sendPasswordChangedAlertFn func(ctx context.Context, user *models.User) error
 }
 
 func (f *fakeEmailService) SendWelcomeEmail(ctx context.Context, user *models.User) error {
@@ -307,23 +307,23 @@ func newTestAuthService(
 	emailService EmailService,
 ) *authServiceImpl {
 	config := &AuthConfig{
-		JWTSecret:                 "test-secret",
-		AccessTokenExpiry:         15 * time.Minute,
-		RefreshTokenExpiry:        7 * 24 * time.Hour,
-		PasswordMinLength:         1,
-		BcryptCost:                12,
-		MaxLoginAttempts:          5,
-		LoginAttemptWindow:        15 * time.Minute,
-		AccountLockoutDuration:    30 * time.Minute,
-		SessionExpiry:             30 * 24 * time.Hour,
-		MaxSessionsPerUser:        5,
-		RequireEmailVerification:  false,
-		TokenAudience:             "test",
-		TokenIssuer:               "test",
-		PasswordRequireLower:      false,
-		PasswordRequireUpper:      false,
-		PasswordRequireNumber:     false,
-		PasswordRequireSymbol:     false,
+		JWTSecret:                "test-secret",
+		AccessTokenExpiry:        15 * time.Minute,
+		RefreshTokenExpiry:       7 * 24 * time.Hour,
+		PasswordMinLength:        1,
+		BcryptCost:               12,
+		MaxLoginAttempts:         5,
+		LoginAttemptWindow:       15 * time.Minute,
+		AccountLockoutDuration:   30 * time.Minute,
+		SessionExpiry:            30 * 24 * time.Hour,
+		MaxSessionsPerUser:       5,
+		RequireEmailVerification: false,
+		TokenAudience:            "test",
+		TokenIssuer:              "test",
+		PasswordRequireLower:     false,
+		PasswordRequireUpper:     false,
+		PasswordRequireNumber:    false,
+		PasswordRequireSymbol:    false,
 	}
 
 	return &authServiceImpl{

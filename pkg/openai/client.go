@@ -32,27 +32,27 @@ func DefaultClientConfig(apiKey string) ClientConfig {
 	if model == "" {
 		model = "gpt-4o"
 	}
-	
+
 	baseURL := os.Getenv("OPENAI_BASE_URL")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
-	
+
 	// For OpenRouter, add openai/ prefix if not present
 	if baseURL == "https://openrouter.ai/api/v1" && model == "gpt-4o" {
 		model = "openai/gpt-4o"
 	}
-	
+
 	referer := os.Getenv("OPENAI_REFERER")
 	if referer == "" {
 		referer = "https://kainuguru.com"
 	}
-	
+
 	appTitle := os.Getenv("OPENAI_APP_TITLE")
 	if appTitle == "" {
 		appTitle = "Kainuguru"
 	}
-	
+
 	return ClientConfig{
 		APIKey:      apiKey,
 		Model:       model,
@@ -251,7 +251,7 @@ func (c *Client) makeVisionRequest(ctx context.Context, request VisionRequest) (
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 	httpReq.Header.Set("User-Agent", c.config.UserAgent)
-	
+
 	// Add OpenRouter specific headers if configured
 	if c.config.Referer != "" {
 		httpReq.Header.Set("HTTP-Referer", c.config.Referer)
@@ -405,7 +405,7 @@ func GetModelLimits(model string) ModelLimits {
 			MaxImages:       10,
 			CostPer1KTokens: 0.01,
 		},
-		"gpt-4-vision-preview": {  // Deprecated but keeping for reference
+		"gpt-4-vision-preview": { // Deprecated but keeping for reference
 			MaxTokens:       4096,
 			MaxImageSize:    20 * 1024 * 1024,
 			MaxImages:       10,

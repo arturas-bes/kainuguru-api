@@ -548,7 +548,7 @@ func TestExtractionJobService_CleanupExpiredJobsDelegates(t *testing.T) {
 	}
 }
 
-type mockExtractionJobRepository struct{
+type mockExtractionJobRepository struct {
 	getByIDFunc         func(ctx context.Context, id int64) (*models.ExtractionJob, error)
 	getAllFunc          func(ctx context.Context, filters *extractionjob.Filters) ([]*models.ExtractionJob, error)
 	createFunc          func(ctx context.Context, job *models.ExtractionJob) error

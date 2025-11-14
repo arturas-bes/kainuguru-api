@@ -498,14 +498,14 @@ func (e *ProductExtractor) isValidPromotion(p Promotion) bool {
 	if len(strings.TrimSpace(p.NameLT)) == 0 && p.PromotionType == "" && p.PriceEUR == nil && p.DiscountPct == nil {
 		return false
 	}
-	
+
 	// CRITICAL: Keep entries with either a price OR a percent (or explicit bundle/loyalty tag)
 	// Many valid promotions have ONLY a percent badge without a price
 	hasPrice := p.PriceEUR != nil && regexp.MustCompile(`\d+[,.]\d{2}\s*€`).MatchString(*p.PriceEUR)
 	hasPct := p.DiscountPct != nil && *p.DiscountPct > 0 && *p.DiscountPct < 100
 	isBundle := strings.EqualFold(p.DiscountType, "bundle") || strings.Contains(strings.Join(p.SpecialTags, " "), "+")
 	isLoyalty := strings.EqualFold(p.DiscountType, "loyalty") || p.LoyaltyRequired
-	
+
 	// Accept if ANY of these conditions is true (not all required)
 	return hasPrice || hasPct || isBundle || isLoyalty
 }

@@ -548,9 +548,9 @@ func TestShoppingListService_GetListStatisticsCallsGetByID(t *testing.T) {
 	repo := &fakeShoppingListRepository{
 		getByIDFn: func(ctx context.Context, id int64) (*models.ShoppingList, error) {
 			return &models.ShoppingList{
-				ID:                 30,
-				ItemCount:          itemCount,
-				CompletedItemCount: completedItemCount,
+				ID:                  30,
+				ItemCount:           itemCount,
+				CompletedItemCount:  completedItemCount,
 				EstimatedTotalPrice: &estimatedTotal,
 			}, nil
 		},

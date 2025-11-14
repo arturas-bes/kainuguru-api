@@ -135,7 +135,7 @@ func TestAppError_WithStatusCode(t *testing.T) {
 
 func TestCommonConstructors(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		constructor func() *AppError
 		wantType    ErrorType
 		wantStatus  int

@@ -329,7 +329,6 @@ func (r *priceHistoryResolver) ValidTo(ctx context.Context, obj *models.PriceHis
 	return obj.ValidTo.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
-
 // PriceAlert nested resolvers
 func (r *priceAlertResolver) ID(ctx context.Context, obj *models.PriceAlert) (string, error) {
 	return fmt.Sprintf("%d", obj.ID), nil
@@ -366,4 +365,3 @@ func (r *priceAlertResolver) CreatedAt(ctx context.Context, obj *models.PriceAle
 func (r *priceAlertResolver) UpdatedAt(ctx context.Context, obj *models.PriceAlert) (string, error) {
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
-

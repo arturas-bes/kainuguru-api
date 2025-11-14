@@ -14,14 +14,14 @@ import (
 
 // ProcessorConfig holds configuration for PDF processing
 type ProcessorConfig struct {
-	TempDir       string        `json:"temp_dir"`
-	DPI           int           `json:"dpi"`
-	Format        string        `json:"format"`        // jpeg, png, ppm
-	Quality       int           `json:"quality"`       // 1-100 for jpeg
-	Timeout       time.Duration `json:"timeout"`
-	Cleanup       bool          `json:"cleanup"`
-	DeleteSource  bool          `json:"delete_source"` // Delete source PDF after successful conversion
-	MaxFileSize   int64         `json:"max_file_size"` // bytes
+	TempDir      string        `json:"temp_dir"`
+	DPI          int           `json:"dpi"`
+	Format       string        `json:"format"`  // jpeg, png, ppm
+	Quality      int           `json:"quality"` // 1-100 for jpeg
+	Timeout      time.Duration `json:"timeout"`
+	Cleanup      bool          `json:"cleanup"`
+	DeleteSource bool          `json:"delete_source"` // Delete source PDF after successful conversion
+	MaxFileSize  int64         `json:"max_file_size"` // bytes
 }
 
 // DefaultProcessorConfig returns sensible defaults
@@ -33,7 +33,7 @@ func DefaultProcessorConfig() ProcessorConfig {
 		Quality:      85,
 		Timeout:      30 * time.Second,
 		Cleanup:      true,
-		DeleteSource: false, // Default to false for safety
+		DeleteSource: false,            // Default to false for safety
 		MaxFileSize:  50 * 1024 * 1024, // 50MB
 	}
 }
@@ -214,7 +214,7 @@ func (p *Processor) convertToImages(ctx context.Context, pdfPath string, pageCou
 	baseName := filepath.Base(pdfPath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 	outputPrefix := filepath.Join(p.config.TempDir, nameWithoutExt)
-	
+
 	// Clean up any existing output files with the same prefix
 	if err := p.cleanupOldFiles(outputPrefix); err != nil {
 		// Log but don't fail - this is a best-effort cleanup
@@ -255,7 +255,7 @@ func (p *Processor) convertToImages(ctx context.Context, pdfPath string, pageCou
 // findOutputFiles locates the generated image files
 func (p *Processor) findOutputFiles(outputPrefix string, expectedCount int) ([]string, error) {
 	var outputFiles []string
-	
+
 	// Get file extension based on format
 	ext := p.config.Format
 	if ext == "jpeg" {
@@ -331,28 +331,28 @@ func (p *Processor) ProcessFromReader(ctx context.Context, reader io.Reader, fil
 func (p *Processor) cleanupOldFiles(outputPrefix string) error {
 	dir := filepath.Dir(outputPrefix)
 	base := filepath.Base(outputPrefix)
-	
+
 	// Get file extension
 	ext := p.config.Format
 	if ext == "jpeg" {
 		ext = "jpg"
 	}
-	
+
 	// Remove any existing files matching the pattern
 	pattern := fmt.Sprintf("%s-*.%s", base, ext)
 	matches, err := filepath.Glob(filepath.Join(dir, pattern))
 	if err != nil {
 		return err
 	}
-	
+
 	for _, match := range matches {
 		os.Remove(match) // Best effort, ignore errors
 	}
-	
+
 	// Also remove single file if exists
 	singleFile := fmt.Sprintf("%s.%s", outputPrefix, ext)
 	os.Remove(singleFile)
-	
+
 	return nil
 }
 

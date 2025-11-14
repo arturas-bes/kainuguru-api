@@ -109,11 +109,11 @@ func (s *SentryMonitor) CaptureBusinessEvent(eventName string, data map[string]i
 		scope.SetLevel(sentry.LevelInfo)
 		scope.SetTag("event_type", "business")
 		scope.SetTag("event_name", eventName)
-		
+
 		for key, value := range data {
 			scope.SetExtra(key, value)
 		}
-		
+
 		sentry.CaptureMessage(fmt.Sprintf("Business Event: %s", eventName))
 	})
 

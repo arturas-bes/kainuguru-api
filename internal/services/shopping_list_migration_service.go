@@ -21,10 +21,10 @@ type ShoppingListMigrationService interface {
 }
 
 type shoppingListMigrationService struct {
-	db                     *bun.DB
-	productMasterService   ProductMasterService
+	db                      *bun.DB
+	productMasterService    ProductMasterService
 	shoppingListItemService ShoppingListItemService
-	logger                 *slog.Logger
+	logger                  *slog.Logger
 }
 
 // NewShoppingListMigrationService creates a new migration service
@@ -34,10 +34,10 @@ func NewShoppingListMigrationService(
 	shoppingListItemService ShoppingListItemService,
 ) ShoppingListMigrationService {
 	return &shoppingListMigrationService{
-		db:                     db,
-		productMasterService:   productMasterService,
+		db:                      db,
+		productMasterService:    productMasterService,
 		shoppingListItemService: shoppingListItemService,
-		logger:                 slog.Default().With("service", "shopping_list_migration"),
+		logger:                  slog.Default().With("service", "shopping_list_migration"),
 	}
 }
 
@@ -56,12 +56,12 @@ type MigrationResult struct {
 
 // MigrationStats contains statistics about the migration
 type MigrationStats struct {
-	TotalItems           int     `json:"total_items"`
-	ItemsWithMaster      int     `json:"items_with_master"`
-	ItemsWithLinkedOnly  int     `json:"items_with_linked_only"`
-	ItemsWithoutProduct  int     `json:"items_without_product"`
-	ExpiredItems         int     `json:"expired_items"`
-	MigrationRate        float64 `json:"migration_rate"`
+	TotalItems          int     `json:"total_items"`
+	ItemsWithMaster     int     `json:"items_with_master"`
+	ItemsWithLinkedOnly int     `json:"items_with_linked_only"`
+	ItemsWithoutProduct int     `json:"items_without_product"`
+	ExpiredItems        int     `json:"expired_items"`
+	MigrationRate       float64 `json:"migration_rate"`
 }
 
 // MigrateExpiredItems migrates shopping list items with expired linked products
@@ -290,7 +290,7 @@ func (s *shoppingListMigrationService) FindReplacementProduct(ctx context.Contex
 
 	// Return the best match (first result has highest score)
 	bestMatch := masters[0]
-	
+
 	// Calculate confidence score based on text similarity
 	// For now, use a simple approach - can be improved with the matching algorithm
 	confidence := calculateSimilarity(searchQuery, bestMatch.NormalizedName)
@@ -389,7 +389,7 @@ func calculateSimilarity(s1, s2 string) float64 {
 	// Simple Levenshtein-based similarity
 	distance := levenshteinDistance(s1, s2)
 	maxLen := max(len(s1), len(s2))
-	
+
 	if maxLen == 0 {
 		return 0
 	}
@@ -427,8 +427,8 @@ func levenshteinDistance(s1, s2 string) int {
 				cost = 1
 			}
 			matrix[i][j] = min(
-				matrix[i-1][j]+1,      // deletion
-				min(matrix[i][j-1]+1,  // insertion
+				matrix[i-1][j]+1, // deletion
+				min(matrix[i][j-1]+1, // insertion
 					matrix[i-1][j-1]+cost)) // substitution
 		}
 	}

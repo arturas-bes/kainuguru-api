@@ -10,11 +10,11 @@ func TestExactNameMatcher(t *testing.T) {
 	matcher := &ExactNameMatcher{weight: 1.0}
 
 	tests := []struct {
-		name           string
-		product        *models.Product
-		master         *models.ProductMaster
-		expectedScore  float64
-		description    string
+		name          string
+		product       *models.Product
+		master        *models.ProductMaster
+		expectedScore float64
+		description   string
 	}{
 		{
 			name: "exact_match",
@@ -56,7 +56,7 @@ func TestExactNameMatcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			score := matcher.Score(tt.product, tt.master)
 			if score != tt.expectedScore {
-				t.Errorf("%s: expected score %.2f, got %.2f", 
+				t.Errorf("%s: expected score %.2f, got %.2f",
 					tt.description, tt.expectedScore, score)
 			}
 		})
@@ -67,12 +67,12 @@ func TestFuzzyNameMatcher(t *testing.T) {
 	matcher := &FuzzyNameMatcher{weight: 0.8}
 
 	tests := []struct {
-		name          string
-		product       *models.Product
-		master        *models.ProductMaster
-		minScore      float64
-		maxScore      float64
-		description   string
+		name        string
+		product     *models.Product
+		master      *models.ProductMaster
+		minScore    float64
+		maxScore    float64
+		description string
 	}{
 		{
 			name: "exact_match",
@@ -104,7 +104,7 @@ func TestFuzzyNameMatcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			score := matcher.Score(tt.product, tt.master)
 			if score < tt.minScore || score > tt.maxScore {
-				t.Errorf("%s: expected score between %.2f and %.2f, got %.2f", 
+				t.Errorf("%s: expected score between %.2f and %.2f, got %.2f",
 					tt.description, tt.minScore, tt.maxScore, score)
 			}
 		})
@@ -113,11 +113,11 @@ func TestFuzzyNameMatcher(t *testing.T) {
 
 func TestTrigramSimilarity(t *testing.T) {
 	tests := []struct {
-		s1           string
-		s2           string
-		minScore     float64
-		maxScore     float64
-		description  string
+		s1          string
+		s2          string
+		minScore    float64
+		maxScore    float64
+		description string
 	}{
 		{
 			s1:          "pienas",
@@ -146,7 +146,7 @@ func TestTrigramSimilarity(t *testing.T) {
 		t.Run(tt.s1+"_vs_"+tt.s2, func(t *testing.T) {
 			score := calculateTrigramSimilarity(tt.s1, tt.s2)
 			if score < tt.minScore || score > tt.maxScore {
-				t.Errorf("%s: expected similarity between %.2f and %.2f, got %.2f", 
+				t.Errorf("%s: expected similarity between %.2f and %.2f, got %.2f",
 					tt.description, tt.minScore, tt.maxScore, score)
 			}
 		})
@@ -161,11 +161,11 @@ func TestBrandCategoryMatcher(t *testing.T) {
 	category := "Pieno produktai"
 
 	tests := []struct {
-		name          string
-		product       *models.Product
-		master        *models.ProductMaster
-		minScore      float64
-		description   string
+		name        string
+		product     *models.Product
+		master      *models.ProductMaster
+		minScore    float64
+		description string
 	}{
 		{
 			name: "same_brand_and_category",
@@ -201,7 +201,7 @@ func TestBrandCategoryMatcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			score := matcher.Score(tt.product, tt.master)
 			if score < tt.minScore {
-				t.Errorf("%s: expected score >= %.2f, got %.2f", 
+				t.Errorf("%s: expected score >= %.2f, got %.2f",
 					tt.description, tt.minScore, score)
 			}
 		})

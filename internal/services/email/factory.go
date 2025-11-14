@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/kainuguru/kainuguru-api/internal/config"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 // NewEmailServiceFromConfig creates an email service based on configuration

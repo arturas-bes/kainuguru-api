@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/jordan-wright/email"
-	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 // SMTPConfig holds SMTP server configuration
@@ -52,7 +52,7 @@ func NewSMTPService(config *SMTPConfig) (Service, error) {
 func (s *smtpEmailService) loadTemplates() error {
 	// Define templates inline for simplicity
 	// In production, these could be loaded from files
-	
+
 	s.templates["verification"] = template.Must(template.New("verification").Parse(`
 <!DOCTYPE html>
 <html>
@@ -336,7 +336,7 @@ func (s *smtpEmailService) sendEmail(ctx context.Context, to, subject, htmlBody 
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 	var auth smtp.Auth
-	
+
 	// Only use auth if username is provided
 	if s.config.Username != "" {
 		auth = smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)

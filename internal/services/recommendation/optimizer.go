@@ -17,9 +17,9 @@ type ShoppingOptimizerService interface {
 }
 
 type shoppingOptimizerService struct {
-	db                *bun.DB
-	priceComparison   PriceComparisonService
-	logger            *slog.Logger
+	db              *bun.DB
+	priceComparison PriceComparisonService
+	logger          *slog.Logger
 }
 
 // NewShoppingOptimizerService creates a new shopping optimizer
@@ -33,12 +33,12 @@ func NewShoppingOptimizerService(db *bun.DB, priceComparison PriceComparisonServ
 
 // OptimizerOptions contains optimization preferences
 type OptimizerOptions struct {
-	MaxStores           int       `json:"max_stores"`            // Maximum stores to visit
-	PreferredStores     []int     `json:"preferred_stores"`      // Prefer these stores
-	UserLocation        *Location `json:"user_location"`         // User's location for distance calc
-	MaxDistance         *float64  `json:"max_distance"`          // Max distance in km
-	PrioritizeSavings   bool      `json:"prioritize_savings"`    // Optimize for cost
-	PrioritizeConvenience bool    `json:"prioritize_convenience"` // Optimize for fewer stores
+	MaxStores             int       `json:"max_stores"`             // Maximum stores to visit
+	PreferredStores       []int     `json:"preferred_stores"`       // Prefer these stores
+	UserLocation          *Location `json:"user_location"`          // User's location for distance calc
+	MaxDistance           *float64  `json:"max_distance"`           // Max distance in km
+	PrioritizeSavings     bool      `json:"prioritize_savings"`     // Optimize for cost
+	PrioritizeConvenience bool      `json:"prioritize_convenience"` // Optimize for fewer stores
 }
 
 // Location represents a geographic location
@@ -49,54 +49,54 @@ type Location struct {
 
 // ShoppingOptimization contains the optimized shopping plan
 type ShoppingOptimization struct {
-	TotalItems          int                      `json:"total_items"`
-	TotalEstimatedCost  float64                  `json:"total_estimated_cost"`
-	TotalEstimatedTime  int                      `json:"total_estimated_time"` // minutes
-	Savings             float64                  `json:"savings"`              // vs shopping at most expensive store
-	StoreAssignments    []StoreAssignment        `json:"store_assignments"`
-	UnassignedProducts  []int64                  `json:"unassigned_products"`
-	Alternatives        []AlternativeStrategy    `json:"alternatives"`
-	OptimizationScore   float64                  `json:"optimization_score"`
+	TotalItems         int                   `json:"total_items"`
+	TotalEstimatedCost float64               `json:"total_estimated_cost"`
+	TotalEstimatedTime int                   `json:"total_estimated_time"` // minutes
+	Savings            float64               `json:"savings"`              // vs shopping at most expensive store
+	StoreAssignments   []StoreAssignment     `json:"store_assignments"`
+	UnassignedProducts []int64               `json:"unassigned_products"`
+	Alternatives       []AlternativeStrategy `json:"alternatives"`
+	OptimizationScore  float64               `json:"optimization_score"`
 }
 
 // StoreAssignment assigns products to a specific store
 type StoreAssignment struct {
-	StoreID           int              `json:"store_id"`
-	StoreName         string           `json:"store_name"`
-	ProductMasterIDs  []int64          `json:"product_master_ids"`
-	ItemCount         int              `json:"item_count"`
-	EstimatedCost     float64          `json:"estimated_cost"`
-	EstimatedTime     int              `json:"estimated_time"` // minutes
-	Distance          *float64         `json:"distance"`       // km from user
-	Products          []AssignedProduct `json:"products"`
+	StoreID          int               `json:"store_id"`
+	StoreName        string            `json:"store_name"`
+	ProductMasterIDs []int64           `json:"product_master_ids"`
+	ItemCount        int               `json:"item_count"`
+	EstimatedCost    float64           `json:"estimated_cost"`
+	EstimatedTime    int               `json:"estimated_time"` // minutes
+	Distance         *float64          `json:"distance"`       // km from user
+	Products         []AssignedProduct `json:"products"`
 }
 
 // AssignedProduct contains details of an assigned product
 type AssignedProduct struct {
-	ProductMasterID   int64    `json:"product_master_id"`
-	ProductName       string   `json:"product_name"`
-	Price             float64  `json:"price"`
-	SavingsVsBest     float64  `json:"savings_vs_best"`
-	AlternativeStores []int    `json:"alternative_stores"`
+	ProductMasterID   int64   `json:"product_master_id"`
+	ProductName       string  `json:"product_name"`
+	Price             float64 `json:"price"`
+	SavingsVsBest     float64 `json:"savings_vs_best"`
+	AlternativeStores []int   `json:"alternative_stores"`
 }
 
 // AlternativeStrategy provides alternative shopping strategies
 type AlternativeStrategy struct {
-	Name              string            `json:"name"`
-	Description       string            `json:"description"`
-	StoreAssignments  []StoreAssignment `json:"store_assignments"`
-	TotalCost         float64           `json:"total_cost"`
-	TotalTime         int               `json:"total_time"`
-	Savings           float64           `json:"savings"`
-	Score             float64           `json:"score"`
+	Name             string            `json:"name"`
+	Description      string            `json:"description"`
+	StoreAssignments []StoreAssignment `json:"store_assignments"`
+	TotalCost        float64           `json:"total_cost"`
+	TotalTime        int               `json:"total_time"`
+	Savings          float64           `json:"savings"`
+	Score            float64           `json:"score"`
 }
 
 // StoreRoute provides optimal route through stores
 type StoreRoute struct {
-	TotalDistance    float64       `json:"total_distance"` // km
-	TotalTime        int           `json:"total_time"`     // minutes
-	Waypoints        []Waypoint    `json:"waypoints"`
-	EstimatedCost    float64       `json:"estimated_cost"` // of travel
+	TotalDistance float64    `json:"total_distance"` // km
+	TotalTime     int        `json:"total_time"`     // minutes
+	Waypoints     []Waypoint `json:"waypoints"`
+	EstimatedCost float64    `json:"estimated_cost"` // of travel
 }
 
 // Waypoint represents a stop on the route
@@ -105,7 +105,7 @@ type Waypoint struct {
 	StoreID     int      `json:"store_id"`
 	StoreName   string   `json:"store_name"`
 	Location    Location `json:"location"`
-	Distance    float64  `json:"distance"`    // from previous
+	Distance    float64  `json:"distance"`     // from previous
 	TimeMinutes int      `json:"time_minutes"` // from previous
 }
 
@@ -172,14 +172,14 @@ func (s *shoppingOptimizerService) OptimizeShoppingList(ctx context.Context, pro
 	}
 
 	optimization := &ShoppingOptimization{
-		TotalItems:          len(productMasterIDs),
-		TotalEstimatedCost:  bestStrategy.TotalCost,
-		TotalEstimatedTime:  bestStrategy.TotalTime,
-		Savings:             bestStrategy.Savings,
-		StoreAssignments:    bestStrategy.StoreAssignments,
-		UnassignedProducts:  unassignedProducts,
-		Alternatives:        strategies[1:], // Other strategies as alternatives
-		OptimizationScore:   bestStrategy.Score,
+		TotalItems:         len(productMasterIDs),
+		TotalEstimatedCost: bestStrategy.TotalCost,
+		TotalEstimatedTime: bestStrategy.TotalTime,
+		Savings:            bestStrategy.Savings,
+		StoreAssignments:   bestStrategy.StoreAssignments,
+		UnassignedProducts: unassignedProducts,
+		Alternatives:       strategies[1:], // Other strategies as alternatives
+		OptimizationScore:  bestStrategy.Score,
 	}
 
 	return optimization, nil
@@ -209,9 +209,9 @@ func (s *shoppingOptimizerService) buildSingleStoreStrategy(comparisons []*Produ
 	// Find best single store
 	var bestStore *storeStrategyInfo
 	for _, info := range storeCounts {
-		if bestStore == nil || 
-		   info.productCount > bestStore.productCount ||
-		   (info.productCount == bestStore.productCount && info.totalPrice < bestStore.totalPrice) {
+		if bestStore == nil ||
+			info.productCount > bestStore.productCount ||
+			(info.productCount == bestStore.productCount && info.totalPrice < bestStore.totalPrice) {
 			infoCopy := info
 			bestStore = &infoCopy
 		}
@@ -346,7 +346,7 @@ func (s *shoppingOptimizerService) buildMaxSavingsStrategy(comparisons []*Produc
 		assignments = append(assignments, *assignment)
 		totalCost += assignment.EstimatedCost
 		totalTime += assignment.EstimatedTime
-		
+
 		for _, p := range assignment.Products {
 			totalSavings += p.SavingsVsBest
 		}

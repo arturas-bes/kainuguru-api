@@ -71,13 +71,13 @@ type ScraperConfig struct {
 }
 
 type WorkerConfig struct {
-	NumWorkers           int           `mapstructure:"num_workers"`
-	MaxWorkers           int           `mapstructure:"max_workers"`
-	QueueCheckInterval   time.Duration `mapstructure:"queue_check_interval"`
-	PollInterval         time.Duration `mapstructure:"poll_interval"`
-	JobTimeout           time.Duration `mapstructure:"job_timeout"`
-	MaxRetryAttempts     int           `mapstructure:"max_retry_attempts"`
-	MaxRetries           int           `mapstructure:"max_retries"`
+	NumWorkers         int           `mapstructure:"num_workers"`
+	MaxWorkers         int           `mapstructure:"max_workers"`
+	QueueCheckInterval time.Duration `mapstructure:"queue_check_interval"`
+	PollInterval       time.Duration `mapstructure:"poll_interval"`
+	JobTimeout         time.Duration `mapstructure:"job_timeout"`
+	MaxRetryAttempts   int           `mapstructure:"max_retry_attempts"`
+	MaxRetries         int           `mapstructure:"max_retries"`
 }
 
 type CORSConfig struct {
@@ -105,10 +105,10 @@ type AppConfig struct {
 }
 
 type EmailConfig struct {
-	Provider string        `mapstructure:"provider"` // "smtp" or "mock"
-	SMTP     SMTPConfig    `mapstructure:"smtp"`
-	FromEmail string       `mapstructure:"from_email"`
-	FromName  string       `mapstructure:"from_name"`
+	Provider  string     `mapstructure:"provider"` // "smtp" or "mock"
+	SMTP      SMTPConfig `mapstructure:"smtp"`
+	FromEmail string     `mapstructure:"from_email"`
+	FromName  string     `mapstructure:"from_name"`
 }
 
 type SMTPConfig struct {
@@ -120,11 +120,11 @@ type SMTPConfig struct {
 }
 
 type StorageConfig struct {
-	Type        string `mapstructure:"type"`         // "filesystem" or "s3"
-	BasePath    string `mapstructure:"base_path"`    // Local filesystem path
-	PublicURL   string `mapstructure:"public_url"`   // Public URL base
+	Type         string `mapstructure:"type"`           // "filesystem" or "s3"
+	BasePath     string `mapstructure:"base_path"`      // Local filesystem path
+	PublicURL    string `mapstructure:"public_url"`     // Public URL base
 	FlyerBaseURL string `mapstructure:"flyer_base_url"` // Base URL for flyer images (can be changed per environment)
-	MaxRetries  int    `mapstructure:"max_retries"`  // Retry attempts for file operations
+	MaxRetries   int    `mapstructure:"max_retries"`    // Retry attempts for file operations
 }
 
 func Load(env string) (*Config, error) {

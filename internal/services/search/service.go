@@ -206,10 +206,10 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	var matchTypeMap = make(map[int]string)
 	for rows.Next() {
 		var (
-			productID               int64
-			storeID, flyerID        int
-			name, matchType         string
-			brand                   sql.NullString
+			productID                 int64
+			storeID, flyerID          int
+			name, matchType           string
+			brand                     sql.NullString
 			currentPrice, searchScore float64
 		)
 

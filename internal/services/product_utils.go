@@ -55,7 +55,7 @@ func CalculateDiscount(original, current float64) float64 {
 // StandardizeUnit standardizes unit types
 func StandardizeUnit(unit string) string {
 	unit = strings.ToLower(strings.TrimSpace(unit))
-	
+
 	unitMap := map[string]string{
 		"kilogramas": "kg", "kg.": "kg",
 		"gramas": "g", "gr": "g", "g.": "g",
@@ -65,7 +65,7 @@ func StandardizeUnit(unit string) string {
 		"pakuotė": "pak.", "pak": "pak.",
 		"dėžutė": "dėž.", "dėž": "dėž.",
 	}
-	
+
 	if standard, ok := unitMap[unit]; ok {
 		return standard
 	}
@@ -77,25 +77,25 @@ func ParsePrice(priceStr string) (float64, error) {
 	if priceStr == "" {
 		return 0, fmt.Errorf("empty price string")
 	}
-	
+
 	// Remove currency symbols and whitespace
 	priceStr = strings.TrimSpace(priceStr)
 	priceStr = strings.ReplaceAll(priceStr, "€", "")
 	priceStr = strings.ReplaceAll(priceStr, "EUR", "")
 	priceStr = strings.TrimSpace(priceStr)
-	
+
 	// Replace comma with dot for decimal separator
 	priceStr = strings.ReplaceAll(priceStr, ",", ".")
-	
+
 	// Parse as float
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid price format: %s", priceStr)
 	}
-	
+
 	if price < 0 {
 		return 0, fmt.Errorf("negative price: %f", price)
 	}
-	
+
 	return price, nil
 }
