@@ -734,18 +734,21 @@ Total: 20 working days (~4 weeks)
 3. `cache/flyer_cache.go` (17 fmt.Errorf sites)
 4. `cache/extraction_cache.go` (444 LOC, 20 fmt.Errorf sites)
 
-**Deferred (low priority, large complex services with 0% coverage):**
-- `ai/extractor.go` (626 LOC, 2 fmt.Errorf sites)
-- `ai/validator.go` (604 LOC, 4 fmt.Errorf sites)
-- `ai/cost_tracker.go` (560 LOC, 2 fmt.Errorf sites)
-- `enrichment/service.go` (656 LOC, 9 fmt.Errorf sites)
-- `enrichment/utils.go` (382 LOC, 8 fmt.Errorf sites)
-- `archive/archiver.go` (575 LOC, 16 fmt.Errorf sites)
-- `archive/cleaner.go` (577 LOC, 6 fmt.Errorf sites)
-- `scraper/iki_scraper.go` (494 LOC, 1 fmt.Errorf site)
-- `scraper/rimi_scraper.go` (405 LOC)
-- `recommendation/optimizer.go` (435 LOC, 4 fmt.Errorf sites)
-- `recommendation/price_comparison_service.go` (4 fmt.Errorf sites)
+**Deferred (low priority, large complex services with 0% coverage - 9 services, ~56 error sites remaining):**
+- `ai/extractor.go` (626 LOC, 2 fmt.Errorf sites) - OpenAI integration
+- `ai/validator.go` (604 LOC, 4 fmt.Errorf sites) - OpenAI validation
+- `ai/cost_tracker.go` (560 LOC, 2 fmt.Errorf sites) - Cost tracking
+- `enrichment/service.go` (656 LOC, 9 fmt.Errorf sites) - Complex orchestration
+- `enrichment/utils.go` (382 LOC, 8 fmt.Errorf sites) - Helper utilities
+- `enrichment/orchestrator.go` - Multi-step workflows
+- `archive/archiver.go` (575 LOC, 16 fmt.Errorf sites) - File operations
+- `archive/cleaner.go` (577 LOC, 6 fmt.Errorf sites) - Cleanup logic
+- `scraper/iki_scraper.go` (494 LOC, 1 fmt.Errorf site) - Web scraping
+- `scraper/rimi_scraper.go` (405 LOC) - Web scraping
+- `recommendation/optimizer.go` (435 LOC, 4 fmt.Errorf sites) - Price optimization
+- `recommendation/price_comparison_service.go` (319 LOC, 4 fmt.Errorf sites) - Price comparisons
+
+**Note**: Deferred services require significant test investment (~30-40 hours estimated) due to complex external dependencies (database, Redis, OpenAI, file system, web scraping).
 
 **Tasks:**
 - [x] **Batch 5 COMPLETE**: Migrated auth subsystem (6 files, 130 error sites, 2,204 LOC) ✅
@@ -782,6 +785,22 @@ Total: 20 working days (~4 weeks)
   - cache/extraction_cache.go: 20 apperrors (Redis extraction cache)
   - Error types: Internal 48, Validation 2, NotFound 2
   - No tests exist (0% coverage), build passes, zero regressions
+- [x] **Batch 10 COMPLETE**: Added tests and migrated utility services (2 files, 14 error sites, 553 LOC) ✅
+  - **product_utils.go**: 8 apperrors (validation & parsing)
+    - Created 40 comprehensive unit tests (369 LOC)
+    - 100% coverage of all 6 utility functions
+    - Tests: NormalizeProductText (6), GenerateSearchVector (3), ValidateProduct (8), CalculateDiscount (5), StandardizeUnit (9), ParsePrice (9)
+    - Error types: Validation 8
+    - All 40 tests pass, zero regressions
+  - **shopping_list_migration_service.go**: 6 apperrors (migration operations)
+    - Created 31 characterization tests (460 LOC) via specialized agent
+    - 25-30% coverage (100% helpers, 90-100% algorithms, 48.3% business logic)
+    - Tests: MigrateItemsByListID (2), CalculateSimilarity (5), LevenshteinDistance (5), NormalizeString, MigrationStats (4), MinMaxHelpers (2), Timestamps
+    - Error types: Internal 6
+    - All 31 tests pass, zero regressions
+  - Test LOC added: 829 lines
+  - Total tests: 224+ tests (from 193)
+  - Services migrated: 28/37 (75.7%, up from 70.3%)
 - [x] Document migration metrics (total LOC, tests passing, regressions)
 
 ---
@@ -955,9 +974,10 @@ After completing Phase 5, these metrics should improve:
 
 ---
 
-**Last Updated:** 2025-11-14 11:30 UTC
-**Status:** Phase 5 COMPLETE - All Priority Batches Done (Batches 5-9)
-**Current Focus:** Supporting services complete (5 files, 52 error sites) - 70.3% of services now use typed errors
+**Last Updated:** 2025-11-14 16:00 UTC
+**Status:** Phase 5 COMPLETE + Batch 10 utility services done
+**Current Focus:** 28/37 services migrated (75.7%) - Added tests to 2 deferred services
+**Remaining:** 9 deferred services with heavy external dependencies (~56 error sites, ~30-40 hours estimated)
 **Owner:** Engineering Lead
 **Reviewers:** Team Leads, Architects
 
