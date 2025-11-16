@@ -78,7 +78,7 @@ func (r *mutationResolver) StartWizard(ctx context.Context, input model.StartWiz
 	req := &wizard.StartWizardRequest{
 		ShoppingListID: listID,
 		UserID:         int64(userID.ID()), // Convert UUID to int64 - NOTE: This is a temporary workaround
-		IdempotencyKey: "", // TODO: Generate from GraphQL request headers
+		IdempotencyKey: "",                 // TODO: Generate from GraphQL request headers
 	}
 
 	// Start wizard session
@@ -231,7 +231,7 @@ func mapWizardSessionToGraphQL(session *models.WizardSession) *model.WizardSessi
 	}
 
 	return &model.WizardSession{
-		ID: session.ID.String(),
+		ID:     session.ID.String(),
 		Status: gqlStatus,
 		ShoppingList: &model.ShoppingList{
 			ID: int(session.ShoppingListID),

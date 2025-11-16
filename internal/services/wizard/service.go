@@ -125,13 +125,13 @@ func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest
 	for _, item := range expiredItems {
 		// Build wizard session item from shopping list item
 		wizItem := models.WizardSessionItem{
-			ItemID:      item.ID,
-			ProductName: item.Description,
-			Brand:       nil, // ShoppingListItem doesn't have brand field directly
+			ItemID:        item.ID,
+			ProductName:   item.Description,
+			Brand:         nil, // ShoppingListItem doesn't have brand field directly
 			OriginalPrice: 0.0,
-			Quantity:    int(item.Quantity),
-			ExpiryDate:  time.Now(), // Will be set from LinkedProduct if available
-			Suggestions: []models.Suggestion{},
+			Quantity:      int(item.Quantity),
+			ExpiryDate:    time.Now(), // Will be set from LinkedProduct if available
+			Suggestions:   []models.Suggestion{},
 		}
 
 		// Extract brand and price from LinkedProduct if available
@@ -139,7 +139,7 @@ func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest
 			wizItem.Brand = item.LinkedProduct.Brand
 			wizItem.OriginalPrice = item.LinkedProduct.CurrentPrice
 			wizItem.ExpiryDate = item.LinkedProduct.ValidTo
-			
+
 			// Set original store info
 			if item.Store != nil {
 				wizItem.OriginalStore = &models.StoreInfo{
