@@ -257,8 +257,8 @@
 
 **Purpose**: Allow users to abandon wizard session without applying changes
 
-- [ ] T066 Implement cancelWizard mutation resolver in wizard.resolvers.go (load session, update Status=CANCELLED, delete from Redis, return true)
-- [ ] T067 Add idempotency key handling in cancelWizard (same pattern)
+- [X] T066 Implement cancelWizard mutation resolver in wizard.resolvers.go (load session, update Status=CANCELLED, delete from Redis, return true)
+- [X] T067 Add idempotency key handling in cancelWizard (same pattern)
 
 **Checkpoint**: Users can exit wizard without changes
 
