@@ -2,11 +2,14 @@ package wizard
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/monitoring"
 	"github.com/kainuguru/kainuguru-api/internal/repositories"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
@@ -84,9 +87,165 @@ func NewService(
 
 // StartWizard initiates a new wizard session
 func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest) (*models.WizardSession, error) {
-	// TODO: Implement in Phase 3 (T017-T022)
-	s.logger.Info("StartWizard called", "shopping_list_id", req.ShoppingListID)
-	return nil, nil
+	s.logger.Info("StartWizard called",
+		"shopping_list_id", req.ShoppingListID,
+		"user_id", req.UserID)
+
+	// 1. Validate shopping list exists and user has permission
+	list, err := s.shoppingListRepo.GetByID(ctx, req.ShoppingListID)
+	if err != nil {
+		s.logger.Error("failed to get shopping list",
+			"list_id", req.ShoppingListID,
+			"error", err)
+		return nil, fmt.Errorf("shopping list not found: %w", err)
+	}
+
+	// User validation is handled by GraphQL resolver
+	// Just log the list owner for audit purposes
+	s.logger.Info("starting wizard for user",
+		"list_user_id", list.UserID,
+		"req_user_id", req.UserID)
+
+	// 2. Get expired items for the shopping list
+	expiredItems, err := s.GetExpiredItemsForList(ctx, req.ShoppingListID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expired items: %w", err)
+	}
+
+	if len(expiredItems) == 0 {
+		s.logger.Info("no expired items found for shopping list",
+			"list_id", req.ShoppingListID)
+		return nil, fmt.Errorf("no expired items found in shopping list")
+	}
+
+	// 3. Convert expired items to wizard session items with suggestions
+	wizardItems := make([]models.WizardSessionItem, 0, len(expiredItems))
+	selectedStoresMap := make(map[int64]models.StoreSelection)
+
+	for _, item := range expiredItems {
+		// Build wizard session item from shopping list item
+		wizItem := models.WizardSessionItem{
+			ItemID:      item.ID,
+			ProductName: item.Description,
+			Brand:       nil, // ShoppingListItem doesn't have brand field directly
+			OriginalPrice: 0.0,
+			Quantity:    int(item.Quantity),
+			ExpiryDate:  time.Now(), // Will be set from LinkedProduct if available
+			Suggestions: []models.Suggestion{},
+		}
+
+		// Extract brand and price from LinkedProduct if available
+		if item.LinkedProduct != nil {
+			wizItem.Brand = item.LinkedProduct.Brand
+			wizItem.OriginalPrice = item.LinkedProduct.CurrentPrice
+			wizItem.ExpiryDate = item.LinkedProduct.ValidTo
+			
+			// Set original store info
+			if item.Store != nil {
+				wizItem.OriginalStore = &models.StoreInfo{
+					StoreID:   item.Store.ID,
+					StoreName: item.Store.Name,
+				}
+			}
+
+			// Perform two-pass search for suggestions
+			products, err := s.TwoPassSearch(ctx, item)
+			if err != nil {
+				s.logger.Error("two-pass search failed for item",
+					"item_id", item.ID,
+					"product_name", item.Description,
+					"error", err)
+				// Continue with other items even if one fails
+			} else {
+				// Convert products to suggestions
+				for _, product := range products {
+					if product.Store == nil {
+						continue // Skip products without store relation
+					}
+
+					suggestion := models.Suggestion{
+						FlyerProductID:  int64(product.ID),
+						ProductMasterID: nil,
+						ProductName:     product.Name,
+						Brand:           product.Brand,
+						StoreID:         product.StoreID,
+						StoreName:       product.Store.Name,
+						Price:           product.CurrentPrice,
+						Unit:            product.UnitType,
+						SizeValue:       nil, // TODO: Parse from UnitSize
+						SizeUnit:        product.UnitSize,
+						Score:           0.0, // Will be calculated by scoring
+						Confidence:      0.0,
+						Explanation:     "",
+						MatchedFields:   []string{},
+						ScoreBreakdown:  models.ScoreBreakdown{},
+						PriceDifference: product.CurrentPrice - wizItem.OriginalPrice,
+						ValidFrom:       &product.ValidFrom,
+						ValidTo:         &product.ValidTo,
+					}
+
+					if product.ProductMasterID != nil {
+						pmID := int64(*product.ProductMasterID)
+						suggestion.ProductMasterID = &pmID
+					}
+
+					wizItem.Suggestions = append(wizItem.Suggestions, suggestion)
+
+					// Track store for selection
+					if _, exists := selectedStoresMap[int64(product.StoreID)]; !exists {
+						selectedStoresMap[int64(product.StoreID)] = models.StoreSelection{
+							StoreID:    product.StoreID,
+							StoreName:  product.Store.Name,
+							ItemCount:  1,
+							TotalPrice: product.CurrentPrice,
+							Savings:    0.0,
+						}
+					}
+				}
+			}
+		}
+
+		wizardItems = append(wizardItems, wizItem)
+	}
+
+	// 5. Create wizard session
+	sessionID := uuid.New()
+	now := time.Now()
+	session := &models.WizardSession{
+		ID:               sessionID,
+		UserID:           req.UserID,
+		ShoppingListID:   req.ShoppingListID,
+		Status:           models.WizardStatusActive,
+		DatasetVersion:   1, // Version 1 for initial implementation
+		ExpiredItems:     wizardItems,
+		CurrentItemIndex: 0,
+		SelectedStores:   selectedStoresMap,
+		Decisions:        make(map[int64]models.Decision),
+		StartedAt:        now,
+		ExpiresAt:        now.Add(30 * time.Minute), // 30-minute TTL
+		LastUpdatedAt:    now,
+	}
+
+	// 6. Save session to Redis
+	if err := s.wizardCache.SaveSession(ctx, session); err != nil {
+		s.logger.Error("failed to save wizard session to cache",
+			"session_id", sessionID,
+			"error", err)
+		return nil, fmt.Errorf("failed to create wizard session: %w", err)
+	}
+
+	// 7. Track metrics
+	monitoring.WizardSessionsTotal.WithLabelValues("started").Inc()
+	monitoring.WizardSelectedStoreCount.WithLabelValues("active").Observe(float64(len(selectedStoresMap)))
+
+	s.logger.Info("wizard session created successfully",
+		"session_id", sessionID,
+		"list_id", req.ShoppingListID,
+		"user_id", req.UserID,
+		"expired_items_count", len(expiredItems),
+		"selected_stores_count", len(selectedStoresMap))
+
+	return session, nil
 }
 
 // GetSession retrieves a wizard session
