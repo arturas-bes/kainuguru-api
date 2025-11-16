@@ -32,9 +32,9 @@ func TestFlyerRepository_GetAllAndCount(t *testing.T) {
 		UpdatedAt: now,
 	})
 	insertTestFlyerRow(t, db, &models.Flyer{
-		ID:        2,
-		StoreID:   2,
-		Status:    string(models.FlyerStatusCompleted),
+		ID:         2,
+		StoreID:    2,
+		Status:     string(models.FlyerStatusCompleted),
 		IsArchived: true,
 		ValidFrom:  now.Add(-24 * time.Hour),
 		ValidTo:    now.Add(24 * time.Hour),

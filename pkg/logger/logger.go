@@ -256,4 +256,3 @@ func LogWorkerJobCompleted(workerID, jobType, jobID string, duration time.Durati
 			Msg("Background job failed")
 	}
 }
-

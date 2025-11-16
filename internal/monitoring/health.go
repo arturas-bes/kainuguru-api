@@ -83,7 +83,7 @@ func (h *HealthChecker) Check(ctx context.Context) HealthCheck {
 // checkDatabase checks database connectivity
 func (h *HealthChecker) checkDatabase(ctx context.Context) CheckResult {
 	start := time.Now()
-	
+
 	// Ping database with timeout
 	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -133,7 +133,7 @@ func (h *HealthChecker) HTTPHandler() http.HandlerFunc {
 		health := h.Check(ctx)
 
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Set appropriate status code
 		statusCode := http.StatusOK
 		if health.Status == HealthStatusDegraded {
@@ -141,7 +141,7 @@ func (h *HealthChecker) HTTPHandler() http.HandlerFunc {
 		} else if health.Status == HealthStatusUnhealthy {
 			statusCode = http.StatusServiceUnavailable
 		}
-		
+
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(health)
 	}
@@ -159,7 +159,7 @@ func (h *HealthChecker) LivenessHandler() http.HandlerFunc {
 func (h *HealthChecker) ReadinessHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		
+
 		// Quick database check only
 		pingCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 		defer cancel()
@@ -177,9 +177,9 @@ func (h *HealthChecker) ReadinessHandler() http.HandlerFunc {
 
 // MetricsSnapshot represents a snapshot of system metrics
 type MetricsSnapshot struct {
-	Timestamp       time.Time              `json:"timestamp"`
-	DatabaseStats   sql.DBStats            `json:"database_stats"`
-	Uptime          time.Duration          `json:"uptime"`
+	Timestamp     time.Time     `json:"timestamp"`
+	DatabaseStats sql.DBStats   `json:"database_stats"`
+	Uptime        time.Duration `json:"uptime"`
 }
 
 // GetMetrics returns current system metrics

@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -35,10 +38,13 @@ func NewShoppingListServiceWithRepository(repo shoppinglist.Repository) Shopping
 func (s *shoppingListService) GetByID(ctx context.Context, id int64) (*models.ShoppingList, error) {
 	list, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("shopping list not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get shopping list by ID %d", id)
 	}
 	if list == nil {
-		return nil, fmt.Errorf("shopping list with ID %d not found", id)
+		return nil, apperrors.NotFound(fmt.Sprintf("shopping list with ID %d not found", id))
 	}
 	return list, nil
 }
@@ -46,7 +52,7 @@ func (s *shoppingListService) GetByID(ctx context.Context, id int64) (*models.Sh
 func (s *shoppingListService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ShoppingList, error) {
 	lists, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping lists by IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping lists by IDs")
 	}
 	return lists, nil
 }
@@ -54,7 +60,7 @@ func (s *shoppingListService) GetByIDs(ctx context.Context, ids []int64) ([]*mod
 func (s *shoppingListService) GetByUserID(ctx context.Context, userID uuid.UUID, filters ShoppingListFilters) ([]*models.ShoppingList, error) {
 	lists, err := s.repo.GetByUserID(ctx, userID, &filters)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping lists for user: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping lists for user")
 	}
 	return lists, nil
 }
@@ -63,7 +69,7 @@ func (s *shoppingListService) GetByUserID(ctx context.Context, userID uuid.UUID,
 func (s *shoppingListService) CountByUserID(ctx context.Context, userID uuid.UUID, filters ShoppingListFilters) (int, error) {
 	count, err := s.repo.CountByUserID(ctx, userID, &filters)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count shopping lists for user: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count shopping lists for user")
 	}
 	return count, nil
 }
@@ -71,10 +77,13 @@ func (s *shoppingListService) CountByUserID(ctx context.Context, userID uuid.UUI
 func (s *shoppingListService) GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error) {
 	list, err := s.repo.GetByShareCode(ctx, shareCode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list by share code: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("shopping list not found with share code %s", shareCode))
+		}
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping list by share code")
 	}
 	if list == nil {
-		return nil, fmt.Errorf("failed to get shopping list by share code: %w", sql.ErrNoRows)
+		return nil, apperrors.NotFound(fmt.Sprintf("shopping list not found with share code %s", shareCode))
 	}
 
 	return list, nil
@@ -90,7 +99,7 @@ func (s *shoppingListService) Create(ctx context.Context, list *models.ShoppingL
 	// If this is the user's first list, make it default
 	count, err := s.repo.CountByUserID(ctx, list.UserID, nil)
 	if err != nil {
-		return fmt.Errorf("failed to check existing lists: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check existing lists")
 	}
 
 	if count == 0 {
@@ -100,13 +109,13 @@ func (s *shoppingListService) Create(ctx context.Context, list *models.ShoppingL
 	// If setting as default, unset other defaults
 	if list.IsDefault {
 		if err := s.repo.UnsetDefaultLists(ctx, list.UserID, nil); err != nil {
-			return fmt.Errorf("failed to unset other defaults: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unset other defaults")
 		}
 	}
 
 	// Insert the list
 	if err := s.repo.Create(ctx, list); err != nil {
-		return fmt.Errorf("failed to create shopping list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create shopping list")
 	}
 
 	return nil
@@ -118,12 +127,12 @@ func (s *shoppingListService) Update(ctx context.Context, list *models.ShoppingL
 	// If setting as default, unset other defaults
 	if list.IsDefault {
 		if err := s.repo.UnsetDefaultLists(ctx, list.UserID, &list.ID); err != nil {
-			return fmt.Errorf("failed to unset other defaults: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unset other defaults")
 		}
 	}
 
 	if err := s.repo.Update(ctx, list); err != nil {
-		return fmt.Errorf("failed to update shopping list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update shopping list")
 	}
 
 	return nil
@@ -131,7 +140,7 @@ func (s *shoppingListService) Update(ctx context.Context, list *models.ShoppingL
 
 func (s *shoppingListService) Delete(ctx context.Context, id int64) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete shopping list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete shopping list")
 	}
 
 	return nil
@@ -142,10 +151,13 @@ func (s *shoppingListService) Delete(ctx context.Context, id int64) error {
 func (s *shoppingListService) GetUserDefaultList(ctx context.Context, userID uuid.UUID) (*models.ShoppingList, error) {
 	list, err := s.repo.GetUserDefaultList(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get default shopping list: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("default shopping list not found")
+		}
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get default shopping list")
 	}
 	if list == nil {
-		return nil, fmt.Errorf("failed to get default shopping list: %w", sql.ErrNoRows)
+		return nil, apperrors.NotFound("default shopping list not found")
 	}
 
 	return list, nil
@@ -154,12 +166,12 @@ func (s *shoppingListService) GetUserDefaultList(ctx context.Context, userID uui
 func (s *shoppingListService) SetDefaultList(ctx context.Context, userID uuid.UUID, listID int64) error {
 	// Unset all defaults for this user
 	if err := s.repo.UnsetDefaultLists(ctx, userID, nil); err != nil {
-		return fmt.Errorf("failed to unset defaults: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unset defaults")
 	}
 
 	// Set the new default
 	if err := s.repo.SetDefaultList(ctx, userID, listID); err != nil {
-		return fmt.Errorf("failed to set default list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to set default list")
 	}
 
 	return nil
@@ -167,7 +179,7 @@ func (s *shoppingListService) SetDefaultList(ctx context.Context, userID uuid.UU
 
 func (s *shoppingListService) ArchiveList(ctx context.Context, listID int64) error {
 	if err := s.repo.Archive(ctx, listID, true); err != nil {
-		return fmt.Errorf("failed to archive list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to archive list")
 	}
 
 	return nil
@@ -175,7 +187,7 @@ func (s *shoppingListService) ArchiveList(ctx context.Context, listID int64) err
 
 func (s *shoppingListService) UnarchiveList(ctx context.Context, listID int64) error {
 	if err := s.repo.Archive(ctx, listID, false); err != nil {
-		return fmt.Errorf("failed to unarchive list: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unarchive list")
 	}
 
 	return nil
@@ -185,14 +197,14 @@ func (s *shoppingListService) GenerateShareCode(ctx context.Context, listID int6
 	// Generate a secure random share code
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("failed to generate share code: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate share code")
 	}
 
 	shareCode := base64.URLEncoding.EncodeToString(b)
 
 	// Update the list
 	if err := s.repo.UpdateShareSettings(ctx, listID, true, &shareCode); err != nil {
-		return "", fmt.Errorf("failed to set share code: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to set share code")
 	}
 
 	return shareCode, nil
@@ -200,7 +212,7 @@ func (s *shoppingListService) GenerateShareCode(ctx context.Context, listID int6
 
 func (s *shoppingListService) DisableSharing(ctx context.Context, listID int64) error {
 	if err := s.repo.UpdateShareSettings(ctx, listID, false, nil); err != nil {
-		return fmt.Errorf("failed to disable sharing: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to disable sharing")
 	}
 
 	return nil
@@ -214,7 +226,7 @@ func (s *shoppingListService) GetSharedList(ctx context.Context, shareCode strin
 
 func (s *shoppingListService) UpdateListStatistics(ctx context.Context, listID int64) error {
 	if err := s.repo.UpdateStatistics(ctx, listID); err != nil {
-		return fmt.Errorf("failed to update statistics: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update statistics")
 	}
 	return nil
 }
@@ -237,7 +249,7 @@ func (s *shoppingListService) GetListStatistics(ctx context.Context, listID int6
 func (s *shoppingListService) GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error) {
 	categories, err := s.repo.GetUserCategories(ctx, userID, listID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shopping list categories: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get shopping list categories")
 	}
 	return categories, nil
 }
@@ -265,7 +277,7 @@ func (s *shoppingListService) ValidateListAccess(ctx context.Context, listID int
 	}
 
 	if !hasAccess {
-		return fmt.Errorf("user does not have access to this shopping list")
+		return apperrors.Internal("user does not have access to this shopping list")
 	}
 
 	return nil
@@ -274,7 +286,7 @@ func (s *shoppingListService) ValidateListAccess(ctx context.Context, listID int
 func (s *shoppingListService) CanUserAccessList(ctx context.Context, listID int64, userID uuid.UUID) (bool, error) {
 	canAccess, err := s.repo.CanUserAccessList(ctx, listID, userID)
 	if err != nil {
-		return false, fmt.Errorf("failed to check list access: %w", err)
+		return false, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check list access")
 	}
 	return canAccess, nil
 }

@@ -1,10 +1,11 @@
 package services
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 // NormalizeProductText normalizes Lithuanian text for search
@@ -25,21 +26,21 @@ func GenerateSearchVector(normalizedName string) string {
 // Note: price can be 0 for category/brand_line promotions that only have discount_percent
 func ValidateProduct(name string, price float64) error {
 	if name == "" {
-		return fmt.Errorf("product name is required")
+		return errors.Validation("product name is required")
 	}
 	if len(name) < 3 {
-		return fmt.Errorf("product name too short: %s", name)
+		return errors.ValidationF("product name too short: %s", name)
 	}
 	if len(name) > 150 {
-		return fmt.Errorf("product name too long: %s", name)
+		return errors.ValidationF("product name too long: %s", name)
 	}
 	// Allow price = 0 for percent-only promotions (category/brand_line)
 	// Only reject negative prices
 	if price < 0 {
-		return fmt.Errorf("invalid price: %f", price)
+		return errors.ValidationF("invalid price: %f", price)
 	}
 	if price > 9999.99 {
-		return fmt.Errorf("price too high: %f", price)
+		return errors.ValidationF("price too high: %f", price)
 	}
 	return nil
 }
@@ -55,7 +56,7 @@ func CalculateDiscount(original, current float64) float64 {
 // StandardizeUnit standardizes unit types
 func StandardizeUnit(unit string) string {
 	unit = strings.ToLower(strings.TrimSpace(unit))
-	
+
 	unitMap := map[string]string{
 		"kilogramas": "kg", "kg.": "kg",
 		"gramas": "g", "gr": "g", "g.": "g",
@@ -65,7 +66,7 @@ func StandardizeUnit(unit string) string {
 		"pakuotė": "pak.", "pak": "pak.",
 		"dėžutė": "dėž.", "dėž": "dėž.",
 	}
-	
+
 	if standard, ok := unitMap[unit]; ok {
 		return standard
 	}
@@ -75,27 +76,27 @@ func StandardizeUnit(unit string) string {
 // ParsePrice parses a price string to float64
 func ParsePrice(priceStr string) (float64, error) {
 	if priceStr == "" {
-		return 0, fmt.Errorf("empty price string")
+		return 0, errors.Validation("empty price string")
 	}
-	
+
 	// Remove currency symbols and whitespace
 	priceStr = strings.TrimSpace(priceStr)
 	priceStr = strings.ReplaceAll(priceStr, "€", "")
 	priceStr = strings.ReplaceAll(priceStr, "EUR", "")
 	priceStr = strings.TrimSpace(priceStr)
-	
+
 	// Replace comma with dot for decimal separator
 	priceStr = strings.ReplaceAll(priceStr, ",", ".")
-	
+
 	// Parse as float
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid price format: %s", priceStr)
+		return 0, errors.ValidationF("invalid price format: %s", priceStr)
 	}
-	
+
 	if price < 0 {
-		return 0, fmt.Errorf("negative price: %f", price)
+		return 0, errors.ValidationF("negative price: %f", price)
 	}
-	
+
 	return price, nil
 }

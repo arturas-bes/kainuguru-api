@@ -39,7 +39,6 @@ func New(cfg Config) (*Database, error) {
 		cfg.SSLMode,
 	)
 
-
 	// Parse connection configuration
 	poolConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

@@ -34,14 +34,14 @@ func NewPriceComparisonService(db *bun.DB) PriceComparisonService {
 
 // ProductPriceComparison contains price comparison across stores
 type ProductPriceComparison struct {
-	ProductMasterID   int64             `json:"product_master_id"`
-	ProductName       string            `json:"product_name"`
-	StorePrices       []StorePriceInfo  `json:"store_prices"`
-	BestPrice         *StorePriceInfo   `json:"best_price"`
-	AveragePrice      float64           `json:"average_price"`
-	PriceRange        float64           `json:"price_range"`
-	SavingsPotential  float64           `json:"savings_potential"`
-	LastUpdated       time.Time         `json:"last_updated"`
+	ProductMasterID  int64            `json:"product_master_id"`
+	ProductName      string           `json:"product_name"`
+	StorePrices      []StorePriceInfo `json:"store_prices"`
+	BestPrice        *StorePriceInfo  `json:"best_price"`
+	AveragePrice     float64          `json:"average_price"`
+	PriceRange       float64          `json:"price_range"`
+	SavingsPotential float64          `json:"savings_potential"`
+	LastUpdated      time.Time        `json:"last_updated"`
 }
 
 // StorePriceInfo contains price info for a specific store
@@ -61,15 +61,15 @@ type StorePriceInfo struct {
 
 // StoreSavingsAnalysis contains savings analysis for a store
 type StoreSavingsAnalysis struct {
-	StoreID              int                        `json:"store_id"`
-	StoreName            string                     `json:"store_name"`
-	TotalItems           int                        `json:"total_items"`
-	ItemsAvailable       int                        `json:"items_available"`
-	AvailabilityRate     float64                    `json:"availability_rate"`
-	TotalPrice           float64                    `json:"total_price"`
-	TotalSavings         float64                    `json:"total_savings"`
-	ComparisonByStore    map[int]*StoreComparison   `json:"comparison_by_store"`
-	MissingProducts      []int64                    `json:"missing_products"`
+	StoreID           int                      `json:"store_id"`
+	StoreName         string                   `json:"store_name"`
+	TotalItems        int                      `json:"total_items"`
+	ItemsAvailable    int                      `json:"items_available"`
+	AvailabilityRate  float64                  `json:"availability_rate"`
+	TotalPrice        float64                  `json:"total_price"`
+	TotalSavings      float64                  `json:"total_savings"`
+	ComparisonByStore map[int]*StoreComparison `json:"comparison_by_store"`
+	MissingProducts   []int64                  `json:"missing_products"`
 }
 
 // StoreComparison compares this store against another
@@ -210,7 +210,7 @@ func (s *priceComparisonService) GetStoreWithBestPrices(ctx context.Context, pro
 
 	// Build store-wise totals
 	storeTotals := make(map[int]*storeTotalInfo)
-	
+
 	for _, comp := range comparisons {
 		for _, priceInfo := range comp.StorePrices {
 			if _, exists := storeTotals[priceInfo.StoreID]; !exists {

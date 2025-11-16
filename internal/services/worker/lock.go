@@ -2,11 +2,13 @@ package worker
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type DistributedLock struct {
@@ -40,11 +42,11 @@ func (lm *LockManager) AcquireLock(ctx context.Context, resource string, ttl tim
 
 	acquired, err := lm.redis.SetNX(ctx, key, value, ttl).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to acquire lock")
 	}
 
 	if !acquired {
-		return nil, fmt.Errorf("lock already held by another process")
+		return nil, apperrors.Conflict("lock already held by another process")
 	}
 
 	lock := &DistributedLock{
@@ -92,7 +94,7 @@ func (lm *LockManager) TryAcquireLock(ctx context.Context, resource string, ttl 
 		}
 	}
 
-	return nil, fmt.Errorf("timeout waiting for lock on resource %s", resource)
+	return nil, apperrors.Wrapf(nil, apperrors.ErrorTypeInternal, "timeout waiting for lock on resource %s", resource)
 }
 
 func (dl *DistributedLock) Release(ctx context.Context) error {
@@ -112,12 +114,12 @@ func (dl *DistributedLock) Release(ctx context.Context) error {
 
 	result, err := dl.redis.Eval(ctx, script, []string{dl.key}, dl.value).Result()
 	if err != nil {
-		return fmt.Errorf("failed to release lock: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to release lock")
 	}
 
 	deleted := result.(int64)
 	if deleted == 0 {
-		return fmt.Errorf("lock was not owned by this process")
+		return apperrors.Authentication("lock was not owned by this process")
 	}
 
 	return nil
@@ -135,12 +137,12 @@ func (dl *DistributedLock) Extend(ctx context.Context, newTTL time.Duration) err
 
 	result, err := dl.redis.Eval(ctx, script, []string{dl.key}, dl.value, int(newTTL.Seconds())).Result()
 	if err != nil {
-		return fmt.Errorf("failed to extend lock: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to extend lock")
 	}
 
 	extended := result.(int64)
 	if extended == 0 {
-		return fmt.Errorf("lock was not owned by this process")
+		return apperrors.Authentication("lock was not owned by this process")
 	}
 
 	dl.ttl = newTTL
@@ -150,10 +152,10 @@ func (dl *DistributedLock) Extend(ctx context.Context, newTTL time.Duration) err
 func (dl *DistributedLock) IsHeld(ctx context.Context) (bool, error) {
 	value, err := dl.redis.Get(ctx, dl.key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to check lock: %w", err)
+		return false, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check lock")
 	}
 
 	return value == dl.value, nil
@@ -162,15 +164,15 @@ func (dl *DistributedLock) IsHeld(ctx context.Context) (bool, error) {
 func (dl *DistributedLock) GetTTL(ctx context.Context) (time.Duration, error) {
 	ttl, err := dl.redis.TTL(ctx, dl.key).Result()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get lock TTL: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get lock TTL")
 	}
 
 	if ttl == -1 {
-		return 0, fmt.Errorf("lock exists but has no TTL")
+		return 0, apperrors.Validation("lock exists but has no TTL")
 	}
 
 	if ttl == -2 {
-		return 0, fmt.Errorf("lock does not exist")
+		return 0, apperrors.Validation("lock does not exist")
 	}
 
 	return ttl, nil

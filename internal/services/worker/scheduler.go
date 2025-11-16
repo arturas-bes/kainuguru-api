@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/robfig/cron/v3"
 )
 
@@ -43,7 +44,7 @@ func NewJobScheduler(queue *JobQueue, redis *redis.Client) *JobScheduler {
 
 func (js *JobScheduler) Start() error {
 	if js.running {
-		return fmt.Errorf("scheduler is already running")
+		return apperrors.Conflict("scheduler is already running")
 	}
 
 	js.cron.Start()
@@ -66,7 +67,7 @@ func (js *JobScheduler) Stop() {
 
 func (js *JobScheduler) AddJob(scheduledJob *ScheduledJob) error {
 	if !js.running {
-		return fmt.Errorf("scheduler is not running")
+		return apperrors.Conflict("scheduler is not running")
 	}
 
 	if !scheduledJob.Enabled {
@@ -77,7 +78,7 @@ func (js *JobScheduler) AddJob(scheduledJob *ScheduledJob) error {
 		js.executeScheduledJob(scheduledJob)
 	})
 	if err != nil {
-		return fmt.Errorf("failed to add scheduled job: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to add scheduled job")
 	}
 
 	// Store the cron entry ID for later removal
@@ -100,7 +101,7 @@ func (js *JobScheduler) AddJob(scheduledJob *ScheduledJob) error {
 func (js *JobScheduler) RemoveJob(jobID string) error {
 	scheduledJob, exists := js.scheduledJobs[jobID]
 	if !exists {
-		return fmt.Errorf("scheduled job %s not found", jobID)
+		return apperrors.NotFound(fmt.Sprintf("scheduled job %s not found", jobID))
 	}
 
 	// Parse entry ID and remove from cron

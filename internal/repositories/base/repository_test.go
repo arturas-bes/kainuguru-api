@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"strings"
+
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	"github.com/uptrace/bun/driver/sqliteshim"
-	"strings"
 )
 
 type testEntity struct {

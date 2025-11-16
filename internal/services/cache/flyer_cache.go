@@ -3,10 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type FlyerData struct {
@@ -51,19 +53,19 @@ func (fc *FlyerCache) SetFlyer(ctx context.Context, flyer *FlyerData) error {
 
 	data, err := json.Marshal(flyer)
 	if err != nil {
-		return fmt.Errorf("failed to marshal flyer data: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal flyer data")
 	}
 
 	err = fc.redis.Set(ctx, key, data, fc.defaultTTL).Err()
 	if err != nil {
-		return fmt.Errorf("failed to cache flyer: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cache flyer")
 	}
 
 	// Add to store index
 	storeKey := fc.storeIndexKey(flyer.StoreCode)
 	err = fc.redis.SAdd(ctx, storeKey, flyer.ID).Err()
 	if err != nil {
-		return fmt.Errorf("failed to update store index: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update store index")
 	}
 
 	// Set TTL on store index
@@ -77,16 +79,16 @@ func (fc *FlyerCache) GetFlyer(ctx context.Context, flyerID string) (*FlyerData,
 
 	data, err := fc.redis.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // Not found
 		}
-		return nil, fmt.Errorf("failed to get flyer from cache: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyer from cache")
 	}
 
 	var flyer FlyerData
 	err = json.Unmarshal([]byte(data), &flyer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal flyer data: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unmarshal flyer data")
 	}
 
 	return &flyer, nil
@@ -97,10 +99,10 @@ func (fc *FlyerCache) GetFlyersByStore(ctx context.Context, storeCode string) ([
 
 	flyerIDs, err := fc.redis.SMembers(ctx, storeKey).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return []*FlyerData{}, nil
 		}
-		return nil, fmt.Errorf("failed to get flyer IDs for store: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get flyer IDs for store")
 	}
 
 	flyers := make([]*FlyerData, 0, len(flyerIDs))
@@ -122,19 +124,19 @@ func (fc *FlyerCache) SetFlyerPage(ctx context.Context, page *FlyerPageData) err
 
 	data, err := json.Marshal(page)
 	if err != nil {
-		return fmt.Errorf("failed to marshal page data: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal page data")
 	}
 
 	err = fc.redis.Set(ctx, key, data, fc.defaultTTL).Err()
 	if err != nil {
-		return fmt.Errorf("failed to cache page: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cache page")
 	}
 
 	// Add to flyer pages index
 	pagesKey := fc.flyerPagesKey(page.FlyerID)
 	err = fc.redis.SAdd(ctx, pagesKey, page.PageNum).Err()
 	if err != nil {
-		return fmt.Errorf("failed to update pages index: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update pages index")
 	}
 
 	// Set TTL on pages index
@@ -148,16 +150,16 @@ func (fc *FlyerCache) GetFlyerPage(ctx context.Context, flyerID string, pageNum 
 
 	data, err := fc.redis.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // Not found
 		}
-		return nil, fmt.Errorf("failed to get page from cache: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get page from cache")
 	}
 
 	var page FlyerPageData
 	err = json.Unmarshal([]byte(data), &page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal page data: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unmarshal page data")
 	}
 
 	return &page, nil
@@ -168,10 +170,10 @@ func (fc *FlyerCache) GetFlyerPages(ctx context.Context, flyerID string) ([]*Fly
 
 	pageNums, err := fc.redis.SMembers(ctx, pagesKey).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return []*FlyerPageData{}, nil
 		}
-		return nil, fmt.Errorf("failed to get page numbers for flyer: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get page numbers for flyer")
 	}
 
 	pages := make([]*FlyerPageData, 0, len(pageNums))
@@ -226,7 +228,7 @@ func (fc *FlyerCache) DeleteFlyer(ctx context.Context, flyerID string) error {
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to delete flyer from cache: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete flyer from cache")
 	}
 
 	return nil
@@ -251,7 +253,7 @@ func (fc *FlyerCache) InvalidateStore(ctx context.Context, storeCode string) err
 	storeKey := fc.storeIndexKey(storeCode)
 	err = fc.redis.Del(ctx, storeKey).Err()
 	if err != nil {
-		return fmt.Errorf("failed to delete store index: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete store index")
 	}
 
 	return nil
@@ -262,21 +264,21 @@ func (fc *FlyerCache) GetCacheStats(ctx context.Context) (map[string]interface{}
 	flyerPattern := fc.keyPrefix + "flyer:*"
 	flyerKeys, err := fc.redis.Keys(ctx, flyerPattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count flyers: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count flyers")
 	}
 
 	// Count total pages
 	pagePattern := fc.keyPrefix + "page:*"
 	pageKeys, err := fc.redis.Keys(ctx, pagePattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count pages: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count pages")
 	}
 
 	// Count stores
 	storePattern := fc.keyPrefix + "store:*"
 	storeKeys, err := fc.redis.Keys(ctx, storePattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count stores: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count stores")
 	}
 
 	return map[string]interface{}{

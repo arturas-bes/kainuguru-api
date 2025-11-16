@@ -257,6 +257,368 @@ func TestShoppingListService_GetUserCategories(t *testing.T) {
 	}
 }
 
+func TestShoppingListService_GetByIDDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	repo := &fakeShoppingListRepository{
+		getByIDFn: func(ctx context.Context, id int64) (*models.ShoppingList, error) {
+			called = true
+			if id != 42 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return &models.ShoppingList{ID: 42, Name: "Test"}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	result, err := service.GetByID(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 42 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetByIDReturnsErrorWhenNil(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeShoppingListRepository{
+		getByIDFn: func(ctx context.Context, id int64) (*models.ShoppingList, error) {
+			return nil, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	_, err := service.GetByID(context.Background(), 99)
+	if err == nil {
+		t.Fatalf("expected error when repository returns nil")
+	}
+}
+
+func TestShoppingListService_GetByIDsDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	repo := &fakeShoppingListRepository{
+		getByIDsFn: func(ctx context.Context, ids []int64) ([]*models.ShoppingList, error) {
+			called = true
+			if len(ids) != 2 || ids[0] != 1 || ids[1] != 2 {
+				t.Fatalf("unexpected IDs: %v", ids)
+			}
+			return []*models.ShoppingList{{ID: 1}, {ID: 2}}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	result, err := service.GetByIDs(context.Background(), []int64{1, 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(result) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetByUserIDDelegates(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	called := false
+	repo := &fakeShoppingListRepository{
+		getByUserIDFn: func(ctx context.Context, uid uuid.UUID, filters *shoppinglist.Filters) ([]*models.ShoppingList, error) {
+			called = true
+			if uid != userID {
+				t.Fatalf("unexpected user ID: %s", uid)
+			}
+			if filters == nil || filters.Limit != 10 {
+				t.Fatalf("filters not forwarded correctly")
+			}
+			return []*models.ShoppingList{{ID: 1}, {ID: 2}}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	filters := ShoppingListFilters{Limit: 10}
+	result, err := service.GetByUserID(context.Background(), userID, filters)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || len(result) != 2 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_CountByUserIDDelegates(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	called := false
+	repo := &fakeShoppingListRepository{
+		countByUserIDFn: func(ctx context.Context, uid uuid.UUID, filters *shoppinglist.Filters) (int, error) {
+			called = true
+			if uid != userID {
+				t.Fatalf("unexpected user ID: %s", uid)
+			}
+			return 5, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	filters := ShoppingListFilters{}
+	count, err := service.CountByUserID(context.Background(), userID, filters)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || count != 5 {
+		t.Fatalf("expected delegation to repository, got count %d", count)
+	}
+}
+
+func TestShoppingListService_GetByShareCodeDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	shareCode := "abc123"
+	repo := &fakeShoppingListRepository{
+		getByShareCodeFn: func(ctx context.Context, code string) (*models.ShoppingList, error) {
+			called = true
+			if code != shareCode {
+				t.Fatalf("unexpected share code: %s", code)
+			}
+			return &models.ShoppingList{ID: 10, ShareCode: &shareCode}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	result, err := service.GetByShareCode(context.Background(), shareCode)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 10 {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetByShareCodeReturnsErrorWhenNil(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeShoppingListRepository{
+		getByShareCodeFn: func(ctx context.Context, shareCode string) (*models.ShoppingList, error) {
+			return nil, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	_, err := service.GetByShareCode(context.Background(), "invalid")
+	if err == nil {
+		t.Fatalf("expected error when repository returns nil")
+	}
+}
+
+func TestShoppingListService_UpdateSetsTimestamp(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	beforeUpdate := time.Now()
+	called := false
+
+	repo := &fakeShoppingListRepository{
+		unsetDefaultListsFn: func(ctx context.Context, uid uuid.UUID, excludeID *int64) error {
+			if *excludeID != 50 {
+				t.Fatalf("expected excludeID 50, got %d", *excludeID)
+			}
+			return nil
+		},
+		updateFn: func(ctx context.Context, list *models.ShoppingList) error {
+			called = true
+			if list.UpdatedAt.Before(beforeUpdate) {
+				t.Fatalf("UpdatedAt not set correctly")
+			}
+			return nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	list := &models.ShoppingList{ID: 50, UserID: userID, Name: "Updated", IsDefault: true}
+	if err := service.Update(context.Background(), list); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_DeleteDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	repo := &fakeShoppingListRepository{
+		deleteFn: func(ctx context.Context, id int64) error {
+			called = true
+			if id != 99 {
+				t.Fatalf("unexpected ID: %d", id)
+			}
+			return nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	if err := service.Delete(context.Background(), 99); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetUserDefaultListDelegates(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	called := false
+	repo := &fakeShoppingListRepository{
+		getUserDefaultListFn: func(ctx context.Context, uid uuid.UUID) (*models.ShoppingList, error) {
+			called = true
+			if uid != userID {
+				t.Fatalf("unexpected user ID: %s", uid)
+			}
+			return &models.ShoppingList{ID: 15, IsDefault: true}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	result, err := service.GetUserDefaultList(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 15 || !result.IsDefault {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetUserDefaultListReturnsErrorWhenNil(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	repo := &fakeShoppingListRepository{
+		getUserDefaultListFn: func(ctx context.Context, uid uuid.UUID) (*models.ShoppingList, error) {
+			return nil, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	_, err := service.GetUserDefaultList(context.Background(), userID)
+	if err == nil {
+		t.Fatalf("expected error when repository returns nil")
+	}
+}
+
+func TestShoppingListService_UpdateStatisticsDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	repo := &fakeShoppingListRepository{
+		updateStatisticsFn: func(ctx context.Context, listID int64) error {
+			called = true
+			if listID != 20 {
+				t.Fatalf("unexpected list ID: %d", listID)
+			}
+			return nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	if err := service.UpdateListStatistics(context.Background(), 20); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
+func TestShoppingListService_GetListStatisticsCallsGetByID(t *testing.T) {
+	t.Parallel()
+
+	itemCount := 10
+	completedItemCount := 7
+	estimatedTotal := 25.50
+
+	repo := &fakeShoppingListRepository{
+		getByIDFn: func(ctx context.Context, id int64) (*models.ShoppingList, error) {
+			return &models.ShoppingList{
+				ID:                  30,
+				ItemCount:           itemCount,
+				CompletedItemCount:  completedItemCount,
+				EstimatedTotalPrice: &estimatedTotal,
+			}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	stats, err := service.GetListStatistics(context.Background(), 30)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stats.TotalItems != itemCount || stats.CompletedItems != completedItemCount {
+		t.Fatalf("stats not populated correctly: %#v", stats)
+	}
+	if stats.EstimatedTotal == nil || *stats.EstimatedTotal != estimatedTotal {
+		t.Fatalf("estimated total not set correctly")
+	}
+}
+
+func TestShoppingListService_GetSharedListDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	shareCode := "xyz789"
+	repo := &fakeShoppingListRepository{
+		getByShareCodeFn: func(ctx context.Context, code string) (*models.ShoppingList, error) {
+			called = true
+			if code != shareCode {
+				t.Fatalf("unexpected share code: %s", code)
+			}
+			return &models.ShoppingList{ID: 40, ShareCode: &shareCode}, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	result, err := service.GetSharedList(context.Background(), shareCode)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || result.ID != 40 {
+		t.Fatalf("expected delegation via GetByShareCode")
+	}
+}
+
+func TestShoppingListService_CanUserAccessListDelegates(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	called := false
+	repo := &fakeShoppingListRepository{
+		canUserAccessListFn: func(ctx context.Context, listID int64, uid uuid.UUID) (bool, error) {
+			called = true
+			if listID != 60 || uid != userID {
+				t.Fatalf("unexpected args: listID=%d userID=%s", listID, uid)
+			}
+			return true, nil
+		},
+	}
+
+	service := NewShoppingListServiceWithRepository(repo)
+	canAccess, err := service.CanUserAccessList(context.Background(), 60, userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called || !canAccess {
+		t.Fatalf("expected delegation to repository")
+	}
+}
+
 type fakeShoppingListRepository struct {
 	createFn              func(ctx context.Context, list *models.ShoppingList) error
 	updateFn              func(ctx context.Context, list *models.ShoppingList) error

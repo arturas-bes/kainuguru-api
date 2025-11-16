@@ -3,12 +3,14 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 	"github.com/uptrace/bun"
 )
 
@@ -48,14 +50,14 @@ func (s *sessionService) CreateSession(ctx context.Context, input *models.Sessio
 	// Set browser info if provided
 	if input.BrowserInfo != nil {
 		if err := session.SetBrowserInfo(*input.BrowserInfo); err != nil {
-			return nil, fmt.Errorf("failed to set browser info: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to set browser info")
 		}
 	}
 
 	// Set location info if provided
 	if input.LocationInfo != nil {
 		if err := session.SetLocationInfo(*input.LocationInfo); err != nil {
-			return nil, fmt.Errorf("failed to set location info: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to set location info")
 		}
 	}
 
@@ -65,7 +67,7 @@ func (s *sessionService) CreateSession(ctx context.Context, input *models.Sessio
 		Exec(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create session")
 	}
 
 	return session, nil
@@ -80,10 +82,10 @@ func (s *sessionService) GetSession(ctx context.Context, sessionID uuid.UUID) (*
 		Scan(ctx)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("session not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("session not found")
 		}
-		return nil, fmt.Errorf("failed to get session: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get session")
 	}
 
 	return session, nil
@@ -99,10 +101,10 @@ func (s *sessionService) GetSessionByTokenHash(ctx context.Context, tokenHash st
 		Scan(ctx)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("session not found or expired")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound("session not found or expired")
 		}
-		return nil, fmt.Errorf("failed to get session by token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get session by token")
 	}
 
 	return session, nil
@@ -117,7 +119,7 @@ func (s *sessionService) UpdateSessionActivity(ctx context.Context, sessionID uu
 		Exec(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to update session activity: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update session activity")
 	}
 
 	return nil
@@ -133,7 +135,7 @@ func (s *sessionService) InvalidateSession(ctx context.Context, sessionID uuid.U
 		Exec(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to invalidate session: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to invalidate session")
 	}
 
 	return nil
@@ -149,7 +151,7 @@ func (s *sessionService) InvalidateUserSessions(ctx context.Context, userID uuid
 		Exec(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to invalidate user sessions: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to invalidate user sessions")
 	}
 
 	return nil
@@ -166,7 +168,7 @@ func (s *sessionService) CleanupExpiredSessions(ctx context.Context) (int64, err
 		Exec(ctx)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired sessions: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cleanup expired sessions")
 	}
 
 	rowsAffected, _ := result.RowsAffected()
@@ -238,7 +240,7 @@ func (s *sessionService) GetUserSessions(ctx context.Context, userID uuid.UUID, 
 	var sessions []*models.UserSession
 	err := query.Scan(ctx, &sessions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user sessions: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get user sessions")
 	}
 
 	return sessions, nil
@@ -258,14 +260,14 @@ func (s *sessionService) enforceSessionLimit(ctx context.Context, userID uuid.UU
 		Count(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to count user sessions: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count user sessions")
 	}
 
 	if count >= s.config.MaxSessionsPerUser {
 		// Remove oldest session to make room
 		err = s.removeOldestSession(ctx, userID)
 		if err != nil {
-			return fmt.Errorf("failed to remove oldest session: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to remove oldest session")
 		}
 	}
 
@@ -286,10 +288,10 @@ func (s *sessionService) removeOldestSession(ctx context.Context, userID uuid.UU
 		Scan(ctx, &oldestSessionID)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil // No sessions to remove
 		}
-		return fmt.Errorf("failed to find oldest session: %w", err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to find oldest session: %v", err)
 	}
 
 	// Invalidate the oldest session
@@ -305,7 +307,7 @@ func (s *sessionService) GetActiveSessionCount(ctx context.Context, userID uuid.
 		Count(ctx)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to count active sessions: %w", err)
+		return 0, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to count active sessions: %v", err)
 	}
 
 	return count, nil
@@ -364,7 +366,7 @@ func (s *sessionService) ValidateSession(ctx context.Context, sessionID uuid.UUI
 	}
 
 	if !session.IsValid() {
-		return nil, fmt.Errorf("session is expired or inactive")
+		return nil, apperrors.Validation("session is expired or inactive")
 	}
 
 	// Update activity

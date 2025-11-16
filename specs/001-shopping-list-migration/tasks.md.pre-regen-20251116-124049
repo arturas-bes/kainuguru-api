@@ -1,0 +1,465 @@
+# Tasks: Shopping List Migration Wizard
+
+**Input**: Design documents from `/specs/001-shopping-list-migration/`
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/wizard-api.graphql
+
+**Tests**: NOT included - tests are optional and not explicitly requested in the specification.
+
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- Include exact file paths in descriptions
+
+## Path Conventions
+
+- Go monolith structure: `internal/`, `migrations/`
+- GraphQL schema: `internal/graphql/schema/`
+- Tests: `test/integration/`, `test/unit/`
+
+---
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: Project initialization and database schema
+
+- [ ] T001 Create database migration file migrations/XXXXXX_add_wizard_tables.sql with wizard_sessions, offer_snapshots, and user_migration_preferences tables
+- [ ] T002 [P] Add migration fields to shopping_list_items table (migration_status, original_product_id, original_price, migration_session_id, migrated_at)
+- [ ] T003 [P] Create GraphQL schema file internal/graphql/schema/wizard.graphqls with all types, inputs, queries, mutations from contracts/wizard-api.graphql
+- [ ] T004 Run database migration and verify all tables and indexes are created correctly
+
+**Checkpoint**: Database schema ready, GraphQL schema defined
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+- [ ] T005 Create base Go model internal/models/wizard_session.go with WizardSession struct matching data-model.md specification
+- [ ] T006 [P] Create Go model internal/models/offer_snapshot.go with OfferSnapshot struct for immutable history
+- [ ] T007 [P] Create Go model internal/models/user_migration_preferences.go with UserMigrationPreferences struct
+- [ ] T008 Extend internal/models/shopping_list_item.go with migration tracking fields (MigrationStatus, OriginalProductID, OriginalPrice, MigrationSessionID, MigratedAt)
+- [ ] T009 Create Redis session repository internal/repository/wizard_session_repo.go with SaveSession, GetSession, DeleteSession, ExtendTTL methods using 30-minute TTL
+- [ ] T010 [P] Create PostgreSQL repository internal/repository/offer_snapshot_repo.go with Create, GetBySessionID, GetByItemID methods
+- [ ] T011 [P] Create PostgreSQL repository internal/repository/user_preferences_repo.go with Get, Upsert, Delete methods
+- [ ] T012 Create Suggestion model internal/models/suggestion.go with Product, Score, Confidence, Explanation, MatchedFields, ScoreBreakdown fields
+- [ ] T013 Create SuggestionEngine service internal/services/suggestion_engine.go with CalculateScore and CalculateConfidence methods using deterministic scoring (brand: 3.0, store: 2.0, size: 1.0, price: 1.0)
+- [ ] T014 [P] Create StoreSelector service internal/services/store_selector.go with greedy algorithm for 2-store optimization and ValidateStoreLimit method
+- [ ] T015 Create base GraphQL resolver internal/graphql/resolvers/wizard_resolver.go with resolver struct and dependencies injection
+
+**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+
+---
+
+## Phase 3: User Story 1 - Expired Item Detection & Notification (Priority: P1) 🎯 MVP
+
+**Goal**: Detect when flyer products in shopping lists have expired and notify users on login/app open
+
+**Independent Test**: Create shopping list with flyer items, expire the flyers, verify system detects and flags items with "pending" migration_status
+
+### Implementation for User Story 1
+
+- [ ] T016 [P] [US1] Create worker internal/workers/flyer_expiration_worker.go with DetectExpiredItems method using batch processing pattern (100 items per batch)
+- [ ] T017 [P] [US1] Implement batch query in internal/repository/shopping_list_item_repo.go to find items linked to expired flyers with efficient JOIN on flyers.valid_until
+- [ ] T018 [US1] Implement UpdateMigrationStatus method in internal/repository/shopping_list_item_repo.go to set migration_status='pending', store original_product_id and original_price
+- [ ] T019 [US1] Register FlyerExpirationWorker in worker scheduler with daily cron ("0 0 * * *") and Redis distributed locking
+- [ ] T020 [US1] Implement GraphQL query hasExpiredItems in internal/graphql/resolvers/wizard_resolver.go to return ExpiredItemsCheck with count and list
+- [ ] T021 [US1] Add GetExpiredItems method to internal/repository/shopping_list_item_repo.go with filtering by migration_status='pending'
+- [ ] T022 [US1] Add logging to worker for expired item detection with counts, error rates, and processing time metrics
+
+**Checkpoint**: At this point, expired items are automatically detected daily, users can query for expired items count and list. User Story 1 is fully functional and testable independently.
+
+---
+
+## Phase 4: User Story 2 - Brand-Aware Product Suggestions (Priority: P1)
+
+**Goal**: Generate ranked product suggestions using two-pass search strategy (brand+name, then name only) with deterministic scoring
+
+**Independent Test**: Provide an expired "Coca-Cola 2L" product, verify suggestions prioritize same-brand products from any store over different brands
+
+### Implementation for User Story 2
+
+- [ ] T023 [P] [US2] Create WizardService in internal/services/wizard_service.go with GenerateSuggestions method implementing two-pass search
+- [ ] T024 [US2] Implement Pass 1 search in WizardService.GenerateSuggestions using SearchService.FuzzySearchProducts with query="brand_name product_name"
+- [ ] T025 [US2] Implement Pass 2 search fallback in WizardService.GenerateSuggestions using SearchService.FuzzySearchProducts with query="product_name" if Pass 1 returns <3 results
+- [ ] T026 [US2] Integrate SuggestionEngine.CalculateScore in WizardService to score each search result using brand (3.0), store (2.0), size (1.0), price (1.0) weights
+- [ ] T027 [US2] Implement ranking logic in WizardService to sort suggestions by totalScore DESC and filter by minimum confidence threshold (0.5)
+- [ ] T028 [US2] Add GenerateExplanation method to SuggestionEngine to create human-readable text like "Same brand, similar size, $0.50 cheaper"
+- [ ] T029 [US2] Implement GraphQL query getItemSuggestions in wizard_resolver.go to accept GetSuggestionsInput and return [Suggestion!]! with score breakdown
+- [ ] T030 [US2] Add session validation in WizardService to check session exists, not expired, and dataset version matches current flyer data
+- [ ] T031 [US2] Add caching layer in WizardService for frequent searches with 5-minute Redis TTL to improve P95 latency under 1 second
+
+**Checkpoint**: At this point, User Story 2 works independently - given an expired item, the system generates and ranks brand-aware suggestions. Both US1 and US2 are functional.
+
+---
+
+## Phase 5: User Story 3 - Store Limitation Management (Priority: P2)
+
+**Goal**: Enforce maximum 2 stores per shopping plan and prioritize combinations that minimize store count
+
+**Independent Test**: Select items from 3+ different stores, verify system prevents exceeding 2-store limit with appropriate warnings
+
+### Implementation for User Story 3
+
+- [ ] T032 [P] [US3] Implement ValidateStoreLimit method in StoreSelector to check if adding a suggestion would exceed 2 stores
+- [ ] T033 [P] [US3] Implement CalculateStoreImpact method in StoreSelector to show which stores would be added/affected by a selection
+- [ ] T034 [US3] Add OptimizeStoreSelection method to StoreSelector using greedy algorithm to maximize items from existing 2 stores
+- [ ] T035 [US3] Update WizardService.GenerateSuggestions to call StoreSelector and annotate suggestions with store impact (e.g., "Would add new store" vs "Same as current stores")
+- [ ] T036 [US3] Add selectedStores tracking to WizardSession model in Redis with StoreSelection objects (store ID, item count, total price)
+- [ ] T037 [US3] Implement GetPreferredStores method in user_preferences_repo.go to load user's primary/secondary store preferences
+- [ ] T038 [US3] Update suggestion ranking in WizardService to boost scores for user's preferred stores by 0.5 points
+- [ ] T039 [US3] Add store limit validation to recordDecision mutation in wizard_resolver.go that returns WizardError if limit exceeded
+
+**Checkpoint**: Store limitation enforced - users cannot exceed 2 stores, system prioritizes selections that minimize store count. US1, US2, and US3 all work independently.
+
+---
+
+## Phase 6: User Story 4 - Item-by-Item Decision Making (Priority: P2)
+
+**Goal**: Allow users to review each expired item individually with suggestions and make informed decisions (replace, skip, remove)
+
+**Independent Test**: Start wizard with 5 expired items, verify each item can be reviewed independently with explanations, and decisions are recorded
+
+### Implementation for User Story 4
+
+- [ ] T040 [P] [US4] Implement startWizard mutation in wizard_resolver.go to create WizardSession in Redis with 30-minute TTL
+- [ ] T041 [US4] Add LoadExpiredItems method to WizardService to fetch all shopping list items with migration_status='pending' ordered by sort_order
+- [ ] T042 [US4] Initialize WizardSession in startWizard with currentItemIndex=0, status='ACTIVE', datasetVersion from database, and expiredItems array
+- [ ] T043 [US4] Implement recordDecision mutation in wizard_resolver.go to accept RecordDecisionInput (REPLACE, SKIP, REMOVE)
+- [ ] T044 [US4] Add RecordDecision method to WizardService that updates session.decisions map and increments currentItemIndex
+- [ ] T045 [US4] Create offer snapshot in RecordDecision by calling offer_snapshot_repo.Create with original_item, suggestions, selected_suggestion, decision_type
+- [ ] T046 [US4] Update WizardSession.progress (currentItem, itemsMigrated, itemsSkipped, itemsRemoved, percentComplete) after each decision
+- [ ] T047 [US4] Add GetCurrentItem method to WizardService to return the next unprocessed expired item from session.expiredItems[currentItemIndex]
+- [ ] T048 [US4] Implement activeWizardSession query in wizard_resolver.go to retrieve current user's active session from Redis
+- [ ] T049 [US4] Add session expiry check in all wizard operations to return SessionExpiredError if expiresAt < now
+
+**Checkpoint**: Users can step through wizard item-by-item, make decisions with full context. US1-US4 all functional independently.
+
+---
+
+## Phase 7: User Story 5 - Bulk Decision Making (Priority: P3)
+
+**Goal**: Allow users to accept all suggested replacements at once for faster processing with automatic 2-store optimization
+
+**Independent Test**: Create session with 10 expired items with high-confidence suggestions, select "Accept All", verify all items replaced and limited to 2 stores
+
+### Implementation for User Story 5
+
+- [ ] T050 [P] [US5] Implement bulkAcceptSuggestions mutation in wizard_resolver.go to accept BulkAcceptInput with itemIds and minConfidence threshold
+- [ ] T051 [US5] Add BulkAccept method to WizardService that generates suggestions for all specified items in parallel
+- [ ] T052 [US5] Implement confidence filtering in BulkAccept to only auto-accept suggestions with confidence >= minConfidence (default 0.8)
+- [ ] T053 [US5] Integrate StoreSelector.OptimizeStoreSelection in BulkAccept to automatically select the 2 stores with most items
+- [ ] T054 [US5] Create offer snapshots for all bulk-accepted items in a single batch operation to offer_snapshot_repo
+- [ ] T055 [US5] Update session progress and decisions map for all bulk-accepted items atomically
+- [ ] T056 [US5] Return updated WizardSession with new progress showing itemsMigrated count and selectedStores
+
+**Checkpoint**: Bulk accept functionality works, automatically optimizes for 2-store limit. All user stories US1-US5 functional.
+
+---
+
+## Phase 8: User Story 6 - Session Persistence & Recovery (Priority: P3)
+
+**Goal**: Save migration progress in Redis to allow resumption within 30-minute window, detect stale data on resume
+
+**Independent Test**: Start wizard, make 2 decisions, close app, reopen within 30 minutes, verify progress restored and can continue from item 3
+
+### Implementation for User Story 6
+
+- [ ] T057 [P] [US6] Implement resumeWizard mutation in wizard_resolver.go to accept sessionId and restore from Redis
+- [ ] T058 [US6] Add ValidateDatasetFreshness method to WizardService to compare session.datasetVersion with current flyer dataset_version
+- [ ] T059 [US6] Return StaleDataError in resumeWizard if dataset version changed, prompting user to restart migration
+- [ ] T060 [US6] Implement ExtendSession method in wizard_session_repo.go to refresh Redis TTL to 30 minutes on resume
+- [ ] T061 [US6] Add GetSessionHistory method to wizard_session_repo.go to retrieve decisions map showing which items already processed
+- [ ] T062 [US6] Update activeWizardSession query to return existing active session if found, null otherwise
+- [ ] T063 [US6] Implement cancelWizard mutation in wizard_resolver.go to delete Redis session and set PostgreSQL wizard_sessions.status='CANCELLED'
+
+**Checkpoint**: Session persistence works, users can resume interrupted sessions within 30 minutes. All user stories US1-US6 functional.
+
+---
+
+## Phase 9: Wizard Completion & Application
+
+**Purpose**: Apply all decisions atomically to shopping list, finalize session, learn user preferences
+
+- [ ] T064 Implement completeWizard mutation in wizard_resolver.go to accept CompleteWizardInput with applyChanges and savePreferences flags
+- [ ] T065 Add ApplyChanges method to WizardService that processes all decisions from session and updates shopping_list_items in a database transaction
+- [ ] T066 Implement REPLACE decision logic: update linked_product_id to suggestion product, set migration_status='migrated', record migrated_at timestamp
+- [ ] T067 Implement SKIP decision logic: set migration_status='skipped', keep original product unchanged
+- [ ] T068 Implement REMOVE decision logic: delete shopping_list_item record or mark as inactive
+- [ ] T069 Add idempotency check in ApplyChanges using migration_session_id to prevent double-application if user retries
+- [ ] T070 Implement LearnPreferences method to extract brand preferences and store preferences from user decisions
+- [ ] T071 Update user_migration_preferences table with learned preferences if savePreferences=true in CompleteWizardInput
+- [ ] T072 Calculate and return MigrationSummary (totalItems, itemsMigrated, itemsSkipped, totalSavings, storesUsed, averageConfidence)
+- [ ] T073 Update PostgreSQL wizard_sessions table with completion metadata (completed_at, completion_rate, items_migrated, items_skipped, selected_stores)
+- [ ] T074 Delete Redis session after successful completion to free memory
+- [ ] T075 Add comprehensive error handling in ApplyChanges with rollback on failure and detailed WizardError responses
+
+**Checkpoint**: Wizard can complete successfully, apply all changes atomically, and clean up resources.
+
+---
+
+## Phase 10: GraphQL Subscriptions & Real-time Updates
+
+**Purpose**: Enable real-time wizard progress updates and expired item notifications
+
+- [ ] T076 [P] Implement wizardSessionUpdates subscription in wizard_resolver.go using GraphQL subscription protocol
+- [ ] T077 [P] Implement expiredItemNotifications subscription in wizard_resolver.go to push notifications when worker detects expired items
+- [ ] T078 Add Redis pub/sub channel "wizard:updates:{sessionId}" for broadcasting session state changes
+- [ ] T079 Publish to Redis channel on every recordDecision, bulkAccept, and completeWizard operation
+- [ ] T080 Add Redis pub/sub channel "user:notifications:{userId}" for expired item alerts
+- [ ] T081 Publish ExpiredItemNotification to user channel when FlyerExpirationWorker marks items as pending
+
+**Checkpoint**: Real-time updates working, users see live progress without polling.
+
+---
+
+## Phase 11: Additional Queries & Statistics
+
+**Purpose**: Provide migration history and analytics for users
+
+- [ ] T082 [P] Implement migrationHistory query in wizard_resolver.go with pagination (Connection pattern) and filters (status, date range)
+- [ ] T083 [P] Implement userMigrationPreferences query in wizard_resolver.go to return current user preferences
+- [ ] T084 [P] Implement wizardStatistics query in wizard_resolver.go to calculate totalSessions, completedSessions, averageCompletionRate
+- [ ] T085 Add CalculateStatistics method to WizardService that aggregates data from wizard_sessions and offer_snapshots tables
+- [ ] T086 Implement mostUsedStores calculation by counting store frequency in completed sessions
+- [ ] T087 Implement acceptanceRateByConfidence calculation by grouping suggestions into confidence buckets (0-0.5, 0.5-0.7, 0.7-0.9, 0.9-1.0)
+- [ ] T088 Add efficient database indexes for statistics queries on wizard_sessions(user_id, status, completed_at)
+
+**Checkpoint**: Analytics and history queries available for user insights.
+
+---
+
+## Phase 12: Polish & Cross-Cutting Concerns
+
+**Purpose**: Improvements that affect multiple user stories
+
+- [ ] T089 [P] Add comprehensive logging to all WizardService methods with structured logs (session_id, user_id, operation, duration, errors)
+- [ ] T090 [P] Add metrics for monitoring: wizard_items_flagged_total, wizard_suggestions_returned, wizard_acceptance_rate, wizard_selected_store_count, wizard_latency_ms
+- [ ] T091 Add error handling for SearchService failures with graceful fallback to empty suggestions array
+- [ ] T092 Add input validation for all GraphQL mutations (session exists, item belongs to session, suggestion belongs to item)
+- [ ] T093 Add rate limiting to startWizard mutation (max 5 sessions per user per hour) to prevent abuse
+- [ ] T094 Implement feature flag "wizard_enabled" with environment variable WIZARD_FEATURE_ENABLED for gradual rollout
+- [ ] T095 Add database indexes on shopping_list_items(migration_status) for fast expired item queries
+- [ ] T096 Add partial index on shopping_list_items(migration_status) WHERE migration_status IS NOT NULL to optimize index size
+- [ ] T097 Create integration test script based on quickstart.md to validate end-to-end wizard flow
+- [ ] T098 Document all GraphQL operations in internal/graphql/schema/wizard.graphqls with descriptions and examples
+- [ ] T099 Add API documentation to README.md with example queries and mutations for wizard operations
+- [ ] T100 Run performance test with 1000 concurrent sessions to verify P95 latency <1 second goal
+
+---
+
+## Dependencies & Execut Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: No dependencies - can start immediately
+- **Foundational (Phase 2)**: Depends on Setup (Phase 1) completion - BLOCKS all user stories
+- **User Story 1 (Phase 3)**: Depends on Foundational (Phase 2) - No dependencies on other stories
+- **User Story 2 (Phase 4)**: Depends on Foundational (Phase 2) - Independent of other stories
+- **User Story 3 (Phase 5)**: Depends on Foundational (Phase 2) and User Story 2 (Phase 4) for suggestion generation
+- **User Story 4 (Phase 6)**: Depends on Foundational (Phase 2) and User Story 2 (Phase 4) for suggestions
+- **User Story 5 (Phase 7)**: Depends on User Story 4 (Phase 6) for decision mechanism and User Story 3 (Phase 5) for store optimization
+- **User Story 6 (Phase 8)**: Depends on User Story 4 (Phase 6) for session structure
+- **Wizard Completion (Phase 9)**: Depends on User Story 4 (Phase 6) for decision structure
+- **Subscriptions (Phase 10)**: Depends on User Story 1 (Phase 3) and User Story 4 (Phase 6)
+- **Statistics (Phase 11)**: Depends on Phase 9 for completed session data
+- **Polish (Phase 12)**: Depends on all desired user stories being complete
+
+### User Story Dependencies
+
+- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - FULLY INDEPENDENT
+- **User Story 2 (P1)**: Can start after Foundational (Phase 2) - FULLY INDEPENDENT
+- **User Story 3 (P2)**: Requires US2 for suggestions - depends on Phase 4
+- **User Story 4 (P2)**: Requires US2 for suggestions - depends on Phase 4
+- **User Story 5 (P3)**: Requires US3 and US4 - depends on Phases 5 & 6
+- **User Story 6 (P3)**: Requires US4 session structure - depends on Phase 6
+
+### Within Each User Story
+
+- All tasks within a user story can run in parallel if marked [P]
+- Models before services (where dependencies exist)
+- Services before GraphQL resolvers
+- Core implementation before integration
+
+### Parallel Opportunities
+
+#### Phase 1 - Setup
+- T002 (migration fields) and T003 (GraphQL schema) can run in parallel
+
+#### Phase 2 - Foundational
+- T006, T007, T010, T011 can all run in parallel (different files)
+- T014 can run in parallel with T013
+
+#### Phase 3 - User Story 1
+- T016 and T017 can run in parallel (worker and repository)
+
+#### Phase 4 - User Story 2
+- T023 can run in parallel with any previous phase tasks
+
+#### Phase 10 - Subscriptions
+- T076 and T077 can run in parallel
+
+#### Phase 11 - Statistics
+- T082, T083, T084 can all run in parallel
+
+#### Phase 12 - Polish
+- T089, T090 can run in parallel with most other polish tasks
+
+---
+
+## Parallel Example: Foundational Phase
+
+```bash
+# Launch all repository implementations in parallel:
+Task: "Create Redis session repository internal/repository/wizard_session_repo.go"
+Task: "Create PostgreSQL repository internal/repository/offer_snapshot_repo.go"
+Task: "Create PostgreSQL repository internal/repository/user_preferences_repo.go"
+
+# Then launch services in parallel:
+Task: "Create SuggestionEngine service internal/services/suggestion_engine.go"
+Task: "Create StoreSelector service internal/services/store_selector.go"
+```
+
+---
+
+## Implementation Strategy
+
+### MVP First (User Stories 1 & 2 Only)
+
+1. Complete Phase 1: Setup (database + GraphQL schema)
+2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
+3. Complete Phase 3: User Story 1 (expired detection)
+4. Complete Phase 4: User Story 2 (brand-aware suggestions)
+5. Complete Phase 6: User Story 4 (decision workflow) - minimal working wizard
+6. Complete Phase 9: Wizard Completion (apply changes)
+7. **STOP and VALIDATE**: Test complete flow end-to-end
+8. Deploy/demo if ready
+
+### Incremental Delivery
+
+1. **Foundation** (Phases 1-2) → Database ready, models ready
+2. **MVP** (Phases 3-4, 6, 9) → Basic wizard works: detect, suggest, decide, apply
+3. **Enhanced** (+Phase 5) → Add 2-store optimization
+4. **Efficiency** (+Phase 7) → Add bulk accept for faster processing
+5. **Resilience** (+Phase 8) → Add session persistence
+6. **Real-time** (+Phase 10) → Add subscriptions for live updates
+7. **Analytics** (+Phase 11) → Add statistics and history
+8. **Production Ready** (+Phase 12) → Polish, metrics, performance
+
+### Parallel Team Strategy
+
+With multiple developers after Foundational phase completes:
+
+1. **Team completes Setup + Foundational together** (Phases 1-2)
+2. **Once Foundational is done:**
+   - Developer A: User Story 1 (Phase 3) - Expired detection worker
+   - Developer B: User Story 2 (Phase 4) - Suggestion engine
+   - Developer C: User Story 4 (Phase 6) - Decision workflow
+3. **Merge and integrate**
+4. **Next iteration:**
+   - Developer A: User Story 3 (Phase 5) - Store limits
+   - Developer B: User Story 5 (Phase 7) - Bulk operations
+   - Developer C: Phase 9 - Wizard completion
+5. **Final iteration:**
+   - Developer A: Phase 10 - Subscriptions
+   - Developer B: Phase 11 - Statistics
+   - Developer C: Phase 12 - Polish
+
+---
+
+## Task Count Summary
+
+- **Phase 1 (Setup)**: 4 tasks
+- **Phase 2 (Foundational)**: 11 tasks
+- **Phase 3 (US1 - Expired Detection)**: 7 tasks
+- **Phase 4 (US2 - Brand Suggestions)**: 9 tasks
+- **Phase 5 (US3 - Store Limits)**: 8 tasks
+- **Phase 6 (US4 - Decision Making)**: 10 tasks
+- **Phase 7 (US5 - Bulk Operations)**: 7 tasks
+- **Phase 8 (US6 - Session Persistence)**: 7 tasks
+- **Phase 9 (Completion)**: 12 tasks
+- **Phase 10 (Subscriptions)**: 6 tasks
+- **Phase 11 (Statistics)**: 7 tasks
+- **Phase 12 (Polish)**: 12 tasks
+
+**Total**: 100 tasks
+
+---
+
+## Parallel Opportunities Identified
+
+- **Setup Phase**: 2 parallel opportunities
+- **Foundational Phase**: 6 parallel opportunities (repositories, services)
+- **User Story 1**: 2 parallel opportunities (worker + repo)
+- **User Story 2**: 1 parallel opportunity
+- **User Story 3**: 3 parallel opportunities
+- **User Story 4**: 2 parallel opportunities
+- **User Story 5**: 2 parallel opportunities
+- **User Story 6**: 3 parallel opportunities
+- **Subscriptions**: 2 parallel opportunities
+- **Statistics**: 4 parallel opportunities
+- **Polish**: 3 parallel opportunities
+
+**Total Parallel Opportunities**: ~30 tasks can run in parallel at various stages
+
+---
+
+## Independent Test Criteria Per Story
+
+### User Story 1 - Expired Item Detection
+**Test**: Create shopping list with flyer items, set flyer valid_until to past date, run worker, verify items marked with migration_status='pending'
+
+### User Story 2 - Brand-Aware Suggestions
+**Test**: Provide expired "Coca-Cola 2L", call getItemSuggestions, verify same-brand products ranked highest (score includes +3.0 for brand match)
+
+### User Story 3 - Store Limitation
+**Test**: Create session, select items from Store A, select items from Store B, attempt to select item from Store C, verify error/warning about 2-store limit
+
+### User Story 4 - Decision Making
+**Test**: Start wizard with 5 expired items, call recordDecision for each with different types (REPLACE, SKIP, REMOVE), verify progress updates correctly
+
+### User Story 5 - Bulk Accept
+**Test**: Start wizard with 10 high-confidence items, call bulkAcceptSuggestions, verify all accepted and store count ≤ 2
+
+### User Story 6 - Session Persistence
+**Test**: Start wizard, make 3 decisions, wait 10 minutes, call resumeWizard, verify session restored with correct currentItemIndex
+
+---
+
+## Suggested MVP Scope
+
+**Minimum Viable Product** should include:
+- Phase 1: Setup
+- Phase 2: Foundational
+- Phase 3: User Story 1 (Expired Detection) - Core value proposition
+- Phase 4: User Story 2 (Brand Suggestions) - Core value proposition
+- Phase 6: User Story 4 (Decision Making) - Essential UX
+- Phase 9: Wizard Completion - Close the loop
+
+**Deferred for v2**:
+- Phase 5: User Story 3 (Store Limits) - Nice to have, not blocking
+- Phase 7: User Story 5 (Bulk Operations) - Efficiency feature
+- Phase 8: User Story 6 (Session Persistence) - Edge case handling
+- Phase 10: Subscriptions - Enhancement
+- Phase 11: Statistics - Analytics
+- Phase 12: Full polish - Iterate after user feedback
+
+---
+
+## Notes
+
+- All tasks include exact file paths following Go monolith structure
+- [P] marks tasks that can run in parallel (different files, no dependencies)
+- [Story] labels map tasks to specific user stories for traceability
+- Each user story is independently completable and testable
+- Deterministic scoring ensures consistent, predictable suggestions
+- Two-pass search strategy (brand+name, then name only) maximizes relevance
+- 30-minute session TTL balances usability and resource usage
+- Immutable offer_snapshots provide audit trail for all decisions
+- Feature flag enables gradual rollout and easy rollback
+- Constitution principles followed: Simplicity First, Ship Over Perfect, PostgreSQL Everything, GraphQL From Start

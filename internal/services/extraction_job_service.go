@@ -2,9 +2,13 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 
 	"github.com/kainuguru/kainuguru-api/internal/extractionjob"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -35,7 +39,10 @@ func NewExtractionJobServiceWithRepository(repo extractionjob.Repository) Extrac
 func (s *extractionJobService) GetByID(ctx context.Context, id int64) (*models.ExtractionJob, error) {
 	job, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get extraction job %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("extraction job not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", id)
 	}
 	return job, nil
 }
@@ -44,17 +51,17 @@ func (s *extractionJobService) GetAll(ctx context.Context, filters ExtractionJob
 	filterCopy := filters
 	jobs, err := s.repo.GetAll(ctx, &filterCopy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list extraction jobs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to list extraction jobs")
 	}
 	return jobs, nil
 }
 
 func (s *extractionJobService) Create(ctx context.Context, job *models.ExtractionJob) error {
 	if job == nil {
-		return fmt.Errorf("job cannot be nil")
+		return apperrors.Internal("job cannot be nil")
 	}
 	if job.JobType == "" {
-		return fmt.Errorf("job type is required")
+		return apperrors.Internal("job type is required")
 	}
 	now := s.now()
 	job.Priority = s.normalizePriority(job.Priority)
@@ -70,7 +77,7 @@ func (s *extractionJobService) Create(ctx context.Context, job *models.Extractio
 	job.CreatedAt = now
 	job.UpdatedAt = now
 	if err := s.repo.Create(ctx, job); err != nil {
-		return fmt.Errorf("failed to create extraction job: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create extraction job")
 	}
 	s.logger.Info("extraction job created",
 		slog.Int64("job_id", job.ID),
@@ -82,18 +89,18 @@ func (s *extractionJobService) Create(ctx context.Context, job *models.Extractio
 
 func (s *extractionJobService) Update(ctx context.Context, job *models.ExtractionJob) error {
 	if job == nil {
-		return fmt.Errorf("job cannot be nil")
+		return apperrors.Internal("job cannot be nil")
 	}
 	job.UpdatedAt = s.now()
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to update extraction job %d: %w", job.ID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to update extraction job %d", job.ID)
 	}
 	return nil
 }
 
 func (s *extractionJobService) Delete(ctx context.Context, id int64) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete extraction job %d: %w", id, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to delete extraction job %d", id)
 	}
 	return nil
 }
@@ -102,7 +109,7 @@ func (s *extractionJobService) Delete(ctx context.Context, id int64) error {
 func (s *extractionJobService) GetNextJob(ctx context.Context, jobTypes []string, workerID string) (*models.ExtractionJob, error) {
 	job, err := s.repo.GetNextJob(ctx, jobTypes, workerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to reserve extraction job: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to reserve extraction job")
 	}
 	return job, nil
 }
@@ -110,7 +117,7 @@ func (s *extractionJobService) GetNextJob(ctx context.Context, jobTypes []string
 func (s *extractionJobService) GetPendingJobs(ctx context.Context, jobTypes []string) ([]*models.ExtractionJob, error) {
 	jobs, err := s.repo.GetPendingJobs(ctx, jobTypes, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pending extraction jobs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to list pending extraction jobs")
 	}
 	return jobs, nil
 }
@@ -118,7 +125,7 @@ func (s *extractionJobService) GetPendingJobs(ctx context.Context, jobTypes []st
 func (s *extractionJobService) GetProcessingJobs(ctx context.Context, workerID string) ([]*models.ExtractionJob, error) {
 	jobs, err := s.repo.GetProcessingJobs(ctx, workerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list processing extraction jobs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to list processing extraction jobs")
 	}
 	return jobs, nil
 }
@@ -127,7 +134,7 @@ func (s *extractionJobService) GetProcessingJobs(ctx context.Context, workerID s
 func (s *extractionJobService) StartProcessing(ctx context.Context, jobID int64, workerID string) error {
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", jobID)
 	}
 	now := s.now()
 	job.Status = string(models.JobStatusProcessing)
@@ -137,7 +144,7 @@ func (s *extractionJobService) StartProcessing(ctx context.Context, jobID int64,
 	job.Attempts++
 
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to mark extraction job %d as processing: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to mark extraction job %d as processing", jobID)
 	}
 	return nil
 }
@@ -145,14 +152,14 @@ func (s *extractionJobService) StartProcessing(ctx context.Context, jobID int64,
 func (s *extractionJobService) CompleteJob(ctx context.Context, jobID int64) error {
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", jobID)
 	}
 	now := s.now()
 	job.Status = string(models.JobStatusCompleted)
 	job.CompletedAt = &now
 	job.UpdatedAt = now
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to complete extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to complete extraction job %d", jobID)
 	}
 	return nil
 }
@@ -160,7 +167,7 @@ func (s *extractionJobService) CompleteJob(ctx context.Context, jobID int64) err
 func (s *extractionJobService) FailJob(ctx context.Context, jobID int64, errorMsg string) error {
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", jobID)
 	}
 	now := s.now()
 	job.Status = string(models.JobStatusFailed)
@@ -170,7 +177,7 @@ func (s *extractionJobService) FailJob(ctx context.Context, jobID int64, errorMs
 	job.ErrorCount++
 
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to mark extraction job %d as failed: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to mark extraction job %d as failed", jobID)
 	}
 	return nil
 }
@@ -178,7 +185,7 @@ func (s *extractionJobService) FailJob(ctx context.Context, jobID int64, errorMs
 func (s *extractionJobService) CancelJob(ctx context.Context, jobID int64) error {
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", jobID)
 	}
 	now := s.now()
 	job.Status = string(models.JobStatusCancelled)
@@ -186,7 +193,7 @@ func (s *extractionJobService) CancelJob(ctx context.Context, jobID int64) error
 	job.UpdatedAt = now
 	job.WorkerID = nil
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to cancel extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to cancel extraction job %d", jobID)
 	}
 	return nil
 }
@@ -194,7 +201,7 @@ func (s *extractionJobService) CancelJob(ctx context.Context, jobID int64) error
 func (s *extractionJobService) RetryJob(ctx context.Context, jobID int64, delayMinutes int) error {
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get extraction job %d", jobID)
 	}
 	now := s.now()
 	job.Status = string(models.JobStatusPending)
@@ -206,7 +213,7 @@ func (s *extractionJobService) RetryJob(ctx context.Context, jobID int64, delayM
 	job.ScheduledFor = now.Add(time.Duration(delayMinutes) * time.Minute)
 
 	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to reschedule extraction job %d: %w", jobID, err)
+		return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to reschedule extraction job %d", jobID)
 	}
 	return nil
 }
@@ -237,7 +244,7 @@ func (s *extractionJobService) CreateMatchProductsJob(ctx context.Context, flyer
 func (s *extractionJobService) CleanupExpiredJobs(ctx context.Context) (int64, error) {
 	count, err := s.repo.DeleteExpiredJobs(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired extraction jobs: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cleanup expired extraction jobs")
 	}
 	return count, nil
 }
@@ -246,11 +253,11 @@ func (s *extractionJobService) CleanupCompletedJobs(ctx context.Context, olderTh
 	cutoff := s.now().Add(-olderThan)
 	completed, err := s.repo.DeleteCompletedJobs(ctx, cutoff)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup completed jobs: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cleanup completed jobs")
 	}
 	failed, err := s.repo.DeleteFailedJobs(ctx, cutoff)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup failed jobs: %w", err)
+		return 0, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cleanup failed jobs")
 	}
 	return completed + failed, nil
 }
@@ -263,7 +270,7 @@ func (s *extractionJobService) createJobWithPayload(ctx context.Context, jobType
 		MaxAttempts: 3,
 	}
 	if err := job.SetPayload(payload); err != nil {
-		return fmt.Errorf("failed to encode extraction job payload: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to encode extraction job payload")
 	}
 	return s.Create(ctx, job)
 }

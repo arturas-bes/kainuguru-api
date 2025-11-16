@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package recommendation_test
@@ -74,7 +75,7 @@ func TestShoppingOptimizerIntegration(t *testing.T) {
 	store2 := createTestStore(t, db, "Store 2", "S2")
 	master1 := createTestProductMaster(t, db, "Product 1", "Brand1")
 	master2 := createTestProductMaster(t, db, "Product 2", "Brand2")
-	
+
 	createTestProduct(t, db, store1, master1, "Product 1", 1.99)
 	createTestProduct(t, db, store2, master1, "Product 1", 1.79)
 	createTestProduct(t, db, store1, master2, "Product 2", 2.49)
@@ -116,7 +117,7 @@ func TestShoppingOptimizerIntegration(t *testing.T) {
 		strategies, err := optimizerSvc.RecommendBestStrategy(ctx, items)
 		require.NoError(t, err)
 		assert.Len(t, strategies, 3)
-		
+
 		// Should have all three strategies
 		strategyTypes := make(map[recommendation.OptimizationStrategy]bool)
 		for _, s := range strategies {

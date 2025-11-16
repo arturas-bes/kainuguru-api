@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -13,6 +15,8 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/services/matching"
 	"github.com/kainuguru/kainuguru-api/pkg/normalize"
 	"github.com/uptrace/bun"
+
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type productMasterService struct {
@@ -46,7 +50,10 @@ func NewProductMasterServiceWithRepository(db *bun.DB, repo productmaster.Reposi
 func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.ProductMaster, error) {
 	master, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product master by ID %d: %w", id, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("product master not found with ID %d", id))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get product master by ID %d", id)
 	}
 
 	return master, nil
@@ -55,7 +62,7 @@ func (s *productMasterService) GetByID(ctx context.Context, id int64) (*models.P
 func (s *productMasterService) GetByIDs(ctx context.Context, ids []int64) ([]*models.ProductMaster, error) {
 	masters, err := s.repo.GetByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product masters by IDs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get product masters by IDs")
 	}
 
 	return masters, nil
@@ -65,7 +72,7 @@ func (s *productMasterService) GetAll(ctx context.Context, filters ProductMaster
 	f := filters
 	masters, err := s.repo.GetAll(ctx, &f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product masters: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get product masters")
 	}
 
 	return masters, nil
@@ -85,7 +92,7 @@ func (s *productMasterService) Create(ctx context.Context, master *models.Produc
 	}
 
 	if err := s.repo.Create(ctx, master); err != nil {
-		return fmt.Errorf("failed to create product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create product master")
 	}
 
 	s.logger.Info("product master created",
@@ -105,11 +112,11 @@ func (s *productMasterService) Update(ctx context.Context, master *models.Produc
 
 	rowsAffected, err := s.repo.Update(ctx, master)
 	if err != nil {
-		return fmt.Errorf("failed to update product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update product master")
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("product master not found: %d", master.ID)
+		return apperrors.NotFound(fmt.Sprintf("product master not found: %d", master.ID))
 	}
 
 	s.logger.Info("product master updated",
@@ -123,11 +130,11 @@ func (s *productMasterService) Update(ctx context.Context, master *models.Produc
 func (s *productMasterService) Delete(ctx context.Context, id int64) error {
 	rowsAffected, err := s.repo.SoftDelete(ctx, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete product master")
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("product master not found: %d", id)
+		return apperrors.NotFound(fmt.Sprintf("product master not found: %d", id))
 	}
 
 	s.logger.Info("product master deleted",
@@ -143,7 +150,10 @@ func (s *productMasterService) GetByCanonicalName(ctx context.Context, name stri
 
 	master, err := s.repo.GetByCanonicalName(ctx, normalizedName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product master by canonical name: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("product master not found with canonical name %s", name))
+		}
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get product master by canonical name")
 	}
 
 	return master, nil
@@ -152,7 +162,7 @@ func (s *productMasterService) GetByCanonicalName(ctx context.Context, name stri
 func (s *productMasterService) GetActiveProductMasters(ctx context.Context) ([]*models.ProductMaster, error) {
 	masters, err := s.repo.GetActive(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get active product masters: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get active product masters")
 	}
 
 	return masters, nil
@@ -161,7 +171,7 @@ func (s *productMasterService) GetActiveProductMasters(ctx context.Context) ([]*
 func (s *productMasterService) GetVerifiedProductMasters(ctx context.Context) ([]*models.ProductMaster, error) {
 	masters, err := s.repo.GetVerified(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get verified product masters: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get verified product masters")
 	}
 
 	return masters, nil
@@ -170,7 +180,7 @@ func (s *productMasterService) GetVerifiedProductMasters(ctx context.Context) ([
 func (s *productMasterService) GetProductMastersForReview(ctx context.Context) ([]*models.ProductMaster, error) {
 	masters, err := s.repo.GetForReview(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product masters for review: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get product masters for review")
 	}
 
 	return masters, nil
@@ -193,7 +203,7 @@ func (s *productMasterService) FindMatchingMasters(ctx context.Context, productN
 
 func (s *productMasterService) FindMatchingMastersWithScores(ctx context.Context, productName string, brand string, category string) ([]*ProductMasterMatch, error) {
 	if strings.TrimSpace(productName) == "" {
-		return nil, fmt.Errorf("product name cannot be empty")
+		return nil, apperrors.Validation("product name cannot be empty")
 	}
 
 	product := &models.Product{
@@ -211,7 +221,7 @@ func (s *productMasterService) FindMatchingMastersWithScores(ctx context.Context
 
 	matchResults, err := s.matcher.FindBestMatches(ctx, product, 5)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find matching masters: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to find matching masters")
 	}
 
 	var matches []*ProductMasterMatch
@@ -249,7 +259,7 @@ func (s *productMasterService) MatchProduct(ctx context.Context, productID int, 
 func (s *productMasterService) FindBestMatch(ctx context.Context, product *models.Product, limit int) ([]*ProductMasterMatch, error) {
 	matchResults, err := s.matcher.FindBestMatches(ctx, product, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find best matches: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to find best matches")
 	}
 
 	var matches []*ProductMasterMatch
@@ -292,7 +302,7 @@ func (s *productMasterService) CreateFromProduct(ctx context.Context, product *m
 	}
 
 	if err := s.repo.CreateMasterWithMatch(ctx, product, master); err != nil {
-		return nil, fmt.Errorf("failed to create master from product: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create master from product")
 	}
 
 	s.logger.Info("created master from product",
@@ -308,7 +318,10 @@ func (s *productMasterService) CreateFromProduct(ctx context.Context, product *m
 func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, productID int) (*models.ProductMaster, error) {
 	product, err := s.repo.GetProduct(ctx, productID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.NotFound(fmt.Sprintf("product not found with ID %d", productID))
+		}
+		return nil, apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to get product %d", productID)
 	}
 
 	now := time.Now()
@@ -337,7 +350,7 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 	}
 
 	if err := s.repo.CreateMasterAndLinkProduct(ctx, product, master); err != nil {
-		return nil, fmt.Errorf("failed to create master: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create master")
 	}
 
 	s.logger.Info("created master from product",
@@ -352,7 +365,7 @@ func (s *productMasterService) CreateMasterFromProduct(ctx context.Context, prod
 // Verification operations
 func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID int64, verifierID string) error {
 	if err := s.repo.VerifyMaster(ctx, masterID, 1.0, time.Now()); err != nil {
-		return fmt.Errorf("failed to verify product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to verify product master")
 	}
 
 	s.logger.Info("product master verified",
@@ -366,11 +379,11 @@ func (s *productMasterService) VerifyProductMaster(ctx context.Context, masterID
 func (s *productMasterService) DeactivateProductMaster(ctx context.Context, masterID int64) error {
 	rowsAffected, err := s.repo.DeactivateMaster(ctx, masterID, time.Now())
 	if err != nil {
-		return fmt.Errorf("failed to deactivate product master: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to deactivate product master")
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("product master not found: %d", masterID)
+		return apperrors.NotFound(fmt.Sprintf("product master not found: %d", masterID))
 	}
 
 	s.logger.Info("product master deactivated",
@@ -382,7 +395,7 @@ func (s *productMasterService) DeactivateProductMaster(ctx context.Context, mast
 
 func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int64, duplicateOfID int64) error {
 	if err := s.repo.MarkAsDuplicate(ctx, masterID, duplicateOfID); err != nil {
-		return fmt.Errorf("failed to mark as duplicate: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to mark as duplicate")
 	}
 
 	s.logger.Info("product master marked as duplicate",
@@ -397,7 +410,7 @@ func (s *productMasterService) MarkAsDuplicate(ctx context.Context, masterID int
 func (s *productMasterService) GetMatchingStatistics(ctx context.Context, masterID int64) (*ProductMasterStats, error) {
 	stats, err := s.repo.GetMatchingStatistics(ctx, masterID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get matching statistics: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get matching statistics")
 	}
 
 	successRate := 100.0
@@ -418,7 +431,7 @@ func (s *productMasterService) GetMatchingStatistics(ctx context.Context, master
 func (s *productMasterService) GetOverallMatchingStats(ctx context.Context) (*OverallMatchingStats, error) {
 	stats, err := s.repo.GetOverallStatistics(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get overall stats: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get overall stats")
 	}
 
 	result := &OverallMatchingStats{

@@ -166,12 +166,12 @@ func (f *Flyer) GetFolderName() string {
 
 	dateStr := f.ValidFrom.Format("2006-01-02")
 	storeCode := strings.ToLower(f.Store.Code)
-	
+
 	title := "leidinys" // default
 	if f.Title != nil && *f.Title != "" {
 		title = slugify(*f.Title)
 	}
-	
+
 	return fmt.Sprintf("%s-%s-%s", dateStr, storeCode, title)
 }
 
@@ -181,10 +181,10 @@ func (f *Flyer) GetImageBasePath() string {
 	if f.Store == nil {
 		return ""
 	}
-	
+
 	storeCode := strings.ToLower(f.Store.Code)
 	folderName := f.GetFolderName()
-	
+
 	return fmt.Sprintf("flyers/%s/%s", storeCode, folderName)
 }
 
@@ -192,7 +192,7 @@ func (f *Flyer) GetImageBasePath() string {
 func slugify(title string) string {
 	// Convert to lowercase
 	slug := strings.ToLower(title)
-	
+
 	// Replace Lithuanian characters
 	replacements := map[string]string{
 		"ą": "a", "č": "c", "ę": "e", "ė": "e",
@@ -201,31 +201,31 @@ func slugify(title string) string {
 	for lt, en := range replacements {
 		slug = strings.ReplaceAll(slug, lt, en)
 	}
-	
+
 	// Remove non-alphanumeric characters (keep spaces for now)
 	reg := regexp.MustCompile("[^a-z0-9 -]")
 	slug = reg.ReplaceAllString(slug, "")
-	
+
 	// Replace spaces with hyphens
 	slug = strings.ReplaceAll(slug, " ", "-")
-	
+
 	// Remove multiple consecutive hyphens
 	reg = regexp.MustCompile("-+")
 	slug = reg.ReplaceAllString(slug, "-")
-	
+
 	// Trim hyphens from start/end
 	slug = strings.Trim(slug, "-")
-	
+
 	// Limit length
 	if len(slug) > 30 {
 		slug = slug[:30]
 		// Trim trailing hyphen if cut in middle of word
 		slug = strings.TrimRight(slug, "-")
 	}
-	
+
 	if slug == "" {
 		slug = "leidinys"
 	}
-	
+
 	return slug
 }

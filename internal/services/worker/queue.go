@@ -3,11 +3,13 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type JobType string
@@ -82,7 +84,7 @@ func (q *JobQueue) Enqueue(ctx context.Context, job *Job) error {
 
 	jobData, err := json.Marshal(job)
 	if err != nil {
-		return fmt.Errorf("failed to marshal job: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal job")
 	}
 
 	// If job is scheduled, add to scheduled set
@@ -106,22 +108,22 @@ func (q *JobQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, er
 	// First check for scheduled jobs that are ready
 	err := q.moveScheduledJobs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to move scheduled jobs: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to move scheduled jobs")
 	}
 
 	// Pop job with highest priority
 	result, err := q.redis.BZPopMin(ctx, timeout, q.queueName).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // No jobs available
 		}
-		return nil, fmt.Errorf("failed to dequeue job: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to dequeue job")
 	}
 
 	var job Job
 	err = json.Unmarshal([]byte(result.Member.(string)), &job)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unmarshal job")
 	}
 
 	// Move to processing set
@@ -132,12 +134,12 @@ func (q *JobQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, er
 
 	jobData, err := json.Marshal(job)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal processing job: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal processing job")
 	}
 
 	err = q.redis.SAdd(ctx, q.processingSet, string(jobData)).Err()
 	if err != nil {
-		return nil, fmt.Errorf("failed to add job to processing set: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to add job to processing set")
 	}
 
 	return &job, nil
@@ -151,7 +153,7 @@ func (q *JobQueue) Complete(ctx context.Context, job *Job) error {
 
 	jobData, err := json.Marshal(job)
 	if err != nil {
-		return fmt.Errorf("failed to marshal completed job: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal completed job")
 	}
 
 	// Remove from processing set
@@ -174,7 +176,7 @@ func (q *JobQueue) Fail(ctx context.Context, job *Job, errorMsg string) error {
 
 		jobData, err := json.Marshal(job)
 		if err != nil {
-			return fmt.Errorf("failed to marshal retry job: %w", err)
+			return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal retry job")
 		}
 
 		// Remove from processing set
@@ -196,7 +198,7 @@ func (q *JobQueue) Fail(ctx context.Context, job *Job, errorMsg string) error {
 	job.Status = JobStatusFailed
 	jobData, err := json.Marshal(job)
 	if err != nil {
-		return fmt.Errorf("failed to marshal failed job: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal failed job")
 	}
 
 	// Remove from processing set
@@ -213,22 +215,22 @@ func (q *JobQueue) Fail(ctx context.Context, job *Job, errorMsg string) error {
 func (q *JobQueue) GetQueueStats(ctx context.Context) (map[string]int64, error) {
 	pending, err := q.redis.ZCard(ctx, q.queueName).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending count: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get pending count")
 	}
 
 	processing, err := q.redis.SCard(ctx, q.processingSet).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get processing count: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get processing count")
 	}
 
 	scheduled, err := q.redis.ZCard(ctx, q.queueName+":scheduled").Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get scheduled count: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get scheduled count")
 	}
 
 	deadLetter, err := q.redis.SCard(ctx, q.deadLetterSet).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dead letter count: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get dead letter count")
 	}
 
 	return map[string]int64{
@@ -294,7 +296,7 @@ func (q *JobQueue) CleanupStaleJobs(ctx context.Context, timeout time.Duration) 
 
 	members, err := q.redis.SMembers(ctx, q.processingSet).Result()
 	if err != nil {
-		return fmt.Errorf("failed to get processing jobs: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get processing jobs")
 	}
 
 	for _, member := range members {
@@ -307,7 +309,7 @@ func (q *JobQueue) CleanupStaleJobs(ctx context.Context, timeout time.Duration) 
 			// Job has been processing too long, move back to queue for retry
 			err := q.Fail(ctx, &job, "job processing timeout")
 			if err != nil {
-				return fmt.Errorf("failed to fail stale job %s: %w", job.ID, err)
+				return apperrors.Wrapf(err, apperrors.ErrorTypeInternal, "failed to fail stale job %s", job.ID)
 			}
 		}
 	}

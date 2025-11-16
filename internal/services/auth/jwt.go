@@ -3,12 +3,12 @@ package auth
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 // jwtService implements JWTService
@@ -32,13 +32,13 @@ func (j *jwtService) GenerateTokenPair(userID uuid.UUID, sessionID uuid.UUID) (*
 	// Generate access token
 	accessToken, err := j.generateToken(userID, sessionID, "", "access", now, accessExpiry)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate access token")
 	}
 
 	// Generate refresh token
 	refreshToken, err := j.generateToken(userID, sessionID, "", "refresh", now, refreshExpiry)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate refresh token")
 	}
 
 	return &TokenPair{
@@ -69,12 +69,12 @@ func (j *jwtService) GetTokenHash(token string) string {
 func (j *jwtService) ExtractClaims(token string) (*TokenClaims, error) {
 	parsedToken, _, err := new(jwt.Parser).ParseUnverified(token, &jwt.MapClaims{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to parse token")
 	}
 
 	claims, ok := parsedToken.Claims.(*jwt.MapClaims)
 	if !ok {
-		return nil, fmt.Errorf("invalid token claims")
+		return nil, apperrors.Authentication("invalid token claims")
 	}
 
 	return j.mapClaimsToTokenClaims(*claims)
@@ -97,7 +97,7 @@ func (j *jwtService) generateToken(userID, sessionID uuid.UUID, email, tokenType
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(j.config.JWTSecret))
 	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
+		return "", apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to sign token")
 	}
 
 	return tokenString, nil
@@ -109,23 +109,23 @@ func (j *jwtService) validateToken(tokenString, expectedType string) (*TokenClai
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Validate signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, apperrors.Authentication("unexpected signing method: %v")
 		}
 		return []byte(j.config.JWTSecret), nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse token: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to parse token")
 	}
 
 	if !token.Valid {
-		return nil, fmt.Errorf("invalid token")
+		return nil, apperrors.Authentication("invalid token")
 	}
 
 	// Extract claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, fmt.Errorf("invalid token claims")
+		return nil, apperrors.Authentication("invalid token claims")
 	}
 
 	tokenClaims, err := j.mapClaimsToTokenClaims(claims)
@@ -135,21 +135,21 @@ func (j *jwtService) validateToken(tokenString, expectedType string) (*TokenClai
 
 	// Validate token type
 	if tokenClaims.TokenType != expectedType {
-		return nil, fmt.Errorf("invalid token type: expected %s, got %s", expectedType, tokenClaims.TokenType)
+		return nil, apperrors.Validation("invalid token type: expected %s, got %s")
 	}
 
 	// Validate expiry
 	if time.Now().After(tokenClaims.ExpiresAt) {
-		return nil, fmt.Errorf("token has expired")
+		return nil, apperrors.Authentication("token has expired")
 	}
 
 	// Validate audience and issuer
 	if tokenClaims.Audience != j.config.TokenAudience {
-		return nil, fmt.Errorf("invalid token audience")
+		return nil, apperrors.Authentication("invalid token audience")
 	}
 
 	if tokenClaims.Issuer != j.config.TokenIssuer {
-		return nil, fmt.Errorf("invalid token issuer")
+		return nil, apperrors.Authentication("invalid token issuer")
 	}
 
 	return tokenClaims, nil
@@ -160,22 +160,22 @@ func (j *jwtService) mapClaimsToTokenClaims(claims jwt.MapClaims) (*TokenClaims,
 	// Extract and validate required claims
 	subStr, ok := claims["sub"].(string)
 	if !ok {
-		return nil, fmt.Errorf("invalid or missing subject claim")
+		return nil, apperrors.Authentication("invalid or missing subject claim")
 	}
 
 	userID, err := uuid.Parse(subStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user ID in subject claim: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "invalid user ID in subject claim")
 	}
 
 	sidStr, ok := claims["sid"].(string)
 	if !ok {
-		return nil, fmt.Errorf("invalid or missing session ID claim")
+		return nil, apperrors.Authentication("invalid or missing session ID claim")
 	}
 
 	sessionID, err := uuid.Parse(sidStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid session ID claim: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "invalid session ID claim")
 	}
 
 	email, _ := claims["email"].(string) // Optional
@@ -193,7 +193,7 @@ func (j *jwtService) mapClaimsToTokenClaims(claims jwt.MapClaims) (*TokenClaims,
 	if exp, ok := claims["exp"].(float64); ok {
 		expiresAt = time.Unix(int64(exp), 0)
 	} else {
-		return nil, fmt.Errorf("missing or invalid expiry claim")
+		return nil, apperrors.Authentication("missing or invalid expiry claim")
 	}
 
 	return &TokenClaims{
@@ -214,13 +214,13 @@ func (j *jwtService) ValidateTokenStructure(tokenString string) error {
 	// Basic JWT structure validation (header.payload.signature)
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
-		return fmt.Errorf("invalid token structure")
+		return apperrors.Validation("invalid token structure")
 	}
 
 	// Try to decode without verification
 	_, _, err := new(jwt.Parser).ParseUnverified(tokenString, &jwt.MapClaims{})
 	if err != nil {
-		return fmt.Errorf("invalid token format: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "invalid token format")
 	}
 
 	return nil

@@ -20,20 +20,20 @@ type Product struct {
 	ProductMasterID *int `bun:"product_master_id" json:"product_master_id,omitempty"`
 
 	// Basic product information
-	Name           string  `bun:"name,notnull" json:"name"`
-	NormalizedName string  `bun:"normalized_name,notnull" json:"normalized_name"`
-	Brand          *string `bun:"brand" json:"brand,omitempty"`
-	Category       *string `bun:"category" json:"category,omitempty"`
-	Subcategory    *string `bun:"subcategory" json:"subcategory,omitempty"`
-	Description    *string `bun:"description" json:"description,omitempty"`
+	Name           string   `bun:"name,notnull" json:"name"`
+	NormalizedName string   `bun:"normalized_name,notnull" json:"normalized_name"`
+	Brand          *string  `bun:"brand" json:"brand,omitempty"`
+	Category       *string  `bun:"category" json:"category,omitempty"`
+	Subcategory    *string  `bun:"subcategory" json:"subcategory,omitempty"`
+	Description    *string  `bun:"description" json:"description,omitempty"`
 	Tags           []string `bun:"tags,array" json:"tags,omitempty"`
 
 	// Pricing information
-	CurrentPrice     float64  `bun:"current_price,notnull" json:"current_price"`
-	OriginalPrice    *float64 `bun:"original_price" json:"original_price,omitempty"`
-	DiscountPercent  *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
-	SpecialDiscount  *string  `bun:"special_discount" json:"special_discount,omitempty"` // e.g., "1+1", "3 už 2"
-	Currency         string   `bun:"-" json:"currency"`                                   // Not stored in DB, always EUR
+	CurrentPrice    float64  `bun:"current_price,notnull" json:"current_price"`
+	OriginalPrice   *float64 `bun:"original_price" json:"original_price,omitempty"`
+	DiscountPercent *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
+	SpecialDiscount *string  `bun:"special_discount" json:"special_discount,omitempty"` // e.g., "1+1", "3 už 2"
+	Currency        string   `bun:"-" json:"currency"`                                  // Not stored in DB, always EUR
 
 	// Product specifications
 	UnitSize    *string `bun:"unit_size" json:"unit_size,omitempty"`

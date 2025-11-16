@@ -3,10 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	apperrors "github.com/kainuguru/kainuguru-api/pkg/errors"
 )
 
 type ProductData struct {
@@ -71,19 +73,19 @@ func (ec *ExtractionCache) SetExtractionResult(ctx context.Context, result *Extr
 
 	data, err := json.Marshal(result)
 	if err != nil {
-		return fmt.Errorf("failed to marshal extraction result: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal extraction result")
 	}
 
 	err = ec.redis.Set(ctx, key, data, ec.defaultTTL).Err()
 	if err != nil {
-		return fmt.Errorf("failed to cache extraction result: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cache extraction result")
 	}
 
 	// Add to flyer index
 	flyerKey := ec.flyerIndexKey(result.FlyerID)
 	err = ec.redis.SAdd(ctx, flyerKey, result.PageNum).Err()
 	if err != nil {
-		return fmt.Errorf("failed to update flyer index: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update flyer index")
 	}
 
 	// Set TTL on flyer index
@@ -106,16 +108,16 @@ func (ec *ExtractionCache) GetExtractionResult(ctx context.Context, flyerID stri
 
 	data, err := ec.redis.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // Not found
 		}
-		return nil, fmt.Errorf("failed to get extraction result from cache: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get extraction result from cache")
 	}
 
 	var result ExtractionResult
 	err = json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal extraction result: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unmarshal extraction result")
 	}
 
 	return &result, nil
@@ -126,10 +128,10 @@ func (ec *ExtractionCache) GetFlyerExtractions(ctx context.Context, flyerID stri
 
 	pageNums, err := ec.redis.SMembers(ctx, flyerKey).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return []*ExtractionResult{}, nil
 		}
-		return nil, fmt.Errorf("failed to get page numbers for flyer: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get page numbers for flyer")
 	}
 
 	results := make([]*ExtractionResult, 0, len(pageNums))
@@ -161,18 +163,18 @@ func (ec *ExtractionCache) setProductData(ctx context.Context, product *ProductD
 
 	data, err := json.Marshal(product)
 	if err != nil {
-		return fmt.Errorf("failed to marshal product data: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to marshal product data")
 	}
 
 	err = ec.redis.Set(ctx, productKey, data, ec.defaultTTL).Err()
 	if err != nil {
-		return fmt.Errorf("failed to cache product: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to cache product")
 	}
 
 	// Add to search indices
 	err = ec.addToSearchIndices(ctx, product)
 	if err != nil {
-		return fmt.Errorf("failed to update search indices: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update search indices")
 	}
 
 	return nil
@@ -183,16 +185,16 @@ func (ec *ExtractionCache) GetProduct(ctx context.Context, productID string) (*P
 
 	data, err := ec.redis.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // Not found
 		}
-		return nil, fmt.Errorf("failed to get product from cache: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to get product from cache")
 	}
 
 	var product ProductData
 	err = json.Unmarshal([]byte(data), &product)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal product data: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to unmarshal product data")
 	}
 
 	return &product, nil
@@ -203,8 +205,8 @@ func (ec *ExtractionCache) SearchProductsByName(ctx context.Context, searchTerm 
 	nameKey := ec.nameIndexKey(searchTerm)
 
 	productIDs, err := ec.redis.SMembers(ctx, nameKey).Result()
-	if err != nil && err != redis.Nil {
-		return nil, fmt.Errorf("failed to search products by name: %w", err)
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to search products by name")
 	}
 
 	// If no exact match, try fuzzy search with pattern matching
@@ -212,7 +214,7 @@ func (ec *ExtractionCache) SearchProductsByName(ctx context.Context, searchTerm 
 		pattern := ec.keyPrefix + "name:*" + searchTerm + "*"
 		keys, err := ec.redis.Keys(ctx, pattern).Result()
 		if err != nil {
-			return nil, fmt.Errorf("failed to perform fuzzy search: %w", err)
+			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to perform fuzzy search")
 		}
 
 		// Collect product IDs from all matching keys
@@ -250,10 +252,10 @@ func (ec *ExtractionCache) SearchProductsByBrand(ctx context.Context, brand stri
 
 	productIDs, err := ec.redis.SMembers(ctx, brandKey).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return []*ProductData{}, nil
 		}
-		return nil, fmt.Errorf("failed to search products by brand: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to search products by brand")
 	}
 
 	// Limit results
@@ -346,7 +348,7 @@ func (ec *ExtractionCache) DeleteExtraction(ctx context.Context, flyerID string,
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to delete extraction from cache: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete extraction from cache")
 	}
 
 	return nil
@@ -371,7 +373,7 @@ func (ec *ExtractionCache) InvalidateFlyer(ctx context.Context, flyerID string) 
 	flyerKey := ec.flyerIndexKey(flyerID)
 	err = ec.redis.Del(ctx, flyerKey).Err()
 	if err != nil {
-		return fmt.Errorf("failed to delete flyer index: %w", err)
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to delete flyer index")
 	}
 
 	return nil
@@ -382,27 +384,27 @@ func (ec *ExtractionCache) GetCacheStats(ctx context.Context) (map[string]interf
 	extractionPattern := ec.keyPrefix + "result:*"
 	extractionKeys, err := ec.redis.Keys(ctx, extractionPattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count extractions: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count extractions")
 	}
 
 	// Count total products
 	productPattern := ec.keyPrefix + "product:*"
 	productKeys, err := ec.redis.Keys(ctx, productPattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count products: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count products")
 	}
 
 	// Count search indices
 	namePattern := ec.keyPrefix + "name:*"
 	nameKeys, err := ec.redis.Keys(ctx, namePattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count name indices: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count name indices")
 	}
 
 	brandPattern := ec.keyPrefix + "brand:*"
 	brandKeys, err := ec.redis.Keys(ctx, brandPattern).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to count brand indices: %w", err)
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to count brand indices")
 	}
 
 	return map[string]interface{}{
