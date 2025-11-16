@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kainuguru/kainuguru-api/internal/models"
+	"github.com/kainuguru/kainuguru-api/internal/monitoring"
 )
 
 // GetExpiredItemsForList retrieves all expired items for a shopping list
@@ -17,6 +18,11 @@ func (s *wizardService) GetExpiredItemsForList(ctx context.Context, listID int64
 			"list_id", listID,
 			"error", err)
 		return nil, err
+	}
+
+	// Track expired items detected for Prometheus metrics
+	if len(items) > 0 {
+		monitoring.WizardItemsFlaggedTotal.WithLabelValues("expired").Add(float64(len(items)))
 	}
 
 	s.logger.Info("retrieved expired items",

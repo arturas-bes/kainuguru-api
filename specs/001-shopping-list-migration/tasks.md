@@ -89,9 +89,9 @@
 - [X] T017 [P] [US1] Create internal/services/wizard/expired_detection.go with GetExpiredItemsForList(ctx, listID) using shopping_list_repository.GetExpiredItems()
 - [X] T018 [P] [US1] Extend internal/graphql/resolvers/shopping_list.resolvers.go to add ShoppingList.expiredItemCount field resolver (calls GetExpiredItemsForList, returns count)
 - [X] T019 [P] [US1] Extend internal/graphql/resolvers/shopping_list.resolvers.go to add ShoppingList.hasActiveWizardSession field resolver (checks Redis for active session)
-- [ ] T020 [US1] Create worker internal/workers/expire_flyer_items.go that runs daily at midnight to mark items as expired when flyers pass valid_to (uses cron, updates shopping_list_items)
-- [ ] T021 [US1] Add Prometheus counter wizard_items_flagged_total in internal/monitoring/metrics.go, increment in GetExpiredItemsForList()
-- [ ] T022 [US1] Add zerolog fields (list_id, expired_count) to expired detection service calls
+- [X] T020 [US1] Create worker internal/workers/expire_flyer_items.go that runs daily at midnight to mark items as expired when flyers pass valid_to (uses cron, updates shopping_list_items)
+- [X] T021 [US1] Add Prometheus counter wizard_items_flagged_total in internal/monitoring/metrics.go, increment in GetExpiredItemsForList()
+- [X] T022 [US1] Add zerolog fields (list_id, expired_count) to expired detection service calls
 
 **Checkpoint**: Users can see expired item counts and are notified to start wizard
 
