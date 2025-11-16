@@ -267,9 +267,25 @@ func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) 
 	s.logger.Info("DecideItem called",
 		"session_id", req.SessionID,
 		"item_id", req.ItemID,
-		"decision", req.Decision)
+		"decision", req.Decision,
+		"idempotency_key", req.IdempotencyKey)
 
-	// 1. Load session from Redis
+	// 1. Check idempotency if key provided
+	if req.IdempotencyKey != "" {
+		cachedSessionID, err := s.wizardCache.GetIdempotencyKey(ctx, req.IdempotencyKey)
+		if err == nil && cachedSessionID != uuid.Nil {
+			// Idempotency key found, load the cached session
+			cachedSession, err := s.wizardCache.GetSession(ctx, cachedSessionID)
+			if err == nil && cachedSession != nil {
+				s.logger.Info("returning cached decision result",
+					"session_id", cachedSessionID,
+					"idempotency_key", req.IdempotencyKey)
+				return cachedSession, nil
+			}
+		}
+	}
+
+	// 2. Load session from Redis
 	session, err := s.wizardCache.GetSession(ctx, req.SessionID)
 	if err != nil {
 		s.logger.Error("failed to load wizard session",
@@ -335,6 +351,16 @@ func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) 
 			"session_id", req.SessionID,
 			"error", err)
 		return nil, fmt.Errorf("failed to save decision: %w", err)
+	}
+
+	// 8. Store idempotency result if key provided
+	if req.IdempotencyKey != "" {
+		if err := s.wizardCache.SaveIdempotencyKey(ctx, req.IdempotencyKey, session.ID); err != nil {
+			// Log but don't fail the request if idempotency storage fails
+			s.logger.Warn("failed to store idempotency result",
+				"idempotency_key", req.IdempotencyKey,
+				"error", err)
+		}
 	}
 
 	s.logger.Info("decision recorded successfully",

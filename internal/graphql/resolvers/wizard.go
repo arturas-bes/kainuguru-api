@@ -141,13 +141,17 @@ func (r *mutationResolver) RecordDecision(ctx context.Context, input model.Recor
 		return nil, fmt.Errorf("invalid decision type: %s", input.Decision)
 	}
 
+	// Generate idempotency key from session+item+decision if not in future GraphQL spec
+	// For now, use session:item:decision as the key
+	idempotencyKey := fmt.Sprintf("wizard:decision:%s:%d:%s", sessionUUID.String(), itemID, decisionStr)
+
 	// Build service request
 	req := &wizard.DecideItemRequest{
 		SessionID:      sessionUUID,
 		ItemID:         itemID,
 		Decision:       decisionStr,
 		SuggestionID:   suggestionID,
-		IdempotencyKey: "", // TODO: Implement in T037
+		IdempotencyKey: idempotencyKey,
 	}
 
 	// Call service
