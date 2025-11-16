@@ -250,15 +250,38 @@ func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest
 
 // GetSession retrieves a wizard session
 func (s *wizardService) GetSession(ctx context.Context, sessionID uuid.UUID) (*models.WizardSession, error) {
-	// TODO: Implement in Phase 3 (T017-T022)
 	s.logger.Info("GetSession called", "session_id", sessionID)
-	return nil, nil
+
+	// Load session from Redis
+	session, err := s.wizardCache.GetSession(ctx, sessionID)
+	if err != nil {
+		s.logger.Error("failed to load wizard session",
+			"session_id", sessionID,
+			"error", err)
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	s.logger.Info("session loaded successfully",
+		"session_id", sessionID,
+		"status", session.Status,
+		"expired", session.IsExpired())
+
+	return session, nil
 }
 
 // CancelWizard cancels an active wizard session
 func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) error {
-	// TODO: Implement in Phase 10 (T060-T066)
 	s.logger.Info("CancelWizard called", "session_id", sessionID)
+
+	// Delete session from Redis
+	if err := s.wizardCache.DeleteSession(ctx, sessionID); err != nil {
+		s.logger.Error("failed to delete wizard session",
+			"session_id", sessionID,
+			"error", err)
+		return fmt.Errorf("failed to cancel session: %w", err)
+	}
+
+	s.logger.Info("session cancelled successfully", "session_id", sessionID)
 	return nil
 }
 

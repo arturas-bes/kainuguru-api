@@ -32,14 +32,43 @@ func (r *queryResolver) ActiveWizardSession(ctx context.Context) (*model.WizardS
 // WizardSession returns a wizard session by ID
 func (r *queryResolver) WizardSession(ctx context.Context, id string) (*model.WizardSession, error) {
 	// Require authentication
-	_, ok := middleware.GetUserFromContext(ctx)
+	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	// TODO: Implement session lookup by ID (T038)
-	_ = id
-	return nil, fmt.Errorf("not implemented yet")
+	// Parse session ID
+	sessionUUID, err := parseUUID(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session ID: %w", err)
+	}
+
+	// Load session from Redis
+	session, err := r.wizardService.GetSession(ctx, sessionUUID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Verify user owns the session (security check)
+	if session.UserID != int64(userID.ID()) {
+		return nil, fmt.Errorf("access denied: session does not belong to current user")
+	}
+
+	// Check if session is expired (T039)
+	if session.IsExpired() {
+		// Delete expired session from cache
+		_ = r.wizardService.CancelWizard(ctx, sessionUUID)
+		
+		// Return session with EXPIRED status
+		gqlSession := mapWizardSessionToGraphQL(session)
+		gqlSession.Status = model.WizardStatusExpired
+		return gqlSession, nil
+	}
+
+	// Map to GraphQL model
+	gqlSession := mapWizardSessionToGraphQL(session)
+
+	return gqlSession, nil
 }
 
 // ============================================
@@ -87,6 +116,9 @@ func (r *mutationResolver) StartWizard(ctx context.Context, input model.StartWiz
 	if err != nil {
 		return nil, fmt.Errorf("failed to start wizard session: %w", err)
 	}
+
+	// Session is newly created, so it cannot be expired
+	// Expiration check is not needed here (T039)
 
 	// TODO: Lock the shopping list (FR-016) - Phase 13 (T076-T079)
 	// This will be implemented in a future task
@@ -154,7 +186,7 @@ func (r *mutationResolver) RecordDecision(ctx context.Context, input model.Recor
 		IdempotencyKey: idempotencyKey,
 	}
 
-	// Call service
+	// Call service (includes expiration check in DecideItem - T039)
 	session, err := r.wizardService.DecideItem(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to record decision: %w", err)
