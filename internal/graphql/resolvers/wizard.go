@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
@@ -81,6 +82,19 @@ func (r *mutationResolver) StartWizard(ctx context.Context, input model.StartWiz
 	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("authentication required")
+	}
+
+	// T069: Rate limiting - max 5 sessions per user per hour
+	if r.rateLimiter != nil {
+		rateLimitKey := fmt.Sprintf("wizard:rate_limit:start:%s", userID.String())
+		allowed, err := r.rateLimiter.CheckRateLimit(ctx, rateLimitKey, 5, 1*time.Hour)
+		if err != nil {
+			// Log error but don't block the request (soft limit)
+			// In production, this should use structured logging
+			_ = err
+		} else if !allowed {
+			return nil, fmt.Errorf("rate limit exceeded: maximum 5 wizard sessions per hour")
+		}
 	}
 
 	// Parse shopping list ID
