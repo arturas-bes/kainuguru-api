@@ -268,10 +268,10 @@
 
 **Purpose**: Cross-cutting concerns and final integration
 
-- [ ] T068 [P] Add DataLoader for Store, Product, ProductMaster to prevent N+1 queries in wizardSession resolver (use existing dataloader pattern from codebase)
-- [ ] T069 [P] Add rate limiting to startWizard mutation (max 5 sessions per user per hour) to prevent abuse
-- [ ] T070 Update internal/graphql/schema/shopping_list.graphqls to extend ShoppingList type with expiredItemCount and hasActiveWizardSession fields
-- [ ] T071 [P] Create quickstart example in specs/001-shopping-list-migration/quickstart.md showing cURL/GraphQL calls for full wizard flow
+- [X] T068 [P] Add DataLoader for Store, Product, ProductMaster to prevent N+1 queries in wizardSession resolver (use existing dataloader pattern from codebase)
+- [X] T069 [P] Add rate limiting to startWizard mutation (max 5 sessions per user per hour) to prevent abuse
+- [X] T070 Update internal/graphql/schema/shopping_list.graphqls to extend ShoppingList type with expiredItemCount and hasActiveWizardSession fields
+- [X] T071 [P] Create quickstart example in specs/001-shopping-list-migration/quickstart.md showing cURL/GraphQL calls for full wizard flow
 - [ ] T072 Add comment documentation to all public wizard service methods (godoc format)
 - [ ] T073 Run gqlgen generate final time to regenerate resolvers with all changes
 - [ ] T074 Run go fmt ./... and go vet ./... on all wizard code
