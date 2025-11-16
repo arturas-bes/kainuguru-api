@@ -265,6 +265,36 @@ func (r *shoppingListResolver) CanBeShared(ctx context.Context, obj *models.Shop
 	return obj.CanBeShared(), nil
 }
 
+// ExpiredItemCount returns the count of expired items in this shopping list
+// Used for displaying "3 items need updating" notification
+func (r *shoppingListResolver) ExpiredItemCount(ctx context.Context, obj *models.ShoppingList) (int, error) {
+	if r.wizardService == nil {
+		return 0, nil // Wizard service not initialized
+	}
+
+	count, err := r.wizardService.CountExpiredItems(ctx, obj.ID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count expired items: %w", err)
+	}
+
+	return count, nil
+}
+
+// HasActiveWizardSession returns true if this shopping list has an active wizard session
+// Used for displaying "migration in progress" indicator
+func (r *shoppingListResolver) HasActiveWizardSession(ctx context.Context, obj *models.ShoppingList) (bool, error) {
+	if r.wizardService == nil {
+		return false, nil // Wizard service not initialized
+	}
+
+	hasActive, err := r.wizardService.HasActiveWizardSession(ctx, obj.ID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check wizard session: %w", err)
+	}
+
+	return hasActive, nil
+}
+
 // Update User resolver to return shopping lists - Phase 2.2
 
 // ShoppingLists resolves the shoppingLists field on User (updating Phase 2.1 stub)

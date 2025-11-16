@@ -38,6 +38,9 @@ type ShoppingListItem struct {
 	StoreID         *int   `bun:"store_id" json:"store_id"`
 	FlyerID         *int   `bun:"flyer_id" json:"flyer_id"`
 
+	// Wizard migration tracking (FR-020 compliance)
+	Origin string `bun:"origin,default:'free_text'" json:"origin"` // 'flyer' or 'free_text'
+
 	// Price tracking
 	EstimatedPrice *float64 `bun:"estimated_price" json:"estimated_price"`
 	ActualPrice    *float64 `bun:"actual_price" json:"actual_price"`
@@ -103,6 +106,14 @@ const (
 	AvailabilityStatusSeasonal    AvailabilityStatus = "seasonal"
 )
 
+// ItemOrigin represents the source of a shopping list item (wizard migration tracking)
+type ItemOrigin string
+
+const (
+	ItemOriginFlyer    ItemOrigin = "flyer"     // Item from flyer offer
+	ItemOriginFreeText ItemOrigin = "free_text" // Manually entered by user
+)
+
 // UnitType represents the type of unit measurement
 type UnitType string
 
@@ -156,6 +167,22 @@ func (sli *ShoppingListItem) GetTotalEstimatedPrice() float64 {
 		return 0
 	}
 	return *sli.EstimatedPrice * sli.Quantity
+}
+
+// IsFromFlyer returns true if the item originated from a flyer offer (FR-020 compliance)
+func (sli *ShoppingListItem) IsFromFlyer() bool {
+	return sli.Origin == string(ItemOriginFlyer)
+}
+
+// IsFreeText returns true if the item was manually entered by the user (FR-020 compliance)
+func (sli *ShoppingListItem) IsFreeText() bool {
+	return sli.Origin == string(ItemOriginFreeText) || sli.Origin == ""
+}
+
+// SetFlyerOrigin marks the item as originating from a flyer
+func (sli *ShoppingListItem) SetFlyerOrigin() {
+	sli.Origin = string(ItemOriginFlyer)
+	sli.UpdatedAt = time.Now()
 }
 
 // GetTotalActualPrice returns the total actual price (quantity * price)

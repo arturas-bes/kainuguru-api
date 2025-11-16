@@ -1,0 +1,397 @@
+# Shopping List Migration Wizard API Contract
+# Version: 1.0.0
+# Date: 2025-11-15
+
+# ============================================
+# ENUMS
+# ============================================
+
+enum WizardStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum MigrationStatus {
+  PENDING
+  MIGRATED
+  SKIPPED
+}
+
+enum DecisionType {
+  REPLACE
+  SKIP
+  REMOVE
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+# ============================================
+# TYPES
+# ============================================
+
+type WizardSession {
+  id: ID!
+  status: WizardStatus!
+  shoppingList: ShoppingList!
+  expiredItems: [ExpiredItem!]!
+  currentItemIndex: Int!
+  progress: WizardProgress!
+  selectedStores: [StoreSelection!]!
+  datasetVersion: Int!
+  startedAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type ExpiredItem {
+  id: ID!
+  itemId: ID!
+  productName: String!
+  brand: String
+  originalStore: Store
+  originalPrice: Float!
+  quantity: Int!
+  expiryDate: DateTime!
+  migrationStatus: MigrationStatus!
+  suggestions: [Suggestion!]
+}
+
+type Suggestion {
+  id: ID!
+  product: Product!
+  score: Float!
+  confidence: Float!
+  explanation: String!
+  matchedFields: [String!]!
+  scoreBreakdown: ScoreBreakdown!
+  priceDifference: Float!
+  sizeComparison: String
+}
+
+type ScoreBreakdown {
+  brandScore: Float!
+  storeScore: Float!
+  sizeScore: Float!
+  priceScore: Float!
+  totalScore: Float!
+}
+
+type StoreSelection {
+  store: Store!
+  itemCount: Int!
+  totalPrice: Float!
+  savings: Float!
+}
+
+type WizardProgress {
+  currentItem: Int!
+  totalItems: Int!
+  itemsMigrated: Int!
+  itemsSkipped: Int!
+  itemsRemoved: Int!
+  percentComplete: Float!
+}
+
+type WizardResult {
+  success: Boolean!
+  session: WizardSession!
+  summary: MigrationSummary!
+  errors: [WizardError!]
+}
+
+type MigrationSummary {
+  totalItems: Int!
+  itemsMigrated: Int!
+  itemsSkipped: Int!
+  itemsRemoved: Int!
+  totalSavings: Float!
+  storesUsed: [Store!]!
+  averageConfidence: Float!
+}
+
+type WizardError {
+  code: String!
+  message: String!
+  field: String
+  itemId: ID
+}
+
+type OfferSnapshot {
+  id: ID!
+  sessionId: ID!
+  item: ShoppingListItem!
+  originalItem: OriginalItem!
+  suggestions: [Suggestion!]!
+  selectedSuggestion: Suggestion
+  decisionType: DecisionType!
+  confidence: Float!
+  explanation: String
+  createdAt: DateTime!
+}
+
+type OriginalItem {
+  productId: ID!
+  productName: String!
+  brand: String
+  storeId: ID!
+  storeName: String!
+  price: Float!
+  expiryDate: DateTime!
+}
+
+type UserMigrationPreferences {
+  id: ID!
+  preferredStores: [Store!]
+  brandPreferences: [BrandPreference!]
+  autoAcceptThreshold: Float!
+  maxPriceIncrease: Float!
+  skipCategories: [String!]
+  updatedAt: DateTime!
+}
+
+type BrandPreference {
+  category: String!
+  brands: [String!]!
+}
+
+# ============================================
+# INPUTS
+# ============================================
+
+input StartWizardInput {
+  shoppingListId: ID!
+  autoMode: Boolean
+  preferredStoreIds: [ID!]
+  maxStores: Int
+}
+
+input GetSuggestionsInput {
+  sessionId: ID!
+  itemId: ID!
+  includeAllStores: Boolean
+  minConfidence: Float
+  maxResults: Int
+}
+
+input RecordDecisionInput {
+  sessionId: ID!
+  itemId: ID!
+  decision: DecisionType!
+  suggestionId: ID
+  reason: String
+}
+
+input CompleteWizardInput {
+  sessionId: ID!
+  applyChanges: Boolean!
+  savePreferences: Boolean
+}
+
+input BulkAcceptInput {
+  sessionId: ID!
+  itemIds: [ID!]
+  minConfidence: Float
+}
+
+input UpdatePreferencesInput {
+  preferredStoreIds: [ID!]
+  brandPreferences: [BrandPreferenceInput!]
+  autoAcceptThreshold: Float
+  maxPriceIncrease: Float
+  skipCategories: [String!]
+}
+
+input BrandPreferenceInput {
+  category: String!
+  brands: [String!]!
+}
+
+input WizardFilterInput {
+  status: WizardStatus
+  userId: ID
+  dateFrom: DateTime
+  dateTo: DateTime
+}
+
+# ============================================
+# QUERIES
+# ============================================
+
+extend type Query {
+  # Get active wizard session for current user
+  activeWizardSession: WizardSession
+
+  # Get wizard session by ID
+  wizardSession(id: ID!): WizardSession
+
+  # Get suggestions for a specific expired item
+  getItemSuggestions(input: GetSuggestionsInput!): [Suggestion!]!
+
+  # Get user's migration preferences
+  userMigrationPreferences: UserMigrationPreferences
+
+  # Get migration history
+  migrationHistory(
+    filter: WizardFilterInput
+    first: Int
+    after: String
+  ): OfferSnapshotConnection!
+
+  # Check if shopping list has expired items
+  hasExpiredItems(shoppingListId: ID!): ExpiredItemsCheck!
+
+  # Get wizard statistics
+  wizardStatistics(userId: ID): WizardStatistics!
+}
+
+# ============================================
+# MUTATIONS
+# ============================================
+
+extend type Mutation {
+  # Start a new wizard session
+  startWizard(input: StartWizardInput!): WizardSession!
+
+  # Record a decision for an item
+  recordDecision(input: RecordDecisionInput!): WizardSession!
+
+  # Accept all suggestions in bulk
+  bulkAcceptSuggestions(input: BulkAcceptInput!): WizardSession!
+
+  # Complete the wizard and apply changes
+  completeWizard(input: CompleteWizardInput!): WizardResult!
+
+  # Cancel an active wizard session
+  cancelWizard(sessionId: ID!): Boolean!
+
+  # Resume an existing wizard session
+  resumeWizard(sessionId: ID!): WizardSession!
+
+  # Update user migration preferences
+  updateMigrationPreferences(input: UpdatePreferencesInput!): UserMigrationPreferences!
+
+  # Manually trigger expired item detection
+  detectExpiredItems(shoppingListId: ID!): ExpiredItemsCheck!
+}
+
+# ============================================
+# SUBSCRIPTIONS
+# ============================================
+
+extend type Subscription {
+  # Subscribe to wizard session updates
+  wizardSessionUpdates(sessionId: ID!): WizardSession!
+
+  # Subscribe to expired item notifications
+  expiredItemNotifications(userId: ID!): ExpiredItemNotification!
+}
+
+# ============================================
+# ADDITIONAL TYPES
+# ============================================
+
+type ExpiredItemsCheck {
+  hasExpiredItems: Boolean!
+  expiredCount: Int!
+  items: [ExpiredItem!]!
+  suggestedAction: String!
+}
+
+type ExpiredItemNotification {
+  shoppingListId: ID!
+  shoppingListName: String!
+  expiredCount: Int!
+  timestamp: DateTime!
+}
+
+type WizardStatistics {
+  totalSessions: Int!
+  completedSessions: Int!
+  averageCompletionRate: Float!
+  averageItemsPerSession: Float!
+  averageSavings: Float!
+  mostUsedStores: [StoreUsage!]!
+  acceptanceRateByConfidence: [ConfidenceRate!]!
+}
+
+type StoreUsage {
+  store: Store!
+  usageCount: Int!
+  percentage: Float!
+}
+
+type ConfidenceRate {
+  confidenceRange: String!
+  acceptanceRate: Float!
+  itemCount: Int!
+}
+
+type OfferSnapshotConnection {
+  edges: [OfferSnapshotEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type OfferSnapshotEdge {
+  node: OfferSnapshot!
+  cursor: String!
+}
+
+# ============================================
+# ERROR HANDLING
+# ============================================
+
+union WizardOperationResult = WizardSession | WizardError
+
+type WizardValidationError implements AppError {
+  message: String!
+  code: String!
+  field: String!
+  details: [String!]
+}
+
+type SessionExpiredError implements AppError {
+  message: String!
+  code: String!
+  sessionId: ID!
+  expiredAt: DateTime!
+}
+
+type StaleDataError implements AppError {
+  message: String!
+  code: String!
+  currentVersion: Int!
+  sessionVersion: Int!
+}
+
+# ============================================
+# SCHEMA DOCUMENTATION
+# ============================================
+
+"""
+The Shopping List Migration Wizard API provides functionality for helping users
+replace expired flyer products with current alternatives. It maintains a maximum
+of 2 stores per shopping session and uses deterministic scoring for suggestions.
+
+Key Features:
+- Two-pass search strategy (brand-aware substitution)
+- Session management with 30-minute timeout
+- Immutable offer snapshots for history
+- User preference learning
+- Bulk and individual decision making
+
+Scoring Weights:
+- Brand match: 3.0 points
+- Store match: 2.0 points
+- Size similarity: 1.0 point
+- Price advantage: 1.0 point
+"""
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
