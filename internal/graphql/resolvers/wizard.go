@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
 	"github.com/kainuguru/kainuguru-api/internal/models"
@@ -100,14 +101,70 @@ func (r *mutationResolver) StartWizard(ctx context.Context, input model.StartWiz
 // RecordDecision records a user decision for an item in the wizard
 func (r *mutationResolver) RecordDecision(ctx context.Context, input model.RecordDecisionInput) (*model.WizardSession, error) {
 	// Require authentication
-	_, ok := middleware.GetUserFromContext(ctx)
+	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	// TODO: Implement in T036
-	_ = input
-	return nil, fmt.Errorf("not implemented yet")
+	// Parse session ID
+	sessionUUID, err := parseUUID(input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session ID: %w", err)
+	}
+
+	// Parse item ID
+	itemID, err := strconv.ParseInt(input.ItemID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid item ID: %w", err)
+	}
+
+	// Parse suggestion ID if provided
+	var suggestionID *int64
+	if input.SuggestionID != nil {
+		sugID, err := strconv.ParseInt(*input.SuggestionID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid suggestion ID: %w", err)
+		}
+		suggestionID = &sugID
+	}
+
+	// Map GraphQL DecisionType to service decision string
+	var decisionStr string
+	switch input.Decision {
+	case model.DecisionTypeReplace:
+		decisionStr = "REPLACE"
+	case model.DecisionTypeSkip:
+		decisionStr = "SKIP"
+	case model.DecisionTypeRemove:
+		decisionStr = "REMOVE"
+	default:
+		return nil, fmt.Errorf("invalid decision type: %s", input.Decision)
+	}
+
+	// Build service request
+	req := &wizard.DecideItemRequest{
+		SessionID:      sessionUUID,
+		ItemID:         itemID,
+		Decision:       decisionStr,
+		SuggestionID:   suggestionID,
+		IdempotencyKey: "", // TODO: Implement in T037
+	}
+
+	// Call service
+	session, err := r.wizardService.DecideItem(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to record decision: %w", err)
+	}
+
+	// Verify user owns the session (security check)
+	if session.UserID != int64(userID.ID()) {
+		return nil, fmt.Errorf("access denied: session does not belong to current user")
+	}
+
+	// Map to GraphQL model
+	gqlSession := mapWizardSessionToGraphQL(session)
+
+	return gqlSession, nil
 }
 
 // BulkAcceptSuggestions accepts all suggestions in bulk
@@ -152,6 +209,15 @@ func (r *mutationResolver) CancelWizard(ctx context.Context, sessionID string) (
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+// parseUUID parses a string UUID and returns uuid.UUID or error
+func parseUUID(uuidStr string) (uuid.UUID, error) {
+	parsed, err := uuid.Parse(uuidStr)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid UUID format: %w", err)
+	}
+	return parsed, nil
+}
 
 // mapWizardSessionToGraphQL converts service WizardSession to GraphQL model
 func mapWizardSessionToGraphQL(session *models.WizardSession) *model.WizardSession {

@@ -264,9 +264,86 @@ func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) e
 
 // DecideItem records a user decision for a single item
 func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) (*models.WizardSession, error) {
-	// TODO: Implement in Phase 5 (T031-T035)
-	s.logger.Info("DecideItem called", "session_id", req.SessionID, "item_id", req.ItemID)
-	return nil, nil
+	s.logger.Info("DecideItem called",
+		"session_id", req.SessionID,
+		"item_id", req.ItemID,
+		"decision", req.Decision)
+
+	// 1. Load session from Redis
+	session, err := s.wizardCache.GetSession(ctx, req.SessionID)
+	if err != nil {
+		s.logger.Error("failed to load wizard session",
+			"session_id", req.SessionID,
+			"error", err)
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// 2. Check if session is expired
+	if session.IsExpired() {
+		s.logger.Warn("attempted to update expired session",
+			"session_id", req.SessionID,
+			"expires_at", session.ExpiresAt)
+		// Delete expired session from cache
+		_ = s.wizardCache.DeleteSession(ctx, req.SessionID)
+		return nil, fmt.Errorf("session has expired")
+	}
+
+	// 3. Validate decision type
+	var action models.DecisionAction
+	switch req.Decision {
+	case "REPLACE":
+		action = models.DecisionActionReplace
+		if req.SuggestionID == nil {
+			return nil, fmt.Errorf("suggestionId is required for REPLACE decision")
+		}
+	case "SKIP":
+		action = models.DecisionActionSkip
+	case "REMOVE":
+		action = models.DecisionActionRemove
+	default:
+		return nil, fmt.Errorf("invalid decision type: %s", req.Decision)
+	}
+
+	// 4. Validate item exists in session
+	found := false
+	for _, item := range session.ExpiredItems {
+		if item.ItemID == req.ItemID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("item %d not found in wizard session", req.ItemID)
+	}
+
+	// 5. Record decision
+	decision := models.Decision{
+		ItemID:       req.ItemID,
+		Action:       action,
+		SuggestionID: req.SuggestionID,
+		Timestamp:    time.Now(),
+	}
+	session.Decisions[req.ItemID] = decision
+	session.LastUpdatedAt = time.Now()
+
+	// 6. Track metrics
+	monitoring.WizardAcceptanceRate.WithLabelValues(string(action)).Inc()
+
+	// 7. Save updated session to Redis
+	if err := s.wizardCache.SaveSession(ctx, session); err != nil {
+		s.logger.Error("failed to save updated wizard session",
+			"session_id", req.SessionID,
+			"error", err)
+		return nil, fmt.Errorf("failed to save decision: %w", err)
+	}
+
+	s.logger.Info("decision recorded successfully",
+		"session_id", req.SessionID,
+		"item_id", req.ItemID,
+		"action", action,
+		"total_decisions", len(session.Decisions))
+
+	return session, nil
 }
 
 // ApplyBulkDecisions records decisions for multiple items

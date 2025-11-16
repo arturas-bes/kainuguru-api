@@ -14,8 +14,9 @@ type StartWizardRequest struct {
 // DecideItemRequest represents a request to record a decision for a single item
 type DecideItemRequest struct {
 	SessionID      uuid.UUID
-	ItemID         int
-	SuggestionID   *int // nil = keep existing, non-nil = select suggestion
+	ItemID         int64
+	Decision       string // "REPLACE", "SKIP", "REMOVE"
+	SuggestionID   *int64 // Required if Decision=REPLACE
 	IdempotencyKey string
 }
 
