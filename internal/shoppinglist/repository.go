@@ -31,4 +31,5 @@ type Repository interface {
 	CanUserAccessList(ctx context.Context, listID int64, userID uuid.UUID) (bool, error)
 	GetUserCategories(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
 	ClearCompletedItems(ctx context.Context, listID int64) (int, error)
+	GetExpiredItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
 }

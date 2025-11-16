@@ -4,6 +4,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
+	"github.com/kainuguru/kainuguru-api/internal/services/wizard"
 	"github.com/uptrace/bun"
 )
 
@@ -20,6 +21,7 @@ type Resolver struct {
 	shoppingListService     services.ShoppingListService
 	shoppingListItemService services.ShoppingListItemService
 	priceHistoryService     services.PriceHistoryService
+	wizardService           wizard.Service
 	db                      *bun.DB
 }
 
@@ -36,6 +38,7 @@ func NewServiceResolver(
 	shoppingListService services.ShoppingListService,
 	shoppingListItemService services.ShoppingListItemService,
 	priceHistoryService services.PriceHistoryService,
+	wizardService wizard.Service,
 	db *bun.DB,
 ) *Resolver {
 	return &Resolver{
@@ -50,6 +53,7 @@ func NewServiceResolver(
 		shoppingListService:     shoppingListService,
 		shoppingListItemService: shoppingListItemService,
 		priceHistoryService:     priceHistoryService,
+		wizardService:           wizardService,
 		db:                      db,
 	}
 }
