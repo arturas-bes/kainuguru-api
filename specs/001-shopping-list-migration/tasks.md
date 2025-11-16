@@ -160,7 +160,7 @@
 
 - [X] T035 [P] [US4] Implement startWizard mutation resolver in wizard.resolvers.go (create WizardSession, call GetExpiredItemsForList, TwoPassSearch for each, SelectOptimalStores, save to Redis, return session)
 - [X] T036 [P] [US4] Implement decideItem mutation resolver in wizard.resolvers.go (load session from Redis, validate decision, update Decisions map, save session, return updated session)
-- [ ] T037 [US4] Add idempotency key handling in decideItem (check Redis wizard:idempotency:{key}, store result with 24h TTL per data-model.md)
+- [X] T037 [US4] Add idempotency key handling in decideItem (check Redis wizard:idempotency:{key}, store result with 24h TTL per data-model.md)
 - [ ] T038 [US4] Implement wizardSession query resolver in wizard.resolvers.go (load from Redis, map to GraphQL type)
 - [ ] T039 [US4] Add session expiration check in all resolvers (if ExpiresAt < NOW(), return EXPIRED status, delete from Redis)
 - [ ] T040 [US4] Add Prometheus counters wizard_acceptance_rate (track REPLACE/KEEP/REMOVE counts) in metrics.go
