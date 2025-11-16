@@ -1,0 +1,183 @@
+# Feature Specification: Shopping List Migration Wizard
+
+**Feature Branch**: `001-shopping-list-migration`
+**Created**: 2025-11-15
+**Status**: Draft
+**Input**: User description: "Shopping List Migration Wizard"
+
+## Clarifications
+
+### Session 2025-11-15
+
+- Q: When should users be notified about expired flyer items? → A: On next login/app open with visual indicator
+- Q: What should happen when NO alternatives exist for an expired product? → A: Keep as expired with "no alternatives" message
+- Q: How should concurrent shopping list modifications be handled during an active wizard session? → A: Lock list during wizard (show "migration in progress")
+- Q: How should free-text items (non-flyer products) be handled during migration? → A: Skip entirely (wizard only for flyer items)
+- Q: What is the maximum acceptable price increase for automatic suggestions? → A: Up to 20% increase
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Expired Item Detection & Notification (Priority: P1)
+
+As a user with a shopping list containing expired flyer items, I want to be notified when products are no longer available so I can update my list with current alternatives.
+
+**Why this priority**: This is the core trigger that initiates the entire migration process. Without detecting expired items, users can't know they need replacements, making this the foundational feature.
+
+**Independent Test**: Can be fully tested by creating a shopping list with flyer items, letting flyers expire, and verifying the system detects and notifies about expired items.
+
+**Acceptance Scenarios**:
+
+1. **Given** a shopping list contains 3 items from expired flyers, **When** the user logs in or opens the app, **Then** they see a badge/indicator on their shopping list, and when viewing the list they see "3 items need updating" with an option to start the migration wizard
+2. **Given** a flyer expires at midnight, **When** the expiry time passes, **Then** all shopping list items from that flyer are marked as expired
+3. **Given** a user has both expired and active flyer items, **When** viewing their list, **Then** expired items are visually distinct from active items
+
+---
+
+### User Story 2 - Brand-Aware Product Suggestions (Priority: P1)
+
+As a user, I want to see similar products from current flyers ranked by relevance (same brand, store, size) so I can make quick replacement decisions.
+
+**Why this priority**: The quality of suggestions directly impacts user satisfaction and adoption. Brand-aware suggestions ensure users get relevant alternatives that match their preferences.
+
+**Independent Test**: Can be tested by providing expired products and verifying the system suggests alternatives with proper brand matching and scoring.
+
+**Acceptance Scenarios**:
+
+1. **Given** an expired "Coca-Cola 12-pack" item, **When** the system searches for alternatives, **Then** it first shows other Coca-Cola products from any store, then shows other cola brands if no Coca-Cola available
+2. **Given** multiple alternatives exist, **When** displaying suggestions, **Then** they are ranked by score (brand match: 3.0, same store: 2.0, size match: 1.0, price proximity: 1.0)
+3. **Given** a same-brand alternative exists in a different store, **When** showing suggestions, **Then** it appears before different-brand alternatives from the same store
+
+---
+
+### User Story 3 - Store Limitation Management (Priority: P2)
+
+As a user, I want to limit my shopping to maximum 2 stores to minimize travel time.
+
+**Why this priority**: Travel efficiency is a key user concern, but the system can still function without this constraint. This enhances usability without being critical for basic functionality.
+
+**Independent Test**: Can be tested by selecting replacements from multiple stores and verifying the system enforces the 2-store maximum.
+
+**Acceptance Scenarios**:
+
+1. **Given** the user has selected items from 2 stores, **When** they try to select an item from a 3rd store, **Then** the system warns them and offers to replace an existing store selection
+2. **Given** suggestions from 5 different stores, **When** displaying options, **Then** the system prioritizes combinations that minimize the number of stores
+3. **Given** a user's current list spans 2 stores, **When** suggesting replacements, **Then** items from these same 2 stores are prioritized
+
+---
+
+### User Story 4 - Item-by-Item Decision Making (Priority: P2)
+
+As a user, I want to review and decide on replacements item-by-item with clear explanations so I can make informed decisions.
+
+**Why this priority**: Granular control over decisions increases user trust and satisfaction, though bulk operations could provide a faster alternative.
+
+**Independent Test**: Can be tested by starting the wizard with multiple expired items and verifying each item can be reviewed and decided independently.
+
+**Acceptance Scenarios**:
+
+1. **Given** 5 expired items, **When** using the wizard, **Then** each item is presented individually with its suggestions
+2. **Given** a suggestion is displayed, **When** the user views it, **Then** they see why it was suggested (e.g., "Same brand, similar size, $0.50 cheaper")
+3. **Given** the user doesn't like any suggestions for an item, **When** reviewing options, **Then** they can skip the item or remove it from their list
+
+---
+
+### User Story 5 - Bulk Decision Making (Priority: P3)
+
+As a user, I want the option to accept all suggested replacements at once for faster processing.
+
+**Why this priority**: This is an efficiency feature that enhances user experience but isn't essential for core functionality.
+
+**Independent Test**: Can be tested by selecting "Replace All" and verifying all expired items are updated with top suggestions.
+
+**Acceptance Scenarios**:
+
+1. **Given** 10 expired items with suggestions, **When** the user selects "Accept All Suggestions", **Then** all items are replaced with the top-ranked alternative for each
+2. **Given** bulk replacement would exceed 2 stores, **When** applying bulk changes, **Then** the system automatically limits selections to the 2 stores with most items
+
+---
+
+### User Story 6 - Session Persistence & Recovery (Priority: P3)
+
+As a user, I want my migration progress saved so I can resume later if interrupted.
+
+**Why this priority**: While helpful for user experience, the migration process is typically quick enough that interruptions are uncommon.
+
+**Independent Test**: Can be tested by starting migration, closing the application, and returning within 30 minutes to verify progress is restored.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user is halfway through migration, **When** they close and reopen the app within 30 minutes, **Then** they can resume from where they left off
+2. **Given** a session is older than 30 minutes, **When** the user returns, **Then** they must restart the migration process
+3. **Given** flyer data changed during an inactive session, **When** resuming, **Then** the system detects stale data and prompts to restart
+
+---
+
+### Edge Cases
+
+- When no alternatives exist for an expired product, the item remains in the list marked as expired with a "No alternatives available" message, allowing manual search or removal
+- How does the system handle products that exist in more than 2 stores when all are equally good matches?
+- Suggestions with price increases over 20% are flagged with warning indicators; users can still select them but are made aware of significant price changes
+- During active wizard session, the shopping list is locked with "migration in progress" indicator shown to other users/sessions
+- What happens if a flyer expires while the user is in the middle of migration?
+- Free-text items (non-flyer products) are skipped entirely as they don't expire; wizard focuses only on flyer-linked items
+- What if the original product comes back in a new flyer during migration?
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: System MUST detect when flyer products in shopping lists have expired
+- **FR-002**: System MUST search for alternative products using a two-pass strategy: first with brand+name, then name only
+- **FR-003**: System MUST calculate suggestion scores using fixed weights (brand: 3.0, store: 2.0, size: 1.0, price: 1.0)
+- **FR-004**: System MUST NOT suggest products from more than 2 stores in a single shopping session
+- **FR-005**: System MUST always show same-brand alternatives when available, regardless of store
+- **FR-006**: System MUST provide confidence scores (0.0-1.0 scale) for each suggestion based on matching criteria
+- **FR-007**: System MUST display explanations for why each product was suggested
+- **FR-008**: System MUST maintain session state for 30 minutes to allow interruption and resumption
+- **FR-009**: System MUST detect if flyer data has changed since session started and alert user
+- **FR-010**: System MUST create immutable snapshots of offers for historical accuracy
+- **FR-011**: System MUST support both individual item decisions and bulk acceptance of suggestions
+- **FR-012**: System MUST preserve existing shopping list data and maintain backward compatibility
+- **FR-013**: Users MUST be able to skip items they don't want to replace
+- **FR-014**: Users MUST be able to remove items from their list during migration
+- **FR-015**: System MUST only use actual flyer prices, never fabricated or predicted prices
+- **FR-016**: System MUST lock the shopping list during active wizard session and show "migration in progress" indicator to other users/sessions
+- **FR-017**: System MUST visually distinguish expired items from active items in the shopping list
+- **FR-018**: System MUST show a badge/indicator on login and app open when expired items exist, allowing users to migrate at their convenience
+- **FR-019**: When no alternatives exist for an expired item, system MUST keep the item in the list with a clear "No alternatives available" message and allow manual actions
+- **FR-020**: System MUST skip free-text items during migration wizard as they are not linked to expiring flyers
+- **FR-021**: System MUST flag suggestions with price increases over 20% with warning indicators while still allowing user selection
+
+### Key Entities *(include if feature involves data)*
+
+- **Shopping List Item**: Represents a product in the user's shopping list, can be linked to a flyer offer or be free-text, has quantity and status (active/expired)
+- **Flyer Offer**: A product available in a specific store's flyer, has price, valid dates, and product details
+- **Migration Session**: Temporary state tracking user's progress through migration wizard, stores decisions and suggestions
+- **Suggestion**: A potential replacement for an expired item, includes score, confidence, and explanation
+- **Store**: A retail location where products can be purchased, used for limiting shopping destinations
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: At least 70% of users who start the migration wizard complete the entire process
+- **SC-002**: Users make decisions on individual items in under 15 seconds on average
+- **SC-003**: At least 80% of suggested replacements are accepted by users
+- **SC-004**: Same-brand alternatives are displayed 100% of the time when available in any active flyer
+- **SC-005**: Shopping plans never exceed 2 stores under any circumstance
+- **SC-006**: Zero data corruption incidents from stale sessions over a 3-month period
+- **SC-007**: 95% of suggestion generations complete in under 1 second
+- **SC-008**: User satisfaction rating for replacement suggestions averages 4.0+ out of 5.0
+- **SC-009**: Reduction in abandoned shopping lists by 30% after feature launch
+- **SC-010**: Support tickets related to expired flyer items decrease by 50% within first month
+
+## Assumptions
+
+- Users typically shop at 1-2 stores per trip based on travel constraints
+- Brand loyalty is the strongest factor in product substitution decisions
+- Price increases up to 20% are generally acceptable for automatic suggestions
+- Session interruptions lasting over 30 minutes likely indicate user has left
+- Product matching based on name similarity is sufficient for cross-brand substitutions
+- Users prefer to review high-value items individually but may bulk-accept low-value items
+- Flyer data updates are infrequent enough that mid-session changes are rare
+- Historical offer data is valuable for analytics but not modified after creation

@@ -1,0 +1,374 @@
+# Implementation Plan: Shopping List Migration Wizard
+
+**Branch**: `001-shopping-list-migration` | **Date**: 2025-11-15 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/001-shopping-list-migration/spec.md`
+
+**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
+
+## Summary
+
+Implement a wizard-based migration system that helps users replace expired flyer products in their shopping lists with currently available alternatives from active flyers. The system uses a two-pass search strategy (brand-aware substitution), deterministic scoring for consistent results, and session management for state persistence. The solution integrates with existing SearchService.FuzzySearchProducts and maintains a hard cap of maximum 2 stores per shopping plan.
+
+## Technical Context
+
+**Language/Version**: Go 1.24+ (per constitution requirement, existing codebase to be upgraded)
+**Primary Dependencies**:
+- GraphQL (gqlgen) for API layer
+- PostgreSQL for data persistence
+- Redis for session storage
+- Existing SearchService for product search
+- Existing ProductMaster for canonical brands/names
+
+**Storage**:
+- PostgreSQL (primary data, offer snapshots)
+- Redis (session state with 30-minute TTL)
+
+**Testing**: Go testing package with BDD scenarios, 70% minimum coverage per constitution
+**Target Platform**: Linux server (Docker container)
+**Project Type**: Web API (GraphQL backend service)
+**Performance Goals**:
+- P95 suggestion generation <1 second (measured from GraphQL request start to response sent, excluding network latency)
+- Support 1000 concurrent sessions
+- Process expired item detection in batch <5 seconds for 10k items
+
+**Constraints**:
+- Maximum 2 stores per shopping plan (hard limit)
+- 30-minute session timeout
+- Must be backward compatible with existing shopping_list_items
+- GraphQL schema changes must be additive only
+- Deterministic scoring (no ML/randomness)
+
+**Scale/Scope**:
+- ~5k active users with shopping lists
+- ~100k products in active flyers at any time
+- ~50 stores with active flyers
+- ~20 items average per shopping list
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+### Core Principles Evaluation
+
+**I. Simplicity First** ✅
+- Uses PostgreSQL for primary storage (no new database)
+- Reuses existing SearchService instead of building new search
+- Simple deterministic scoring with fixed weights
+
+**II. Ship Over Perfect** ✅
+- No ML initially (TODO: add ML later if needed)
+- Greedy store selection algorithm (simple, works)
+- Fixed scoring weights to start
+
+**III. User Value** ✅
+- Directly helps Lithuanian shoppers find replacement deals when products expire
+- Saves money by suggesting alternatives from active flyers
+- Reduces shopping trips by limiting to 2 stores
+
+**IV. Pragmatic Choices** ✅
+- Reuses existing FuzzySearchProducts instead of custom search
+- Uses Redis for sessions (existing infrastructure)
+- Feature flag for gradual rollout
+
+**V. Phase Quality Gates** ✅
+- Implementation divided into 6 clear phases
+- Testing phase included
+- PR workflow will be followed
+
+**VI. Error Handling Excellence** ✅
+- All services will use pkg/errors for typed error handling
+- Three-layer error pattern (repository, service, GraphQL)
+- Proper error wrapping with context
+
+**VII. Testing Discipline** ⚠️ EXCEPTION REQUESTED
+- See "Testing Exception" section below for post-MVP commitment
+
+### Technical Values Check
+
+**MONOLITH FIRST** ✅ - Adding to existing monolithic API
+**POSTGRESQL EVERYTHING** ✅ - Main data storage, only Redis for ephemeral sessions
+**GRAPHQL FROM START** ✅ - GraphQL mutations for wizard flow
+**BASIC LOGGING** ✅ - Structured logs for decisions and errors
+**FAIL GRACEFULLY** ✅ - Return empty suggestions if search fails
+
+### Decision Framework Validation
+
+1. **Does this help users find grocery deals?** YES - Finds replacement deals when products expire
+2. **Can PostgreSQL do it?** YES - For persistent data (Redis only for sessions)
+3. **Is it simpler to use ChatGPT?** NO - Deterministic scoring more appropriate
+4. **Can we monitor it with logs?** YES - All metrics can be derived from logs
+5. **Are errors properly typed and handled?** YES - pkg/errors used throughout
+
+**GATE RESULT**: ✅ PASS - Proceed to Phase 0
+
+## Testing Exception (Constitution VII)
+
+**Exception Requested**: Deferring 70% test coverage requirement to post-MVP phase
+
+**Justification**:
+- Feature is behind feature flag (WIZARD_FEATURE_ENABLED) for safe rollout
+- Quickstart.md provides comprehensive manual testing scenarios
+- Integration test script validates end-to-end flow
+- Production rollout follows gradual strategy (5% → 25% → 50% → 100%)
+
+**Post-MVP Commitment**:
+- Add repository fake implementations within 2 weeks of MVP deployment
+- Achieve 70% coverage within 1 month of MVP deployment
+- Follow table-driven test patterns per constitution
+- Use in-memory SQLite for repository tests
+- Use fakes with function fields for service tests
+
+**Risk Mitigation**:
+- Shadow mode testing before enabling for users
+- Comprehensive logging for debugging production issues
+- Quick rollback via feature flag if issues detected
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/001-shopping-list-migration/
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command)
+├── data-model.md        # Phase 1 output (/speckit.plan command)
+├── quickstart.md        # Phase 1 output (/speckit.plan command)
+├── contracts/           # Phase 1 output (/speckit.plan command)
+└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+```
+
+### Source Code (repository root)
+
+```text
+# Existing Go monolith structure (kainuguru-api)
+internal/
+├── models/
+│   ├── shopping_list_item.go      # Extend with migration fields
+│   ├── offer_snapshot.go          # NEW: Immutable offer history
+│   └── wizard_session.go          # NEW: Session state model
+├── services/
+│   ├── shopping_list_migration_service.go  # Existing, preserve
+│   ├── wizard_service.go          # NEW: Core wizard logic
+│   ├── suggestion_engine.go       # NEW: Scoring and ranking
+│   └── store_selector.go          # NEW: 2-store optimization
+├── graphql/
+│   ├── schema/
+│   │   └── wizard.graphqls        # NEW: Wizard mutations/types
+│   └── resolvers/
+│       └── wizard_resolver.go     # NEW: GraphQL resolvers
+├── workers/
+│   └── flyer_expiration_worker.go # NEW: Detect expired items
+└── repositories/
+    ├── offer_snapshot_repo.go     # NEW: Snapshot persistence
+    └── wizard_session_repo.go     # NEW: Session management
+
+pkg/
+└── errors/
+    └── wizard_errors.go           # NEW: Typed wizard errors
+
+migrations/
+└── XXXXXX_add_wizard_tables.sql   # NEW: Database migrations
+
+test/
+├── integration/
+│   └── wizard_flow_test.go        # NEW: End-to-end tests
+└── unit/
+    ├── suggestion_engine_test.go  # NEW: Scoring tests (post-MVP)
+    └── store_selector_test.go     # NEW: Store limit tests (post-MVP)
+```
+
+**Structure Decision**: Extending the existing Go monolith structure. All new code integrates into the existing `internal/` directory structure, maintaining consistency with current patterns. New GraphQL schema is additive, preserving backward compatibility.
+
+## Complexity Tracking
+
+> No violations - all decisions align with Constitution principles
+
+## Phase 0: Research & Clarifications
+
+### Research Tasks
+
+1. **Existing SearchService Integration**
+   - Document current FuzzySearchProducts API contract
+   - Verify it returns similarity scores we can use
+   - Check if it supports brand filtering
+
+2. **ProductMaster Data Quality**
+   - Assess current brand coverage (target >80%)
+   - Check canonical name consistency
+   - Identify gaps in product categorization
+
+3. **Redis Session Management**
+   - Verify Redis cluster is available in production
+   - Research session serialization patterns in Go
+   - Define session data structure size limits
+
+4. **Database Migration Strategy**
+   - Check if shopping_list_items can be extended safely
+   - Verify foreign key constraints won't break
+   - Plan rollback strategy for schema changes
+
+5. **Worker Infrastructure**
+   - Understand existing worker framework
+   - Check scheduling capabilities for expiry detection
+   - Verify notification system integration points
+
+### Expected Outputs
+- `research.md` with all technical decisions resolved
+- No remaining NEEDS CLARIFICATION items
+- Clear integration points identified
+
+## Phase 1: Design & Contracts
+
+### Data Model Design
+- Define offer_snapshots table schema
+- Extend shopping_list_items with migration fields
+- Design wizard_sessions structure
+- Create user_migration_preferences model
+
+### API Contracts
+- GraphQL schema for wizard mutations
+- Type definitions for suggestions/scores
+- Error response contracts
+- Session validation rules
+
+### Documentation
+- `data-model.md` with entity relationships
+- `contracts/wizard-api.graphql` with full schema
+- `quickstart.md` for testing the wizard flow
+
+### Agent Context Update
+- Run `.specify/scripts/bash/update-agent-context.sh claude`
+- Add wizard-specific patterns and conventions
+
+## Phase 1 Completion: Constitution Re-Check
+
+### Core Principles Re-Evaluation (Post-Design)
+
+**I. Simplicity First** ✅ MAINTAINED
+- Data model extends existing tables (no new systems)
+- Reuses SearchService, ProductMaster, Redis
+- GraphQL follows existing patterns
+
+**II. Ship Over Perfect** ✅ MAINTAINED
+- Fixed scoring weights (no ML complexity)
+- Simple greedy store selection
+- TODOs documented for future enhancements
+
+**III. User Value** ✅ MAINTAINED
+- Direct value: replaces expired products with deals
+- Saves money through price comparisons
+- Saves time with 2-store limit
+
+**IV. Pragmatic Choices** ✅ MAINTAINED
+- Leverages all existing services
+- Uses proven Redis for sessions
+- Feature flag rollout strategy
+
+**V. Phase Quality Gates** ✅ MAINTAINED
+- Clear phase separation achieved
+- Ready for PR workflow after tasks
+
+### Technical Values Re-Check
+
+**MONOLITH FIRST** ✅ - Single API, no new services
+**POSTGRESQL EVERYTHING** ✅ - Primary storage, Redis only for cache
+**GRAPHQL FROM START** ✅ - Pure GraphQL implementation
+**BASIC LOGGING** ✅ - Structured logs, no complex metrics
+**FAIL GRACEFULLY** ✅ - Empty suggestions on error
+
+**FINAL GATE RESULT**: ✅ PASS - Ready for task generation
+
+## Phase 2: Task Generation
+
+*To be completed by `/speckit.tasks` command after Phase 1*
+
+- Generate granular implementation tasks
+- Create dependency graph
+- Assign effort estimates
+- Define acceptance criteria per task
+
+## Implementation Timeline
+
+### Phase 1 - Data Foundation (3 days)
+- Database migrations for new fields
+- Create offer_snapshots table
+- Update Go models
+- Create migration scripts
+
+### Phase 2 - Search Integration (2 days)
+- Implement two-pass search strategy
+- Integrate with existing SearchService
+- Create deterministic scoring engine
+- Add store selection logic
+
+### Phase 3 - Wizard Service (3 days)
+- Build WizardService with session management
+- Implement Redis session storage
+- Add dataset version tracking
+- Create validation logic
+
+### Phase 4 - GraphQL API (2 days)
+- Add new types and mutations
+- Implement resolvers
+- Add idempotency support
+- Create error handling
+
+### Phase 5 - Worker Integration (2 days)
+- Create FlyerExpirationWorker
+- Integrate with existing worker system
+- Add notification triggers
+- Implement batch processing
+
+### Phase 6 - Testing & Validation (3 days)
+- Integration tests for expired item flow
+- Test store cap enforcement
+- Verify deterministic ranking
+- Test session revalidation
+- Performance testing
+
+**Total Timeline**: ~15 days
+
+## Rollout Strategy
+
+1. Deploy database changes (backward compatible)
+2. Deploy service code behind feature flag
+3. Enable for internal testing (5% traffic)
+4. Gradual rollout (25%, 50%, 100%)
+5. Monitor metrics and adjust
+
+## Risk Mitigation
+
+- **Feature flag** for easy rollback
+- **Shadow mode** testing before launch
+- **Comprehensive integration tests**
+- **Session recovery mechanisms**
+- **Data validation** before applying changes
+- **Audit logging** for all decisions
+
+## Dependencies
+
+- Existing SearchService must be stable
+- ProductMaster data quality >80% coverage
+- Redis cluster availability
+- Current flyer ingestion pipeline working
+
+## Monitoring
+
+- `wizard_items_flagged_total` - Count of expired items detected
+- `wizard_suggestions_returned` - Suggestions per session
+- `wizard_acceptance_rate` - User acceptance percentage
+- `wizard_selected_store_count` - Distribution of 1 vs 2 stores
+- `wizard_latency_ms` - P95 latency for suggestion generation (request start to response sent)
+
+## Success Validation
+
+See spec.md "Success Criteria" (SC-001 through SC-010) for complete measurable outcomes.
+
+Key metrics:
+- Wizard completion rate >70%
+- Average decision time <15 seconds per item
+- Suggestion acceptance rate >80%
+- Same-brand products shown 100% when available
+- Store cap never exceeded (max 2 stores)
+- Zero data corruption from stale sessions
+- P95 suggestion generation <1 second
