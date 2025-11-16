@@ -283,14 +283,34 @@ func (r *mutationResolver) CompleteWizard(ctx context.Context, input model.Compl
 // CancelWizard cancels an active wizard session
 func (r *mutationResolver) CancelWizard(ctx context.Context, sessionID string) (bool, error) {
 	// Require authentication
-	_, ok := middleware.GetUserFromContext(ctx)
+	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return false, fmt.Errorf("authentication required")
 	}
 
-	// TODO: Implement in Phase 11 (T066-T067)
-	_ = sessionID
-	return false, fmt.Errorf("not implemented yet")
+	// Parse session ID
+	sessionUUID, err := parseUUID(sessionID)
+	if err != nil {
+		return false, fmt.Errorf("invalid session ID: %w", err)
+	}
+
+	// Load session first to verify ownership
+	session, err := r.wizardService.GetSession(ctx, sessionUUID)
+	if err != nil {
+		return false, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Verify user owns the session
+	if session.UserID != int64(userID.ID()) {
+		return false, fmt.Errorf("access denied: session does not belong to current user")
+	}
+
+	// Call service to cancel wizard (T066)
+	if err := r.wizardService.CancelWizard(ctx, sessionUUID); err != nil {
+		return false, fmt.Errorf("failed to cancel wizard: %w", err)
+	}
+
+	return true, nil
 }
 
 // ============================================

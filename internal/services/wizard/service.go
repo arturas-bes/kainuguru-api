@@ -273,13 +273,29 @@ func (s *wizardService) GetSession(ctx context.Context, sessionID uuid.UUID) (*m
 func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) error {
 	s.logger.Info("CancelWizard called", "session_id", sessionID)
 
-	// Delete session from Redis
+	// Load session from Redis to update status
+	session, err := s.wizardCache.GetSession(ctx, sessionID)
+	if err != nil {
+		s.logger.Error("failed to load wizard session for cancellation",
+			"session_id", sessionID,
+			"error", err)
+		// Session might already be deleted - this is not an error
+		return nil
+	}
+
+	// Update status to CANCELLED
+	session.Status = models.WizardStatusCancelled
+
+	// Delete session from Redis (cancelled sessions are not kept)
 	if err := s.wizardCache.DeleteSession(ctx, sessionID); err != nil {
 		s.logger.Error("failed to delete wizard session",
 			"session_id", sessionID,
 			"error", err)
 		return fmt.Errorf("failed to cancel session: %w", err)
 	}
+
+	// Track metrics
+	monitoring.WizardSessionsTotal.WithLabelValues(string(models.WizardStatusCancelled)).Inc()
 
 	s.logger.Info("session cancelled successfully", "session_id", sessionID)
 	return nil
