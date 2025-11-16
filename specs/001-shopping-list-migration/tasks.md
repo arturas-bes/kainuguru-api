@@ -30,11 +30,11 @@
 
 **Purpose**: Database schema and GraphQL schema initialization
 
-- [ ] T001 Create migration file migrations/0XX_add_wizard_tables.sql for offer_snapshots table per data-model.md schema
-- [ ] T002 Add shopping_list_items.origin enum ('flyer', 'free_text') to migration with DEFAULT 'free_text' for backward compatibility
-- [ ] T003 [P] Backfill shopping_list_items.origin='flyer' WHERE flyer_product_id IS NOT NULL in migration
-- [ ] T004 [P] Copy contracts/wizard-api.graphql to internal/graphql/schema/wizard.graphqls for gqlgen
-- [ ] T005 Run migration and verify tables/indexes created: offer_snapshots, shopping_list_items.origin, all indexes per data-model.md
+- [X] T001 Create migration file migrations/0XX_add_wizard_tables.sql for offer_snapshots table per data-model.md schema
+- [X] T002 Add shopping_list_items.origin enum ('flyer', 'free_text') to migration with DEFAULT 'free_text' for backward compatibility
+- [X] T003 [P] Backfill shopping_list_items.origin='flyer' WHERE flyer_product_id IS NOT NULL in migration
+- [X] T004 [P] Copy contracts/wizard-api.graphql to internal/graphql/schema/wizard.graphqls for gqlgen
+- [X] T005 Run migration and verify tables/indexes created: offer_snapshots, shopping_list_items.origin, all indexes per data-model.md
 
 **Checkpoint**: Database schema ready, GraphQL schema staged for gqlgen
 
@@ -48,21 +48,21 @@
 
 ### Database Models
 
-- [ ] T006 [P] Create internal/models/offer_snapshot.go with OfferSnapshot struct matching data-model.md (ID, ShoppingListItemID, FlyerProductID, ProductMasterID, StoreID, ProductName, Brand, Price, Unit, SizeValue, SizeUnit, Estimated, ValidFrom, ValidTo, SnapshotReason, CreatedAt)
-- [ ] T007 [P] Extend internal/models/shopping_list.go with ShoppingListItem.Origin field (enum: 'flyer', 'free_text')
-- [ ] T008 [P] Create internal/models/wizard_session.go for Redis serialization (ID, UserID, ShoppingListID, ExpiredItems, Suggestions, Decisions, SelectedStores, Status, CreatedAt, ExpiresAt, LastUpdatedAt) per data-model.md
+- [X] T006 [P] Create internal/models/offer_snapshot.go with OfferSnapshot struct matching data-model.md (ID, ShoppingListItemID, FlyerProductID, ProductMasterID, StoreID, ProductName, Brand, Price, Unit, SizeValue, SizeUnit, Estimated, ValidFrom, ValidTo, SnapshotReason, CreatedAt)
+- [X] T007 [P] Extend internal/models/shopping_list.go with ShoppingListItem.Origin field (enum: 'flyer', 'free_text')
+- [X] T008 [P] Create internal/models/wizard_session.go for Redis serialization (ID, UserID, ShoppingListID, ExpiredItems, Suggestions, Decisions, SelectedStores, Status, CreatedAt, ExpiresAt, LastUpdatedAt) per data-model.md
 
 ### Repositories
 
-- [ ] T009 [P] Create internal/repositories/offer_snapshot_repository.go with Create(), GetByShoppingListItemID(), methods (Bun ORM, immutable: no UPDATE)
-- [ ] T010 [P] Extend internal/repositories/shopping_list_repository.go with GetExpiredItems(ctx, listID) (join flyer_products.valid_to < NOW())
-- [ ] T011 Create internal/cache/wizard_cache.go with SaveSession(), GetSession(), DeleteSession() using Redis pattern wizard:session:{id}, 1800s TTL
+- [X] T009 [P] Create internal/repositories/offer_snapshot_repository.go with Create(), GetByShoppingListItemID(), methods (Bun ORM, immutable: no UPDATE)
+- [X] T010 [P] Extend internal/repositories/shopping_list_repository.go with GetExpiredItems(ctx, listID) (join flyer_products.valid_to < NOW())
+- [X] T011 Create internal/cache/wizard_cache.go with SaveSession(), GetSession(), DeleteSession() using Redis pattern wizard:session:{id}, 1800s TTL
 
 ### Base Services
 
-- [ ] T012 Create internal/services/wizard/service.go with struct WizardService{db, redis, searchService, scoringWeights ScoringWeights}
-- [ ] T013 [P] Create internal/services/wizard/scoring.go with ScoreSuggestion() pure function per research.md section 4 (weights: brand 3.0, store 2.0, size 1.0, price 1.0)
-- [ ] T014 [P] Create internal/services/wizard/store_selection.go with SelectOptimalStores() per research.md section 5 (greedy algorithm, maxStores constraint)
+- [X] T012 Create internal/services/wizard/service.go with struct WizardService{db, redis, searchService, scoringWeights ScoringWeights}
+- [X] T013 [P] Create internal/services/wizard/scoring.go with ScoreSuggestion() pure function per research.md section 4 (weights: brand 3.0, store 2.0, size 1.0, price 1.0)
+- [X] T014 [P] Create internal/services/wizard/store_selection.go with SelectOptimalStores() per research.md section 5 (greedy algorithm, maxStores constraint)
 
 ### GraphQL Integration
 

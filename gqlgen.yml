@@ -20,16 +20,12 @@ resolver:
 # Skip generating these types since we have custom implementations
 skip_mod_tidy: true
 
-# Autobind disabled for wizard feature - types conflict with Redis models
-# autobind:
-#   - github.com/kainuguru/kainuguru-api/internal/models
-
 # Custom scalar mappings
 struct_tag: bun
 
 # Skip generating these types since we have custom implementations
 models:
-  # Custom scalars
+  # Custom scalars with marshaling functions
   DateTime:
     model:
       - time.Time
@@ -37,6 +33,22 @@ models:
   # Authentication types
   User:
     model: github.com/kainuguru/kainuguru-api/internal/models.User
+  
+  # Product types
+  Product:
+    model: github.com/kainuguru/kainuguru-api/internal/models.Product
+  
+  Store:
+    model: github.com/kainuguru/kainuguru-api/internal/models.Store
+    
+  Flyer:
+    model: github.com/kainuguru/kainuguru-api/internal/models.Flyer
+    
+  ShoppingList:
+    model: github.com/kainuguru/kainuguru-api/internal/models.ShoppingList
+    
+  ShoppingListItem:
+    model: github.com/kainuguru/kainuguru-api/internal/models.ShoppingListItem
   
   # Wizard GraphQL types - DO NOT autobind to internal/models versions
   # The internal/models versions are for Redis; GraphQL needs its own
