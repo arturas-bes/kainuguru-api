@@ -269,7 +269,7 @@ func (r *mutationResolver) CompleteWizard(ctx context.Context, input model.Compl
 		ItemsRemoved:      result.ItemsDeleted,
 		TotalSavings:      result.TotalEstimatedPrice,
 		StoresUsed:        []*model.Store{}, // TODO: Load stores from session.SelectedStores
-		AverageConfidence: 0.85,              // TODO: Calculate from suggestions
+		AverageConfidence: 0.85,             // TODO: Calculate from suggestions
 	}
 
 	return &model.WizardResult{
