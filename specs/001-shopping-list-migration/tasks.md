@@ -110,7 +110,7 @@
 
 ### Implementation Tasks
 
-- [ ] T023 [P] [US2] Create internal/services/wizard/search.go with TwoPassSearch(ctx, expiredItem) that calls SearchService.FuzzySearchProducts twice (pass 1: brand+name, pass 2: name-only), merges/deduplicates results
+- [X] T023 [P] [US2] Create internal/services/wizard/search.go with TwoPassSearch(ctx, expiredItem) that calls SearchService.FuzzySearchProducts twice (pass 1: brand+name, pass 2: name-only), merges/deduplicates results
 - [ ] T024 [US2] Implement ScoreSuggestion() in scoring.go per research.md (pure function with brand/store/size/price weights, tie-break on price)
 - [ ] T025 [US2] Create internal/services/wizard/explanation.go with GenerateExplanation(suggestion, score) returning human-readable text (e.g., "Same brand, similar size, €0.50 cheaper")
 - [ ] T026 [US2] Implement RankSuggestions(candidates, weights) in scoring.go (sort by TotalScore DESC, PriceCompare ASC, ProductID ASC for determinism)
