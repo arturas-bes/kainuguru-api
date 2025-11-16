@@ -20,9 +20,9 @@ resolver:
 # Skip generating these types since we have custom implementations
 skip_mod_tidy: true
 
-# Autobind types where possible
-autobind:
-  - github.com/kainuguru/kainuguru-api/internal/models
+# Autobind disabled for wizard feature - types conflict with Redis models
+# autobind:
+#   - github.com/kainuguru/kainuguru-api/internal/models
 
 # Custom scalar mappings
 struct_tag: bun
@@ -37,3 +37,14 @@ models:
   # Authentication types
   User:
     model: github.com/kainuguru/kainuguru-api/internal/models.User
+  
+  # Wizard GraphQL types - DO NOT autobind to internal/models versions
+  # The internal/models versions are for Redis; GraphQL needs its own
+  WizardSession:
+    # Let gqlgen generate this
+  WizardSessionItem:
+    # Let gqlgen generate this
+  ExpiredItem:
+    # Let gqlgen generate this
+  Suggestion:
+    # Let gqlgen generate this

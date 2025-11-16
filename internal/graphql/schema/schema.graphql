@@ -2,8 +2,14 @@
 # Lithuanian Grocery Price Comparison & Shopping Lists API
 # Following Hyena-style professional GraphQL patterns
 
-# scalar String
-# scalar String
+# Scalar types
+scalar DateTime
+
+# Error handling interface
+interface AppError {
+  message: String!
+  code: String!
+}
 
 # Core Product Types (following Hyena's nested structure pattern)
 type Product {

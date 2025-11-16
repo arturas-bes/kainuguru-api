@@ -431,3 +431,27 @@ func (r *shoppingListRepository) ValidateShareCode(ctx context.Context, shareCod
 	}
 	return list, err
 }
+
+// GetExpiredItems retrieves shopping list items from expired flyers (wizard migration)
+// Only returns items with origin='flyer' and where the linked flyer product has expired
+func (r *shoppingListRepository) GetExpiredItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error) {
+	var items []*models.ShoppingListItem
+	err := r.db.NewSelect().
+		Model(&items).
+		Relation("LinkedProduct").
+		Relation("Store").
+		Relation("ProductMaster").
+		Where("sli.shopping_list_id = ?", listID).
+		Where("sli.origin = ?", models.ItemOriginFlyer).
+		Where("sli.linked_product_id IS NOT NULL").
+		Join("INNER JOIN products AS p ON p.id = sli.linked_product_id").
+		Where("p.valid_to < NOW()"). // Flyer product has expired
+		Order("sli.created_at ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}

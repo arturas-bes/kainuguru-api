@@ -24,6 +24,9 @@ type ShoppingList struct {
 	IsPublic  bool    `bun:"is_public,default:false" json:"is_public"`
 	ShareCode *string `bun:"share_code" json:"share_code"`
 
+	// Wizard migration lock (FR-016 compliance)
+	IsLocked bool `bun:"is_locked,default:false" json:"is_locked"`
+
 	// Metadata
 	ItemCount           int      `bun:"item_count,default:0" json:"item_count"`
 	CompletedItemCount  int      `bun:"completed_item_count,default:0" json:"completed_item_count"`
