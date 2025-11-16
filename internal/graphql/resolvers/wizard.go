@@ -219,14 +219,65 @@ func (r *mutationResolver) BulkAcceptSuggestions(ctx context.Context, input mode
 // CompleteWizard completes the wizard and applies changes
 func (r *mutationResolver) CompleteWizard(ctx context.Context, input model.CompleteWizardInput) (*model.WizardResult, error) {
 	// Require authentication
-	_, ok := middleware.GetUserFromContext(ctx)
+	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	// TODO: Implement in Phase 9 (T049-T059)
-	_ = input
-	return nil, fmt.Errorf("not implemented yet")
+	// Parse session ID
+	sessionUUID, err := parseUUID(input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session ID: %w", err)
+	}
+
+	// Load session first to verify ownership
+	session, err := r.wizardService.GetSession(ctx, sessionUUID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Verify user owns the session
+	if session.UserID != int64(userID.ID()) {
+		return nil, fmt.Errorf("access denied: session does not belong to current user")
+	}
+
+	// Generate idempotency key from session ID
+	idempotencyKey := fmt.Sprintf("wizard:complete:%s", sessionUUID.String())
+
+	// Call service to confirm wizard (T050)
+	result, err := r.wizardService.ConfirmWizard(ctx, sessionUUID, idempotencyKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete wizard: %w", err)
+	}
+
+	// Reload session to get final state (will be from cache if idempotent hit)
+	finalSession, _ := r.wizardService.GetSession(ctx, sessionUUID)
+	if finalSession == nil {
+		// Session deleted after completion - recreate minimal session for response
+		finalSession = session
+		finalSession.Status = models.WizardStatusCompleted
+	}
+
+	// Map to GraphQL WizardResult
+	gqlSession := mapWizardSessionToGraphQL(finalSession)
+
+	// Build MigrationSummary
+	summary := &model.MigrationSummary{
+		TotalItems:        len(session.ExpiredItems),
+		ItemsMigrated:     result.ItemsUpdated,
+		ItemsSkipped:      len(session.Decisions) - result.ItemsUpdated - result.ItemsDeleted,
+		ItemsRemoved:      result.ItemsDeleted,
+		TotalSavings:      result.TotalEstimatedPrice,
+		StoresUsed:        []*model.Store{}, // TODO: Load stores from session.SelectedStores
+		AverageConfidence: 0.85,              // TODO: Calculate from suggestions
+	}
+
+	return &model.WizardResult{
+		Success: true,
+		Session: gqlSession,
+		Summary: summary,
+		Errors:  []*model.WizardError{},
+	}, nil
 }
 
 // CancelWizard cancels an active wizard session
