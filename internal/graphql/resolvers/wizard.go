@@ -120,13 +120,17 @@ func (r *mutationResolver) StartWizard(ctx context.Context, input model.StartWiz
 	// Session is newly created, so it cannot be expired
 	// Expiration check is not needed here (T039)
 
-	// TODO: Lock the shopping list (FR-016) - Phase 13 (T076-T079)
-	// This will be implemented in a future task
+	// T077: Lock the shopping list to prevent concurrent wizard sessions (FR-016)
+	list.IsLocked = true
+	if err := r.shoppingListService.Update(ctx, list); err != nil {
+		// Failed to lock - cancel the wizard session we just created
+		_ = r.wizardService.CancelWizard(ctx, session.ID)
+		return nil, fmt.Errorf("failed to lock shopping list: %w", err)
+	}
 
 	// Map service model to GraphQL model
 	gqlSession := mapWizardSessionToGraphQL(session)
 
-	r.shoppingListService.GetByID(ctx, listID) // Reload for logging
 	return gqlSession, nil
 }
 
@@ -250,6 +254,13 @@ func (r *mutationResolver) CompleteWizard(ctx context.Context, input model.Compl
 		return nil, fmt.Errorf("failed to complete wizard: %w", err)
 	}
 
+	// T078: Unlock the shopping list after successful confirmation (FR-016)
+	list, err := r.shoppingListService.GetByID(ctx, session.ShoppingListID)
+	if err == nil {
+		list.IsLocked = false
+		_ = r.shoppingListService.Update(ctx, list)
+	}
+
 	// Reload session to get final state (will be from cache if idempotent hit)
 	finalSession, _ := r.wizardService.GetSession(ctx, sessionUUID)
 	if finalSession == nil {
@@ -308,6 +319,13 @@ func (r *mutationResolver) CancelWizard(ctx context.Context, sessionID string) (
 	// Call service to cancel wizard (T066)
 	if err := r.wizardService.CancelWizard(ctx, sessionUUID); err != nil {
 		return false, fmt.Errorf("failed to cancel wizard: %w", err)
+	}
+
+	// T078: Unlock the shopping list after cancellation (FR-016)
+	list, err := r.shoppingListService.GetByID(ctx, session.ShoppingListID)
+	if err == nil {
+		list.IsLocked = false
+		_ = r.shoppingListService.Update(ctx, list)
 	}
 
 	return true, nil
