@@ -254,6 +254,7 @@ type ShoppingList {
   isArchived: Boolean!
   isPublic: Boolean!
   shareCode: String
+  isLocked: Boolean!  # Indicates if list is being migrated by wizard session (FR-016)
 
   # Statistics
   itemCount: Int!
