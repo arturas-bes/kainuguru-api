@@ -222,17 +222,17 @@
 
 ### Implementation Tasks
 
-- [ ] T049 Create internal/services/wizard/confirm.go with ConfirmWizard(ctx, sessionID) method
-- [ ] T050 Implement confirmWizard mutation resolver in wizard.resolvers.go (load session, validate Status=IN_PROGRESS, call ConfirmWizard service)
-- [ ] T051 In confirm.go ConfirmWizard(), start Bun transaction for atomicity
-- [ ] T052 [P] In transaction: for each REPLACE decision, create OfferSnapshot with snapshot_reason='wizard_migration', estimated=false per data-model.md
-- [ ] T053 [P] In transaction: for each REPLACE decision, update shopping_list_item.flyer_product_id to new product, set origin='flyer'
-- [ ] T054 [P] In transaction: for each REMOVE decision, DELETE shopping_list_item
-- [ ] T055 In transaction: for KEEP decisions, no changes (item remains expired, user handles manually)
-- [ ] T056 After transaction commit, update session Status=COMPLETED, delete from Redis
-- [ ] T057 Add idempotency key handling in confirmWizard (check wizard:idempotency:{key}, store session_id with 24h TTL)
-- [ ] T058 Add revalidation logic: re-fetch all selected flyer_product_ids, verify valid_to >= NOW(), prices match session suggestions (return STALE_DATA error if changed)
-- [ ] T059 Add rollback on revalidation failure (keep session IN_PROGRESS, allow user to review stale items)
+- [X] T049 Create internal/services/wizard/confirm.go with ConfirmWizard(ctx, sessionID) method
+- [X] T050 Implement confirmWizard mutation resolver in wizard.resolvers.go (load session, validate Status=IN_PROGRESS, call ConfirmWizard service)
+- [X] T051 In confirm.go ConfirmWizard(), start Bun transaction for atomicity
+- [X] T052 [P] In transaction: for each REPLACE decision, create OfferSnapshot with snapshot_reason='wizard_migration', estimated=false per data-model.md
+- [X] T053 [P] In transaction: for each REPLACE decision, update shopping_list_item.flyer_product_id to new product, set origin='flyer'
+- [X] T054 [P] In transaction: for each REMOVE decision, DELETE shopping_list_item
+- [X] T055 In transaction: for KEEP decisions, no changes (item remains expired, user handles manually)
+- [X] T056 After transaction commit, update session Status=COMPLETED, delete from Redis
+- [X] T057 Add idempotency key handling in confirmWizard (check wizard:idempotency:{key}, store session_id with 24h TTL)
+- [X] T058 Add revalidation logic: re-fetch all selected flyer_product_ids, verify valid_to >= NOW(), prices match session suggestions (return STALE_DATA error if changed)
+- [X] T059 Add rollback on revalidation failure (keep session IN_PROGRESS, allow user to review stale items)
 
 **Checkpoint**: Wizard decisions permanently applied to shopping list with full ACID guarantees
 
