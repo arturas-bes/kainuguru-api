@@ -285,10 +285,10 @@
 
 **Purpose**: Implement FR-016 list locking and add BDD tests per constitution Phase Quality Gates
 
-- [ ] T076 [P] Add shopping_lists.is_locked BOOLEAN DEFAULT false to migration file (for FR-016 compliance)
-- [ ] T077 [P] Implement locking logic in startWizard mutation: SET shopping_lists.is_locked=true, reject if already locked with "migration in progress" error
-- [ ] T078 Implement unlock logic in confirmWizard and cancelWizard mutations: SET shopping_lists.is_locked=false after transaction complete
-- [ ] T079 Add ShoppingList.isLocked field resolver in shopping_list.resolvers.go (returns is_locked value for "migration in progress" indicator)
+- [X] T076 [P] Add shopping_lists.is_locked BOOLEAN DEFAULT false to migration file (for FR-016 compliance)
+- [X] T077 [P] Implement locking logic in startWizard mutation: SET shopping_lists.is_locked=true, reject if already locked with "migration in progress" error
+- [X] T078 Implement unlock logic in confirmWizard and cancelWizard mutations: SET shopping_lists.is_locked=false after transaction complete
+- [X] T079 Add ShoppingList.isLocked field resolver in shopping_list.resolvers.go (returns is_locked value for "migration in progress" indicator)
 - [ ] T080 Create tests/bdd/wizard_expired_detection_test.go with scenarios: user with expired items sees notification, badge count matches expired count
 - [ ] T081 Create tests/bdd/wizard_suggestions_test.go with scenarios: same-brand appears first, suggestions ranked by score, confidence in 0.0-1.0 range
 - [ ] T082 Create tests/bdd/wizard_decisions_test.go with scenarios: REPLACE/SKIP/REMOVE actions persist, session state updates correctly
