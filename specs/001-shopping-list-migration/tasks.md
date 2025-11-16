@@ -111,12 +111,12 @@
 ### Implementation Tasks
 
 - [X] T023 [P] [US2] Create internal/services/wizard/search.go with TwoPassSearch(ctx, expiredItem) that calls SearchService.FuzzySearchProducts twice (pass 1: brand+name, pass 2: name-only), merges/deduplicates results
-- [ ] T024 [US2] Implement ScoreSuggestion() in scoring.go per research.md (pure function with brand/store/size/price weights, tie-break on price)
-- [ ] T025 [US2] Create internal/services/wizard/explanation.go with GenerateExplanation(suggestion, score) returning human-readable text (e.g., "Same brand, similar size, €0.50 cheaper")
-- [ ] T026 [US2] Implement RankSuggestions(candidates, weights) in scoring.go (sort by TotalScore DESC, PriceCompare ASC, ProductID ASC for determinism)
+- [X] T024 [US2] Implement ScoreSuggestion() in scoring.go per research.md (pure function with brand/store/size/price weights, tie-break on price)
+- [X] T025 [US2] Create internal/services/wizard/explanation.go with GenerateExplanation(suggestion, score) returning human-readable text (e.g., "Same brand, similar size, €0.50 cheaper")
+- [X] T026 [US2] Implement RankSuggestions(candidates, weights) in scoring.go (sort by TotalScore DESC, PriceCompare ASC, ProductID ASC for determinism)
 - [ ] T027 [US2] Add unit tests in tests/unit/scoring_test.go with table-driven tests for ScoreSuggestion() determinism (same inputs → same outputs)
-- [ ] T028 [US2] Implement SelectOptimalStores() in store_selection.go (greedy algorithm, maxStores=2 constraint, minAdditionalItems/minSavingsEUR thresholds per research.md)
-- [ ] T029 [US2] Add Prometheus histogram wizard_latency_ms and counter wizard_suggestions_returned_total in metrics.go
+- [X] T028 [US2] Implement SelectOptimalStores() in store_selection.go (greedy algorithm, maxStores=2 constraint, minAdditionalItems/minSavingsEUR thresholds per research.md)
+- [X] T029 [US2] Add Prometheus histogram wizard_latency_ms and counter wizard_suggestions_returned_total in metrics.go
 
 **Checkpoint**: Two-pass search generates deterministic, ranked suggestions with explanations
 

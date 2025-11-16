@@ -116,6 +116,7 @@ func calculatePriceScore(original *models.Product, suggestedPrice float64) float
 
 // RankSuggestions sorts suggestions by score in descending order
 // Returns a new slice with ranked suggestions
+// Sort order (per constitution): TotalScore DESC, PriceCompare ASC, ProductID ASC
 func RankSuggestions(
 	suggestions []*models.Suggestion,
 	originalProduct *models.Product,
@@ -124,14 +125,40 @@ func RankSuggestions(
 ) []*models.Suggestion {
 	// Calculate scores for all suggestions
 	for _, suggestion := range suggestions {
-		suggestion.Score = ScoreSuggestion(suggestion, originalProduct, userStorePreferences, weights)
+		totalScore := ScoreSuggestion(suggestion, originalProduct, userStorePreferences, weights)
+
+		// Populate ScoreBreakdown with component scores
+		suggestion.ScoreBreakdown.TotalScore = totalScore
+		suggestion.Score = totalScore
+
+		// Calculate price difference for tie-breaking
+		if originalProduct != nil && originalProduct.CurrentPrice > 0 {
+			suggestion.PriceDifference = suggestion.Price - originalProduct.CurrentPrice
+		}
 	}
 
-	// Sort by score descending (bubble sort for simplicity and determinism)
-	// Using bubble sort ensures consistent ordering for same scores
+	// Sort by TotalScore DESC, PriceDifference ASC, FlyerProductID ASC
+	// Using bubble sort for determinism (same scores maintain consistent ordering)
 	for i := 0; i < len(suggestions); i++ {
 		for j := i + 1; j < len(suggestions); j++ {
-			if suggestions[j].Score > suggestions[i].Score {
+			shouldSwap := false
+
+			// Primary sort: Score DESC (higher is better)
+			if suggestions[j].ScoreBreakdown.TotalScore > suggestions[i].ScoreBreakdown.TotalScore {
+				shouldSwap = true
+			} else if suggestions[j].ScoreBreakdown.TotalScore == suggestions[i].ScoreBreakdown.TotalScore {
+				// Tie-breaker 1: PriceDifference ASC (cheaper is better)
+				if suggestions[j].PriceDifference < suggestions[i].PriceDifference {
+					shouldSwap = true
+				} else if suggestions[j].PriceDifference == suggestions[i].PriceDifference {
+					// Tie-breaker 2: FlyerProductID ASC (determinism)
+					if suggestions[j].FlyerProductID < suggestions[i].FlyerProductID {
+						shouldSwap = true
+					}
+				}
+			}
+
+			if shouldSwap {
 				suggestions[i], suggestions[j] = suggestions[j], suggestions[i]
 			}
 		}
