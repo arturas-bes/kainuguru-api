@@ -41,13 +41,19 @@ type ConfirmWizardRequest struct {
 
 // ConfirmWizardResult represents the result of confirming a wizard session
 type ConfirmWizardResult struct {
-	ShoppingListID    int64
-	ItemsUpdated      int
-	ItemsDeleted      int
-	OfferSnapshotsIDs []int
-	Success           bool
-	Message           string
+	ItemsUpdated        int
+	ItemsDeleted        int
+	OfferSnapshotIDs    []int64
+	StoreCount          int
+	TotalEstimatedPrice float64
 }
+
+// Decision action constants
+const (
+	DecisionReplace = "REPLACE"
+	DecisionSkip    = "SKIP"
+	DecisionRemove  = "REMOVE"
+)
 
 // StoreSelectionInput represents user input for store selection
 type StoreSelectionInput struct {

@@ -47,7 +47,7 @@ type Service interface {
 	ApplyBulkDecisions(ctx context.Context, req *ApplyBulkDecisionsRequest) (*models.WizardSession, error)
 
 	// Wizard completion
-	ConfirmWizard(ctx context.Context, req *ConfirmWizardRequest) (*ConfirmWizardResult, error)
+	ConfirmWizard(ctx context.Context, sessionID uuid.UUID, idempotencyKey string) (*ConfirmWizardResult, error)
 }
 
 // wizardService implements the Service interface
@@ -403,8 +403,4 @@ func (s *wizardService) ApplyBulkDecisions(ctx context.Context, req *ApplyBulkDe
 }
 
 // ConfirmWizard completes the wizard and applies all changes atomically
-func (s *wizardService) ConfirmWizard(ctx context.Context, req *ConfirmWizardRequest) (*ConfirmWizardResult, error) {
-	// TODO: Implement in Phase 9 (T049-T059)
-	s.logger.Info("ConfirmWizard called", "session_id", req.SessionID)
-	return nil, nil
-}
+// ApplyBulkDecisions applies multiple decisions at once to a wizard session

@@ -58,7 +58,7 @@ func (r *queryResolver) WizardSession(ctx context.Context, id string) (*model.Wi
 	if session.IsExpired() {
 		// Delete expired session from cache
 		_ = r.wizardService.CancelWizard(ctx, sessionUUID)
-		
+
 		// Return session with EXPIRED status
 		gqlSession := mapWizardSessionToGraphQL(session)
 		gqlSession.Status = model.WizardStatusExpired
