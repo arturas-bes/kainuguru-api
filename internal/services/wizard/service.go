@@ -85,7 +85,20 @@ func NewService(
 	}
 }
 
-// StartWizard initiates a new wizard session
+// StartWizard initiates a new wizard session for migrating expired flyer products.
+// It performs the following steps:
+//   1. Validates shopping list exists and user has permission
+//   2. Checks rate limiting (max 5 sessions per user per hour)
+//   3. Verifies list is not already locked by another wizard session
+//   4. Detects expired items (flyer products with valid_to < NOW)
+//   5. Generates ranked suggestions using two-pass brand-aware search
+//   6. Selects optimal stores (max 2) using greedy algorithm
+//   7. Locks the shopping list (sets is_locked=true)
+//   8. Saves session to Redis with 30-minute TTL
+//
+// Returns ErrRateLimitExceeded if user has started 5+ sessions in the last hour.
+// Returns ErrListLocked if shopping list is already being migrated.
+// Returns ErrNoExpiredItems if no expired items found.
 func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest) (*models.WizardSession, error) {
 	s.logger.Info("StartWizard called",
 		"shopping_list_id", req.ShoppingListID,
@@ -269,7 +282,14 @@ func (s *wizardService) GetSession(ctx context.Context, sessionID uuid.UUID) (*m
 	return session, nil
 }
 
-// CancelWizard cancels an active wizard session
+// CancelWizard cancels an active wizard session without applying any changes.
+// It performs the following cleanup:
+//   1. Updates session status to CANCELLED
+//   2. Unlocks the shopping list (sets is_locked=false)
+//   3. Deletes session from Redis
+//
+// Returns ErrSessionNotFound if session does not exist.
+// This operation is idempotent - multiple cancellations of the same session succeed.
 func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) error {
 	s.logger.Info("CancelWizard called", "session_id", sessionID)
 
@@ -301,7 +321,18 @@ func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) e
 	return nil
 }
 
-// DecideItem records a user decision for a single item
+// DecideItem records a user's decision for a specific expired item.
+// Supports three decision types:
+//   - REPLACE: swap item with a suggested product (requires suggestionID)
+//   - SKIP: keep the expired item unchanged
+//   - REMOVE: delete the item from the shopping list
+//
+// The operation is idempotent - recording the same decision multiple times succeeds.
+// Updates session progress tracking (itemsMigrated, itemsSkipped, itemsRemoved).
+//
+// Returns ErrSessionNotFound if session does not exist.
+// Returns ErrSessionExpired if session TTL has expired.
+// Returns ErrInvalidDecision if suggestionID is missing for REPLACE decision.
 func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) (*models.WizardSession, error) {
 	s.logger.Info("DecideItem called",
 		"session_id", req.SessionID,
