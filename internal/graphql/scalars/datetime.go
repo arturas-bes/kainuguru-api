@@ -10,6 +10,29 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+// DateTime is a custom scalar type for date/time values
+type DateTime time.Time
+
+// MarshalGQL implements graphql.Marshaler for DateTime
+func (d DateTime) MarshalGQL(w io.Writer) {
+	t := time.Time(d)
+	if t.IsZero() {
+		io.WriteString(w, "null")
+		return
+	}
+	io.WriteString(w, strconv.Quote(t.Format(time.RFC3339)))
+}
+
+// UnmarshalGQL implements graphql.Unmarshaler for DateTime
+func (d *DateTime) UnmarshalGQL(v interface{}) error {
+	t, err := UnmarshalDateTime(v)
+	if err != nil {
+		return err
+	}
+	*d = DateTime(t)
+	return nil
+}
+
 // MarshalDateTime marshals time.Time to RFC3339 string format
 func MarshalDateTime(t time.Time) graphql.Marshaler {
 	if t.IsZero() {

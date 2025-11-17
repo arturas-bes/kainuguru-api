@@ -268,14 +268,18 @@ func (r *shoppingListItemResolver) CheckedByUser(ctx context.Context, obj *model
 }
 
 // ProductMaster resolves the productMaster field on ShoppingListItem
-func (r *shoppingListItemResolver) ProductMaster(ctx context.Context, obj *models.ShoppingListItem) (*models.ProductMaster, error) {
+func (r *shoppingListItemResolver) ProductMaster(ctx context.Context, obj *models.ShoppingListItem) (*model.ProductMaster, error) {
 	if obj.ProductMasterID == nil {
 		return nil, nil
 	}
 
 	// Use DataLoader to batch load product masters and prevent N+1 queries
 	loaders := dataloaders.FromContext(ctx)
-	return loaders.ProductMasterLoader.Load(ctx, *obj.ProductMasterID)()
+	pm, err := loaders.ProductMasterLoader.Load(ctx, *obj.ProductMasterID)()
+	if err != nil {
+		return nil, err
+	}
+	return convertProductMasterToGraphQL(pm), nil
 }
 
 // LinkedProduct resolves the linkedProduct field on ShoppingListItem

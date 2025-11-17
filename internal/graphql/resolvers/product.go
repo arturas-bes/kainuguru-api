@@ -110,27 +110,35 @@ func (r *productResolver) Flyer(ctx context.Context, obj *models.Product) (*mode
 	return loaders.FlyerLoader.Load(ctx, obj.FlyerID)()
 }
 
-func (r *productResolver) FlyerPage(ctx context.Context, obj *models.Product) (*models.FlyerPage, error) {
+func (r *productResolver) FlyerPage(ctx context.Context, obj *models.Product) (*model.FlyerPage, error) {
 	if obj.FlyerPageID == nil {
 		return nil, nil
 	}
 	// Use DataLoader to batch load flyer pages and prevent N+1 queries
 	loaders := dataloaders.FromContext(ctx)
-	return loaders.FlyerPageLoader.Load(ctx, *obj.FlyerPageID)()
+	page, err := loaders.FlyerPageLoader.Load(ctx, *obj.FlyerPageID)()
+	if err != nil {
+		return nil, err
+	}
+	return convertFlyerPageToGraphQL(page), nil
 }
 
-func (r *productResolver) ProductMaster(ctx context.Context, obj *models.Product) (*models.ProductMaster, error) {
+func (r *productResolver) ProductMaster(ctx context.Context, obj *models.Product) (*model.ProductMaster, error) {
 	if obj.ProductMasterID == nil {
 		return nil, nil
 	}
 	// Use DataLoader to batch load product masters and prevent N+1 queries
 	loaders := dataloaders.FromContext(ctx)
-	return loaders.ProductMasterLoader.Load(ctx, int64(*obj.ProductMasterID))()
+	pm, err := loaders.ProductMasterLoader.Load(ctx, int64(*obj.ProductMasterID))()
+	if err != nil {
+		return nil, err
+	}
+	return convertProductMasterToGraphQL(pm), nil
 }
 
-func (r *productResolver) PriceHistory(ctx context.Context, obj *models.Product) ([]*models.PriceHistory, error) {
+func (r *productResolver) PriceHistory(ctx context.Context, obj *models.Product) ([]*model.PriceHistory, error) {
 	// Return empty list for now - will be implemented in Phase 3.1
-	return []*models.PriceHistory{}, nil
+	return []*model.PriceHistory{}, nil
 }
 
 func (r *productResolver) CreatedAt(ctx context.Context, obj *models.Product) (string, error) {
@@ -139,4 +147,16 @@ func (r *productResolver) CreatedAt(ctx context.Context, obj *models.Product) (s
 
 func (r *productResolver) UpdatedAt(ctx context.Context, obj *models.Product) (string, error) {
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+func (r *productResolver) BoundingBox(ctx context.Context, obj *models.Product) (*model.ProductBoundingBox, error) {
+	// BoundingBox is extracted from flyer images - not yet implemented
+	// Return nil for now (Phase 3.3 - Image Processing)
+	return nil, nil
+}
+
+func (r *productResolver) PagePosition(ctx context.Context, obj *models.Product) (*model.ProductPosition, error) {
+	// PagePosition is the location of product on flyer page - not yet fully implemented
+	// Return nil for now (Phase 3.3 - Image Processing)
+	return nil, nil
 }

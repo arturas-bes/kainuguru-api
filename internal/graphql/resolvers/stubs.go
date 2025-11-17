@@ -26,7 +26,7 @@ import (
 
 // Price History resolvers implemented in price_history.go (Phase 3.1)
 
-func (r *queryResolver) PriceAlert(ctx context.Context, id string) (*models.PriceAlert, error) {
+func (r *queryResolver) PriceAlert(ctx context.Context, id string) (*model.PriceAlert, error) {
 	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
@@ -34,15 +34,15 @@ func (r *queryResolver) PriceAlerts(ctx context.Context, filters *model.PriceAle
 	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
-func (r *queryResolver) MyPriceAlerts(ctx context.Context) ([]*models.PriceAlert, error) {
+func (r *queryResolver) MyPriceAlerts(ctx context.Context) ([]*model.PriceAlert, error) {
 	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
-func (r *mutationResolver) CreatePriceAlert(ctx context.Context, input model.CreatePriceAlertInput) (*models.PriceAlert, error) {
+func (r *mutationResolver) CreatePriceAlert(ctx context.Context, input model.CreatePriceAlertInput) (*model.PriceAlert, error) {
 	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
-func (r *mutationResolver) UpdatePriceAlert(ctx context.Context, id string, input model.UpdatePriceAlertInput) (*models.PriceAlert, error) {
+func (r *mutationResolver) UpdatePriceAlert(ctx context.Context, id string, input model.UpdatePriceAlertInput) (*model.PriceAlert, error) {
 	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
@@ -50,12 +50,12 @@ func (r *mutationResolver) DeletePriceAlert(ctx context.Context, id string) (boo
 	return false, fmt.Errorf("not implemented yet - Phase 3.2")
 }
 
-func (r *mutationResolver) ActivatePriceAlert(ctx context.Context, id string) (*models.PriceAlert, error) {
-	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
+func (r *mutationResolver) ActivatePriceAlert(ctx context.Context, id string) (*model.PriceAlert, error) {
+	panic(fmt.Errorf("not implemented: ActivatePriceAlert - ActivatePriceAlert"))
 }
 
-func (r *mutationResolver) DeactivatePriceAlert(ctx context.Context, id string) (*models.PriceAlert, error) {
-	return nil, fmt.Errorf("not implemented yet - Phase 3.2")
+func (r *mutationResolver) DeactivatePriceAlert(ctx context.Context, id string) (*model.PriceAlert, error) {
+	panic(fmt.Errorf("not implemented: DeactivatePriceAlert - DeactivatePriceAlert"))
 }
 
 // Nested resolver stubs - TODO: Implement these in their respective phases

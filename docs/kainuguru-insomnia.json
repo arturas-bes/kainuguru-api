@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2025-11-07T09:52:58.338Z",
+  "__export_date": "2025-11-16T15:40:00.000Z",
   "__export_source": "insomnia.desktop.app:v10.0.0",
   "resources": [
     {
@@ -344,6 +344,378 @@
       ],
       "authentication": {},
       "metaSortKey": -1762439890200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "fld_wizard_migration_001",
+      "parentId": "wrk_5933b627207c4f99bf4b568476504b8d",
+      "modified": 1731772800000,
+      "created": 1731772800000,
+      "name": "🧙 Wizard (Migration)",
+      "description": "Shopping List Migration Wizard - Replace expired flyer products with current alternatives",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1762439890197,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_wizard_start_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800001,
+      "created": 1731772800001,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Start Wizard Session",
+      "description": "Start a new wizard session for a shopping list with expired items. Rate limited to 5 sessions per hour.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation StartWizard($input: StartWizardInput!) {\\n    startWizard(input: $input) {\\n      id\\n      status\\n      shoppingList {\\n        id\\n        name\\n        isLocked\\n      }\\n      expiredItems {\\n        id\\n        itemId\\n        productName\\n        brand\\n        originalPrice\\n        quantity\\n        expiryDate\\n        migrationStatus\\n        suggestions {\\n          id\\n          score\\n          confidence\\n          explanation\\n          product {\\n            id\\n            name\\n            brand\\n            price {\\n              current\\n              original\\n              currency\\n            }\\n            store {\\n              id\\n              name\\n            }\\n          }\\n          scoreBreakdown {\\n            brandScore\\n            storeScore\\n            sizeScore\\n            priceScore\\n            totalScore\\n          }\\n          priceDifference\\n        }\\n      }\\n      currentItemIndex\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n      selectedStores {\\n        store {\\n          id\\n          name\\n        }\\n        itemCount\\n        totalPrice\\n        savings\\n      }\\n      startedAt\\n      expiresAt\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"shoppingListId\": \"1\",\n      \"maxStores\": 2\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_start_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800001,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_query_session_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800002,
+      "created": 1731772800002,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Query Active Wizard Session",
+      "description": "Get the active wizard session for the current user",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"query ActiveWizardSession {\\n    activeWizardSession {\\n      id\\n      status\\n      shoppingList {\\n        id\\n        name\\n        expiredItemCount\\n        hasActiveWizardSession\\n      }\\n      expiredItems {\\n        id\\n        itemId\\n        productName\\n        brand\\n        originalPrice\\n        quantity\\n        migrationStatus\\n        suggestions {\\n          id\\n          score\\n          confidence\\n          explanation\\n          product {\\n            id\\n            name\\n            brand\\n            price {\\n              current\\n            }\\n          }\\n        }\\n      }\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n      selectedStores {\\n        store {\\n          id\\n          name\\n        }\\n        itemCount\\n        totalPrice\\n        savings\\n      }\\n      startedAt\\n      expiresAt\\n    }\\n  }\"\\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_query_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800002,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_query_by_id_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800003,
+      "created": 1731772800003,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Query Wizard Session by ID",
+      "description": "Get a specific wizard session by ID",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"query WizardSession($id: ID!) {\\n    wizardSession(id: $id) {\\n      id\\n      status\\n      shoppingList {\\n        id\\n        name\\n      }\\n      expiredItems {\\n        id\\n        itemId\\n        productName\\n        brand\\n        originalPrice\\n        quantity\\n        migrationStatus\\n      }\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n      startedAt\\n      expiresAt\\n    }\\n  }\",\n  \"variables\": {\n    \"id\": \"wizard-session-uuid\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_query_id_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800003,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_decision_replace_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800004,
+      "created": 1731772800004,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Record Decision - REPLACE",
+      "description": "Record a REPLACE decision to swap expired item with suggested product. Idempotent.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation RecordDecision($input: RecordDecisionInput!) {\\n    recordDecision(input: $input) {\\n      id\\n      status\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"sessionId\": \"wizard-session-uuid\",\n      \"itemId\": \"expired-item-uuid\",\n      \"decision\": \"REPLACE\",\n      \"suggestionId\": \"suggestion-uuid\",\n      \"reason\": \"Better price at preferred store\"\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_decision_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800004,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_decision_skip_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800005,
+      "created": 1731772800005,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Record Decision - SKIP",
+      "description": "Record a SKIP decision to keep the expired item unchanged",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation RecordDecision($input: RecordDecisionInput!) {\\n    recordDecision(input: $input) {\\n      id\\n      status\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"sessionId\": \"wizard-session-uuid\",\n      \"itemId\": \"expired-item-uuid\",\n      \"decision\": \"SKIP\",\n      \"reason\": \"Still want this product\"\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_skip_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800005,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_decision_remove_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800006,
+      "created": 1731772800006,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Record Decision - REMOVE",
+      "description": "Record a REMOVE decision to delete the expired item from the list",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation RecordDecision($input: RecordDecisionInput!) {\\n    recordDecision(input: $input) {\\n      id\\n      status\\n      progress {\\n        currentItem\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        percentComplete\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"sessionId\": \"wizard-session-uuid\",\n      \"itemId\": \"expired-item-uuid\",\n      \"decision\": \"REMOVE\",\n      \"reason\": \"No longer need this item\"\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_remove_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800006,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_confirm_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800007,
+      "created": 1731772800007,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Confirm Wizard (Apply Changes)",
+      "description": "Complete wizard and atomically apply all decisions. Validates products are not expired. Idempotent with 24h cache.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation CompleteWizard($input: CompleteWizardInput!) {\\n    completeWizard(input: $input) {\\n      success\\n      session {\\n        id\\n        status\\n        shoppingList {\\n          id\\n          name\\n          isLocked\\n        }\\n      }\\n      summary {\\n        totalItems\\n        itemsMigrated\\n        itemsSkipped\\n        itemsRemoved\\n        totalSavings\\n        storesUsed {\\n          id\\n          name\\n        }\\n        averageConfidence\\n      }\\n      errors {\\n        code\\n        message\\n        field\\n        itemId\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"input\": {\n      \"sessionId\": \"wizard-session-uuid\",\n      \"applyChanges\": true,\n      \"savePreferences\": true\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_confirm_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800007,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_cancel_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800008,
+      "created": 1731772800008,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Cancel Wizard",
+      "description": "Cancel an active wizard session. Unlocks the shopping list and deletes session from Redis.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"mutation CancelWizard($sessionId: ID!) {\\n    cancelWizard(sessionId: $sessionId)\\n  }\",\n  \"variables\": {\n    \"sessionId\": \"wizard-session-uuid\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_cancel_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800008,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_check_expired_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800009,
+      "created": 1731772800009,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Check for Expired Items",
+      "description": "Check if a shopping list has expired items and get count",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"query HasExpiredItems($shoppingListId: ID!) {\\n    hasExpiredItems(shoppingListId: $shoppingListId) {\\n      hasExpiredItems\\n      expiredCount\\n      items {\\n        id\\n        itemId\\n        productName\\n        brand\\n        originalPrice\\n        expiryDate\\n      }\\n      suggestedAction\\n    }\\n  }\",\n  \"variables\": {\n    \"shoppingListId\": \"1\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_check_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800009,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_wizard_lists_with_expired_001",
+      "parentId": "fld_wizard_migration_001",
+      "modified": 1731772800010,
+      "created": 1731772800010,
+      "url": "{{ _.graphql_endpoint }}",
+      "name": "Get Shopping Lists (with Expired Count)",
+      "description": "Query shopping lists with expiredItemCount and hasActiveWizardSession fields",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/graphql",
+        "text": "{\n  \"query\": \"query GetShoppingListsWithExpired($filters: ShoppingListFilters) {\\n    shoppingLists(filters: $filters) {\\n      edges {\\n        node {\\n          id\\n          name\\n          description\\n          isDefault\\n          itemCount\\n          expiredItemCount\\n          hasActiveWizardSession\\n          isLocked\\n          createdAt\\n          updatedAt\\n        }\\n      }\\n      pageInfo {\\n        hasNextPage\\n      }\\n    }\\n  }\",\n  \"variables\": {\n    \"filters\": {\n      \"isArchived\": false\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {% response 'body', 'req_f2bd927c25ea43c398521e491b98bd9f', 'b64::JC5kYXRhLmxvZ2luLmFjY2Vzc1Rva2Vu::46b', 'never', 60 %}",
+          "id": "pair_wizard_lists_auth"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1731772800010,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,

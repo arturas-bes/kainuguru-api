@@ -177,8 +177,12 @@ func (r *queryResolver) ValidFlyers(ctx context.Context, storeIDs []int, first *
 
 // Query resolvers - Flyer Page operations
 
-func (r *queryResolver) FlyerPage(ctx context.Context, id int) (*models.FlyerPage, error) {
-	return r.flyerPageService.GetByID(ctx, id)
+func (r *queryResolver) FlyerPage(ctx context.Context, id int) (*model.FlyerPage, error) {
+	page, err := r.flyerPageService.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return convertFlyerPageToGraphQL(page), nil
 }
 
 func (r *queryResolver) FlyerPages(ctx context.Context, filters *model.FlyerPageFilters, first *int, after *string) (*model.FlyerPageConnection, error) {
@@ -377,8 +381,12 @@ func (r *queryResolver) SearchProducts(ctx context.Context, input model.SearchIn
 
 // ProductMaster query resolvers (Phase 1.3)
 
-func (r *queryResolver) ProductMaster(ctx context.Context, id int) (*models.ProductMaster, error) {
-	return r.productMasterService.GetByID(ctx, int64(id))
+func (r *queryResolver) ProductMaster(ctx context.Context, id int) (*model.ProductMaster, error) {
+	pm, err := r.productMasterService.GetByID(ctx, int64(id))
+	if err != nil {
+		return nil, err
+	}
+	return convertProductMasterToGraphQL(pm), nil
 }
 
 func (r *queryResolver) ProductMasters(ctx context.Context, filters *model.ProductMasterFilters, first *int, after *string) (*model.ProductMasterConnection, error) {
@@ -435,7 +443,7 @@ func buildProductMasterConnection(masters []*models.ProductMaster, limit, offset
 	for i, master := range masters {
 		cursor := encodeCursor(offset + i)
 		edges[i] = &model.ProductMasterEdge{
-			Node:   master,
+			Node:   convertProductMasterToGraphQL(master),
 			Cursor: cursor,
 		}
 	}

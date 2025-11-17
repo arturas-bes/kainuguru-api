@@ -35,19 +35,19 @@ func (r *storeResolver) LastScrapedAt(ctx context.Context, obj *models.Store) (*
 	return &timeStr, nil
 }
 
-func (r *storeResolver) Locations(ctx context.Context, obj *models.Store) ([]*models.StoreLocation, error) {
+func (r *storeResolver) Locations(ctx context.Context, obj *models.Store) ([]*model.StoreLocation, error) {
 	// Parse locations from JSON
 	if obj.Locations == nil || len(obj.Locations) == 0 {
-		return []*models.StoreLocation{}, nil
+		return []*model.StoreLocation{}, nil
 	}
 
 	var locations []*models.StoreLocation
 	if err := json.Unmarshal(obj.Locations, &locations); err != nil {
 		// If parsing fails, return empty slice
-		return []*models.StoreLocation{}, nil
+		return []*model.StoreLocation{}, nil
 	}
 
-	return locations, nil
+	return convertStoreLocationsToGraphQL(locations), nil
 }
 
 func (r *storeResolver) CreatedAt(ctx context.Context, obj *models.Store) (string, error) {

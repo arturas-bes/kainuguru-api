@@ -9,12 +9,14 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/gofiber/fiber/v2"
+	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/generated"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
+	"github.com/kainuguru/kainuguru-api/internal/services/wizard"
 	"github.com/uptrace/bun"
 )
 
@@ -31,6 +33,8 @@ type GraphQLConfig struct {
 	ShoppingListService     services.ShoppingListService
 	ShoppingListItemService services.ShoppingListItemService
 	PriceHistoryService     services.PriceHistoryService
+	WizardService           wizard.Service
+	RateLimiter             *cache.RateLimiter
 	DB                      *bun.DB
 }
 
@@ -49,6 +53,8 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ShoppingListService,
 		config.ShoppingListItemService,
 		config.PriceHistoryService,
+		config.WizardService,
+		config.RateLimiter,
 		config.DB,
 	)
 

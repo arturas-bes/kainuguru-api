@@ -246,8 +246,9 @@ func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingLis
 // Items resolver moved to shopping_list_item.go (Phase 2.3)
 
 // Categories resolves the categories field on ShoppingList
-func (r *shoppingListResolver) Categories(ctx context.Context, obj *models.ShoppingList) ([]*models.ShoppingListCategory, error) {
-	return []*models.ShoppingListCategory{}, nil
+func (r *shoppingListResolver) Categories(ctx context.Context, obj *models.ShoppingList) ([]*model.ShoppingListCategory, error) {
+	// TODO: Implement category loading
+	return []*model.ShoppingListCategory{}, nil
 }
 
 // CompletionPercentage resolves the computed completionPercentage field
@@ -266,7 +267,8 @@ func (r *shoppingListResolver) CanBeShared(ctx context.Context, obj *models.Shop
 }
 
 // ExpiredItemCount returns the count of expired items in this shopping list
-// Used for displaying "3 items need updating" notification
+// ExpiredItemCount returns the count of expired items in this shopping list
+// Used for displaying "3 items need updating" notification badge
 func (r *shoppingListResolver) ExpiredItemCount(ctx context.Context, obj *models.ShoppingList) (int, error) {
 	if r.wizardService == nil {
 		return 0, nil // Wizard service not initialized

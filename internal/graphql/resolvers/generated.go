@@ -11,34 +11,17 @@ import (
 // Flyer returns generated.FlyerResolver implementation.
 func (r *Resolver) Flyer() generated.FlyerResolver { return &flyerResolver{r} }
 
-// FlyerPage returns generated.FlyerPageResolver implementation.
-func (r *Resolver) FlyerPage() generated.FlyerPageResolver { return &flyerPageResolver{r} }
-
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
-// PriceAlert returns generated.PriceAlertResolver implementation.
-func (r *Resolver) PriceAlert() generated.PriceAlertResolver { return &priceAlertResolver{r} }
-
-// PriceHistory returns generated.PriceHistoryResolver implementation.
-func (r *Resolver) PriceHistory() generated.PriceHistoryResolver { return &priceHistoryResolver{r} }
-
 // Product returns generated.ProductResolver implementation.
 func (r *Resolver) Product() generated.ProductResolver { return &productResolver{r} }
-
-// ProductMaster returns generated.ProductMasterResolver implementation.
-func (r *Resolver) ProductMaster() generated.ProductMasterResolver { return &productMasterResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
 // ShoppingList returns generated.ShoppingListResolver implementation.
 func (r *Resolver) ShoppingList() generated.ShoppingListResolver { return &shoppingListResolver{r} }
-
-// ShoppingListCategory returns generated.ShoppingListCategoryResolver implementation.
-func (r *Resolver) ShoppingListCategory() generated.ShoppingListCategoryResolver {
-	return &shoppingListCategoryResolver{r}
-}
 
 // ShoppingListItem returns generated.ShoppingListItemResolver implementation.
 func (r *Resolver) ShoppingListItem() generated.ShoppingListItemResolver {
@@ -51,8 +34,12 @@ func (r *Resolver) Store() generated.StoreResolver { return &storeResolver{r} }
 // User returns generated.UserResolver implementation.
 func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
 
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 // Resolver type definitions - these embed *Resolver to access services
 type flyerResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 type flyerPageResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type priceAlertResolver struct{ *Resolver }

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/kainuguru/kainuguru-api/internal/graphql/model"
-	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 )
 
@@ -68,11 +67,11 @@ func (r *queryResolver) PriceHistory(ctx context.Context, productMasterID int, s
 	return connection, nil
 }
 
-func (r *queryResolver) CurrentPrice(ctx context.Context, productMasterID int, storeID *int) (*models.PriceHistory, error) {
+func (r *queryResolver) CurrentPrice(ctx context.Context, productMasterID int, storeID *int) (*model.PriceHistory, error) {
 	priceHistory, err := r.priceHistoryService.GetCurrentPrice(ctx, productMasterID, storeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current price: %w", err)
 	}
 
-	return priceHistory, nil
+	return convertPriceHistoryToGraphQL(priceHistory), nil
 }

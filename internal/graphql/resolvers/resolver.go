@@ -1,6 +1,7 @@
 package resolvers
 
 import (
+	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
 	"github.com/kainuguru/kainuguru-api/internal/services/search"
@@ -22,6 +23,7 @@ type Resolver struct {
 	shoppingListItemService services.ShoppingListItemService
 	priceHistoryService     services.PriceHistoryService
 	wizardService           wizard.Service
+	rateLimiter             *cache.RateLimiter
 	db                      *bun.DB
 }
 
@@ -39,6 +41,7 @@ func NewServiceResolver(
 	shoppingListItemService services.ShoppingListItemService,
 	priceHistoryService services.PriceHistoryService,
 	wizardService wizard.Service,
+	rateLimiter *cache.RateLimiter,
 	db *bun.DB,
 ) *Resolver {
 	return &Resolver{
@@ -54,6 +57,7 @@ func NewServiceResolver(
 		shoppingListItemService: shoppingListItemService,
 		priceHistoryService:     priceHistoryService,
 		wizardService:           wizardService,
+		rateLimiter:             rateLimiter,
 		db:                      db,
 	}
 }

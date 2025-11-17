@@ -638,6 +638,7 @@ type fakeShoppingListRepository struct {
 	canUserAccessListFn   func(ctx context.Context, listID int64, userID uuid.UUID) (bool, error)
 	getUserCategoriesFn   func(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
 	clearCompletedItemsFn func(ctx context.Context, listID int64) (int, error)
+	getExpiredItemsFn     func(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
 }
 
 func (f *fakeShoppingListRepository) Create(ctx context.Context, list *models.ShoppingList) error {
@@ -764,4 +765,12 @@ func (f *fakeShoppingListRepository) ClearCompletedItems(ctx context.Context, li
 		panic("clearCompletedItemsFn not set")
 	}
 	return f.clearCompletedItemsFn(ctx, listID)
+}
+
+func (f *fakeShoppingListRepository) GetExpiredItems(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error) {
+	if f.getExpiredItemsFn == nil {
+		// Return empty slice if not set (most tests don't need this)
+		return []*models.ShoppingListItem{}, nil
+	}
+	return f.getExpiredItemsFn(ctx, listID)
 }

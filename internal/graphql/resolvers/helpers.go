@@ -259,7 +259,7 @@ func buildFlyerPageConnection(pages []*models.FlyerPage, limit, offset int, tota
 	for i, page := range pages {
 		cursor := encodeCursor(offset + i)
 		edges[i] = &model.FlyerPageEdge{
-			Node:   page,
+			Node:   convertFlyerPageToGraphQL(page),
 			Cursor: cursor,
 		}
 	}
@@ -391,7 +391,7 @@ func buildPriceHistoryConnection(entries []*models.PriceHistory, limit, offset i
 	for i, entry := range entries {
 		cursor := encodeCursor(offset + i)
 		edges[i] = &model.PriceHistoryEdge{
-			Node:   entry,
+			Node:   convertPriceHistoryToGraphQL(entry),
 			Cursor: cursor,
 		}
 	}
@@ -414,6 +414,48 @@ func buildPriceHistoryConnection(entries []*models.PriceHistory, limit, offset i
 	}
 }
 
+// convertPriceHistoryToGraphQL converts models.PriceHistory to model.PriceHistory
+func convertPriceHistoryToGraphQL(ph *models.PriceHistory) *model.PriceHistory {
+	if ph == nil {
+		return nil
+	}
+
+	var flyerID *int
+	if ph.FlyerID != nil {
+		flyerID = ph.FlyerID
+	}
+
+	var saleStartDate, saleEndDate *string
+	if ph.SaleStartDate != nil {
+		formatted := ph.SaleStartDate.Format(time.RFC3339)
+		saleStartDate = &formatted
+	}
+	if ph.SaleEndDate != nil {
+		formatted := ph.SaleEndDate.Format(time.RFC3339)
+		saleEndDate = &formatted
+	}
+
+	return &model.PriceHistory{
+		ID:               strconv.FormatInt(ph.ID, 10),
+		ProductMasterID:  ph.ProductMasterID,
+		StoreID:          ph.StoreID,
+		FlyerID:          flyerID,
+		Price:            ph.Price,
+		OriginalPrice:    ph.OriginalPrice,
+		Currency:         ph.Currency,
+		IsOnSale:         ph.IsOnSale,
+		RecordedAt:       ph.RecordedAt.Format(time.RFC3339),
+		ValidFrom:        ph.ValidFrom.Format(time.RFC3339),
+		ValidTo:          ph.ValidTo.Format(time.RFC3339),
+		SaleStartDate:    saleStartDate,
+		SaleEndDate:      saleEndDate,
+		Source:           ph.Source,
+		ExtractionMethod: ph.ExtractionMethod,
+		Confidence:       ph.Confidence,
+		IsAvailable:      ph.IsAvailable,
+	}
+}
+
 func parseRFC3339Ptr(value *string) *time.Time {
 	if value == nil || *value == "" {
 		return nil
@@ -422,4 +464,160 @@ func parseRFC3339Ptr(value *string) *time.Time {
 		return &t
 	}
 	return nil
+}
+
+// convertProductMasterToGraphQL converts models.ProductMaster to model.ProductMaster
+func convertProductMasterToGraphQL(pm *models.ProductMaster) *model.ProductMaster {
+	if pm == nil {
+		return nil
+	}
+
+	var lastMatchedAt, verifiedAt *string
+	if pm.LastSeenDate != nil {
+		formatted := pm.LastSeenDate.Format(time.RFC3339)
+		lastMatchedAt = &formatted
+	}
+	// Note: models.ProductMaster doesn't have VerifiedAt in DB model
+	// This field may need to be added or handled differently
+
+	return &model.ProductMaster{
+		ID:                  int(pm.ID),
+		CanonicalName:       pm.Name,
+		NormalizedName:      pm.NormalizedName,
+		Brand:               pm.Brand,
+		Category:            pm.Category,
+		Subcategory:         pm.Subcategory,
+		StandardUnitSize:    formatFloatPtr(pm.StandardSize),
+		StandardUnitType:    pm.UnitType,
+		StandardPackageSize: nil, // Not in DB model
+		StandardWeight:      nil, // Not in DB model
+		StandardVolume:      nil, // Not in DB model
+		MatchingKeywords:    strings.Join(pm.AlternativeNames, ","),
+		AlternativeNames:    strings.Join(pm.AlternativeNames, ","),
+		ExclusionKeywords:   "", // Not in DB model
+		ConfidenceScore:     pm.ConfidenceScore,
+		MatchedProducts:     pm.MatchCount,
+		SuccessfulMatches:   pm.MatchCount,                   // Same as match count
+		FailedMatches:       0,                               // Not tracked separately
+		Status:              model.ProductMasterStatusActive, // Default
+		IsVerified:          pm.ConfidenceScore > 0.8,        // Heuristic
+		LastMatchedAt:       lastMatchedAt,
+		VerifiedAt:          verifiedAt,
+		VerifiedBy:          nil,                // Not in DB model
+		MatchSuccessRate:    pm.ConfidenceScore, // Use confidence as proxy
+		CreatedAt:           pm.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:           pm.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+// convertStoreLocationToGraphQL converts models.StoreLocation to model.StoreLocation
+// These are structurally identical, so we can just cast
+func convertStoreLocationToGraphQL(sl *models.StoreLocation) *model.StoreLocation {
+	if sl == nil {
+		return nil
+	}
+	return &model.StoreLocation{
+		City:    sl.City,
+		Lat:     sl.Lat,
+		Lng:     sl.Lng,
+		Address: sl.Address,
+	}
+}
+
+// convertStoreLocationsToGraphQL converts slice of models.StoreLocation to model.StoreLocation
+func convertStoreLocationsToGraphQL(locations []*models.StoreLocation) []*model.StoreLocation {
+	if locations == nil {
+		return nil
+	}
+	result := make([]*model.StoreLocation, len(locations))
+	for i, loc := range locations {
+		result[i] = convertStoreLocationToGraphQL(loc)
+	}
+	return result
+}
+
+// convertShoppingListCategoryToGraphQL converts models.ShoppingListCategory to model.ShoppingListCategory
+func convertShoppingListCategoryToGraphQL(cat *models.ShoppingListCategory) *model.ShoppingListCategory {
+	if cat == nil {
+		return nil
+	}
+
+	return &model.ShoppingListCategory{
+		ID:             int(cat.ID),
+		ShoppingListID: int(cat.ShoppingListID),
+		UserID:         cat.UserID.String(),
+		Name:           cat.Name,
+		ColorHex:       cat.ColorHex,
+		IconName:       cat.IconName,
+		SortOrder:      cat.SortOrder,
+		ItemCount:      cat.ItemCount,
+		CreatedAt:      cat.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+// convertShoppingListCategoriesToGraphQL converts slice
+func convertShoppingListCategoriesToGraphQL(categories []*models.ShoppingListCategory) []*model.ShoppingListCategory {
+	if categories == nil {
+		return nil
+	}
+	result := make([]*model.ShoppingListCategory, len(categories))
+	for i, cat := range categories {
+		result[i] = convertShoppingListCategoryToGraphQL(cat)
+	}
+	return result
+}
+
+// convertFlyerPageToGraphQL converts models.FlyerPage to model.FlyerPage
+func convertFlyerPageToGraphQL(fp *models.FlyerPage) *model.FlyerPage {
+	if fp == nil {
+		return nil
+	}
+
+	// Convert extraction status to FlyerPageStatus enum
+	var status model.FlyerPageStatus
+	switch fp.ExtractionStatus {
+	case "pending":
+		status = model.FlyerPageStatusPending
+	case "processing":
+		status = model.FlyerPageStatusProcessing
+	case "completed":
+		status = model.FlyerPageStatusCompleted
+	case "failed":
+		status = model.FlyerPageStatusFailed
+	default:
+		status = model.FlyerPageStatusPending
+	}
+
+	return &model.FlyerPage{
+		ID:                    fp.ID,
+		FlyerID:               fp.FlyerID,
+		PageNumber:            fp.PageNumber,
+		ImageURL:              fp.ImageURL,
+		ImageWidth:            nil, // Not in DB model
+		ImageHeight:           nil, // Not in DB model
+		Status:                status,
+		ExtractionStartedAt:   nil, // Not in DB model
+		ExtractionCompletedAt: nil, // Not in DB model
+		ProductsExtracted:     0,   // Not directly available
+		ExtractionErrors:      fp.ExtractionAttempts,
+		LastExtractionError:   fp.ExtractionError,
+		LastErrorAt:           nil, // Not in DB model
+		HasImage:              fp.ImageURL != nil && *fp.ImageURL != "",
+		ImageDimensions:       nil, // Not in DB model
+		ProcessingDuration:    nil, // Not in DB model
+		ExtractionEfficiency:  0,   // Not in DB model
+		CreatedAt:             fp.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:             fp.UpdatedAt.Format(time.RFC3339),
+		Flyer:                 fp.Flyer, // Already models.Flyer
+		Products:              nil,      // Loaded separately by resolver
+	}
+}
+
+// formatFloatPtr converts *float64 to *string
+func formatFloatPtr(f *float64) *string {
+	if f == nil {
+		return nil
+	}
+	s := fmt.Sprintf("%.2f", *f)
+	return &s
 }

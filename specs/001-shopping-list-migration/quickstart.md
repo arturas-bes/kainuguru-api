@@ -1,93 +1,27 @@
-# Quick Start Guide: Shopping List Migration Wizard
+# Shopping List Migration Wizard - Quickstart Guide
 
-**Feature**: Shopping List Migration Wizard
-**Date**: 2025-11-15
-**Purpose**: Test and verify the wizard implementation
+## Overview
+
+The Shopping List Migration Wizard helps users update their shopping lists when flyer products expire. It provides intelligent, brand-aware suggestions and guides users through item-by-item decisions.
 
 ## Prerequisites
 
-- Docker and docker-compose running
-- PostgreSQL with test data
-- Redis server running
-- GraphQL playground accessible
+- Authentication token (JWT)
+- Shopping list with expired items
+- GraphQL endpoint: `https://api.kainuguru.com/graphql`
 
-## Setup Test Environment
+## Complete Wizard Flow
 
-### 1. Apply Database Migrations
-
-```bash
-# Run migration to add wizard tables
-go run cmd/migrate/main.go up
-
-# Verify tables created
-psql -U kainuguru -d kainuguru_db -c "\dt wizard_*"
-psql -U kainuguru -d kainuguru_db -c "\dt offer_*"
-```
-
-### 2. Start Services
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Verify Redis is running
-redis-cli ping
-
-# Check GraphQL endpoint
-curl http://localhost:8080/graphql
-```
-
-### 3. Create Test Data
-
-```sql
--- Insert test shopping list with flyer products
-INSERT INTO shopping_lists (user_id, name)
-VALUES (1, 'Test Migration List');
-
--- Add items linked to expiring flyer products
-INSERT INTO shopping_list_items
-(shopping_list_id, name, linked_product_id, store_id, flyer_id, quantity)
-VALUES
-(1, 'Coca-Cola 2L', 12345, 5, 100, 2),
-(1, 'Žemaitijos Milk 1L', 12346, 5, 100, 1),
-(1, 'Gardėsis Bread', 12347, 5, 100, 1);
-
--- Mark flyer as expired
-UPDATE flyers SET valid_until = NOW() - INTERVAL '1 day'
-WHERE id = 100;
-```
-
-## Testing the Wizard Flow
-
-### Step 1: Detect Expired Items
+### Step 1: Check for Expired Items
 
 ```graphql
 query CheckExpiredItems {
-  hasExpiredItems(shoppingListId: "1") {
-    hasExpiredItems
-    expiredCount
-    items {
-      id
-      productName
-      brand
-      originalPrice
-      expiryDate
-    }
-    suggestedAction
-  }
-}
-```
-
-**Expected Response**:
-```json
-{
-  "data": {
-    "hasExpiredItems": {
-      "hasExpiredItems": true,
-      "expiredCount": 3,
-      "items": [...],
-      "suggestedAction": "Start migration wizard to update expired items"
-    }
+  myShoppingLists {
+    id
+    name
+    expiredItemCount
+    hasActiveWizardSession
+    isLocked
   }
 }
 ```
@@ -95,322 +29,245 @@ query CheckExpiredItems {
 ### Step 2: Start Wizard Session
 
 ```graphql
-mutation StartMigration {
-  startWizard(input: {
-    shoppingListId: "1"
-    autoMode: false
-    maxStores: 2
+mutation StartWizard {
+  startWizard(input: { shoppingListID: "123" }) {
+    id
+    status
+    expiresAt
+    selectedStores {
+      id
+      name
+    }
+    expiredItems {
+      id
+      itemID
+      itemName
+      brand
+      suggestions {
+        id
+        productID
+        productName
+        brand
+        price
+        confidence
+        explanation
+      }
+    }
+  }
+}
+```
+
+### Step 3: Make Decisions
+
+#### Replace with Suggestion
+```graphql
+mutation AcceptSuggestion {
+  recordDecision(input: {
+    sessionID: "550e8400-e29b-41d4-a716-446655440000"
+    itemID: "456"
+    decision: REPLACE
+    suggestionID: "789"
   }) {
     id
     status
-    expiredItems {
-      id
-      productName
-      brand
-      originalPrice
-    }
-    progress {
-      totalItems
-      percentComplete
-    }
-    expiresAt
   }
 }
 ```
 
-**Save the session ID** from response for next steps.
-
-### Step 3: Get Suggestions for First Item
-
+#### Skip Item
 ```graphql
-query GetSuggestions {
-  getItemSuggestions(input: {
-    sessionId: "YOUR_SESSION_ID"
-    itemId: "FIRST_ITEM_ID"
-    maxResults: 5
-    minConfidence: 0.5
-  }) {
-    id
-    product {
-      name
-      brand
-      price
-      store {
-        name
-      }
-    }
-    score
-    confidence
-    explanation
-    scoreBreakdown {
-      brandScore
-      storeScore
-      sizeScore
-      priceScore
-      totalScore
-    }
-  }
-}
-```
-
-### Step 4: Record Decision
-
-```graphql
-mutation RecordItemDecision {
+mutation SkipItem {
   recordDecision(input: {
-    sessionId: "YOUR_SESSION_ID"
-    itemId: "FIRST_ITEM_ID"
-    decision: REPLACE
-    suggestionId: "SELECTED_SUGGESTION_ID"
+    sessionID: "550e8400-e29b-41d4-a716-446655440000"
+    itemID: "456"
+    decision: SKIP
   }) {
     id
-    progress {
-      currentItem
-      totalItems
-      itemsMigrated
-      percentComplete
-    }
-    selectedStores {
-      store {
-        name
-      }
-      itemCount
-      totalPrice
-    }
+    status
   }
 }
 ```
 
-### Step 5: Test Bulk Accept
-
+#### Remove Item
 ```graphql
-mutation BulkAccept {
-  bulkAcceptSuggestions(input: {
-    sessionId: "YOUR_SESSION_ID"
-    itemIds: ["ITEM_2_ID", "ITEM_3_ID"]
-    minConfidence: 0.8
+mutation RemoveItem {
+  recordDecision(input: {
+    sessionID: "550e8400-e29b-41d4-a716-446655440000"
+    itemID: "456"
+    decision: REMOVE
   }) {
     id
-    progress {
-      itemsMigrated
-      itemsSkipped
-      percentComplete
-    }
+    status
   }
 }
 ```
 
-### Step 6: Complete Wizard
+### Step 4: Confirm and Apply
 
 ```graphql
-mutation CompleteWizard {
-  completeWizard(input: {
-    sessionId: "YOUR_SESSION_ID"
-    applyChanges: true
-    savePreferences: true
+mutation ConfirmWizard {
+  confirmWizard(input: {
+    sessionID: "550e8400-e29b-41d4-a716-446655440000"
   }) {
     success
-    summary {
-      totalItems
-      itemsMigrated
-      itemsSkipped
-      totalSavings
-      storesUsed {
-        name
-      }
-      averageConfidence
-    }
-    errors {
-      code
-      message
+    result {
+      itemsUpdated
+      itemsDeleted
+      storeCount
+      totalEstimatedPrice
     }
   }
 }
 ```
 
-## Testing Edge Cases
-
-### Test 1: Store Limit Enforcement
+### Alternative: Cancel Wizard
 
 ```graphql
-# Try to select items from 3+ stores
-# Should get error when exceeding 2 stores
-```
-
-### Test 2: Session Timeout
-
-```bash
-# Wait 31 minutes after starting session
-# Try to continue - should get SessionExpiredError
-```
-
-### Test 3: Data Staleness Detection
-
-```sql
--- Change flyer data mid-session
-UPDATE flyers SET dataset_version = dataset_version + 1;
-```
-
-```graphql
-# Try to complete wizard
-# Should get StaleDataError
-```
-
-### Test 4: Same-Brand Priority
-
-```graphql
-# Verify same-brand products appear first
-# Even from different stores
-```
-
-## Performance Testing
-
-### Load Test Script
-
-```bash
-#!/bin/bash
-# Create 100 concurrent wizard sessions
-
-for i in {1..100}; do
-  curl -X POST http://localhost:8080/graphql \
-    -H "Content-Type: application/json" \
-    -d '{"query":"mutation { startWizard(input: { shoppingListId: \"'$i'\" }) { id } }"}' &
-done
-
-wait
-echo "Load test complete"
-```
-
-### Measure Latencies
-
-```graphql
-# Run with timing
-time {
-  getItemSuggestions(input: {
-    sessionId: "..."
-    itemId: "..."
+mutation CancelWizard {
+  cancelWizard(input: {
+    sessionID: "550e8400-e29b-41d4-a716-446655440000"
   }) {
-    # Should complete in <1 second (P95)
+    success
   }
 }
 ```
 
-## Monitoring & Debugging
+## cURL Examples
 
-### Check Redis Sessions
-
+### Start Wizard
 ```bash
-# List all wizard sessions
-redis-cli keys "wizard:session:*"
-
-# Inspect session data
-redis-cli hgetall "wizard:session:UUID"
-
-# Check TTL
-redis-cli ttl "wizard:session:UUID"
-```
-
-### Database Queries
-
-```sql
--- Active sessions
-SELECT * FROM wizard_sessions
-WHERE status = 'active'
-ORDER BY started_at DESC;
-
--- Migration history
-SELECT * FROM offer_snapshots
-WHERE session_id = 'UUID'
-ORDER BY created_at;
-
--- User statistics
-SELECT
-  COUNT(*) as sessions,
-  AVG(completion_rate) as avg_completion,
-  SUM(items_migrated) as total_migrated
-FROM wizard_sessions
-WHERE user_id = 1;
-```
-
-### GraphQL Introspection
-
-```graphql
-# Verify schema additions
-{
-  __type(name: "WizardSession") {
-    fields {
-      name
-      type {
-        name
+curl -X POST https://api.kainuguru.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "query": "mutation StartWizard($input: StartWizardInput!) { startWizard(input: $input) { id status } }",
+    "variables": {
+      "input": {
+        "shoppingListID": "123"
       }
     }
-  }
+  }'
+```
+
+### Record Decision
+```bash
+curl -X POST https://api.kainuguru.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "query": "mutation RecordDecision($input: RecordDecisionInput!) { recordDecision(input: $input) { id } }",
+    "variables": {
+      "input": {
+        "sessionID": "550e8400-e29b-41d4-a716-446655440000",
+        "itemID": "456",
+        "decision": "REPLACE",
+        "suggestionID": "789"
+      }
+    }
+  }'
+```
+
+### Confirm Wizard
+```bash
+curl -X POST https://api.kainuguru.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "query": "mutation ConfirmWizard($input: ConfirmWizardInput!) { confirmWizard(input: $input) { success } }",
+    "variables": {
+      "input": {
+        "sessionID": "550e8400-e29b-41d4-a716-446655440000"
+      }
+    }
+  }'
+```
+
+## Key Features
+
+- **Session Expiration:** 30 minutes TTL
+- **Store Limit:** Maximum 2 stores per session
+- **Rate Limit:** 5 sessions per user per hour
+- **List Locking:** Prevents concurrent wizard sessions
+- **Idempotency:** Safe retry for all mutations
+- **Revalidation:** Staleness detection before applying changes
+- **ACID Transactions:** Atomic application of all decisions
+
+## Error Handling
+
+### Rate Limit Exceeded
+```json
+{
+  "errors": [
+    {
+      "message": "rate limit exceeded: maximum 5 wizard sessions per hour"
+    }
+  ]
 }
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Session Not Found**
-   - Check Redis connection
-   - Verify session hasn't expired
-   - Check session ID format
-
-2. **No Suggestions Returned**
-   - Verify SearchService is running
-   - Check if products exist in current flyers
-   - Review search similarity thresholds
-
-3. **Store Limit Exceeded**
-   - Verify store selection logic
-   - Check selectedStores in session
-
-4. **Data Version Mismatch**
-   - Resync dataset_version
-   - Start new session
-
-## Success Criteria Validation
-
-- [ ] Wizard completion rate >70%
-- [ ] Average decision time <15 seconds
-- [ ] Suggestion acceptance rate >80%
-- [ ] Same-brand shown when available
-- [ ] Never exceed 2 stores
-- [ ] P95 latency <1 second
-
-## Rollback Procedure
-
-If issues arise:
-
-```bash
-# 1. Disable feature flag
-curl -X POST http://localhost:8080/admin/features \
-  -d '{"wizard_enabled": false}'
-
-# 2. Clear Redis sessions
-redis-cli --scan --pattern "wizard:*" | xargs redis-cli del
-
-# 3. Rollback database if needed
-go run cmd/migrate/main.go down
-
-# 4. Restore original shopping lists
-psql -U kainuguru -d kainuguru_db < backup.sql
+### List Already Locked
+```json
+{
+  "errors": [
+    {
+      "message": "shopping list is already being migrated by another active wizard session"
+    }
+  ]
+}
 ```
 
-## Next Steps
+### Session Expired
+```json
+{
+  "errors": [
+    {
+      "message": "session has expired"
+    }
+  ]
+}
+```
 
-After successful testing:
+### Stale Data
+```json
+{
+  "errors": [
+    {
+      "message": "revalidation failed: 2 products are stale or expired"
+    }
+  ]
+}
+```
 
-1. Enable for 5% of users
-2. Monitor metrics for 24 hours
-3. Gradually increase to 25%, 50%, 100%
-4. Collect user feedback
-5. Iterate on scoring algorithm
+## Constitution Compliance
+
+- **FR-002:** Same-brand alternatives prioritized
+- **FR-003:** Maximum 2 stores enforced
+- **FR-004:** Deterministic scoring
+- **FR-005:** Human-readable explanations
+- **FR-016:** List locking prevents concurrent sessions
+- **FR-020:** Origin tracking for wizard-selected products
+
+## Metrics
+
+Prometheus metrics tracked:
+- `wizard_items_flagged_total{reason}`
+- `wizard_suggestions_returned{has_same_brand}`
+- `wizard_acceptance_rate_total{decision}`
+- `wizard_selected_store_count{session_status}`
+- `wizard_latency_ms{operation}`
+- `wizard_sessions_total{status}`
+- `wizard_revalidation_errors_total{error_type}`
+
+## Technical Notes
+
+- **Session Storage:** Redis with 30min TTL
+- **Idempotency:** 24h cache
+- **Transactions:** PostgreSQL ACID guarantees
+- **N+1 Prevention:** DataLoaders for relations
+- **Rate Limiting:** Redis sorted sets
 
 ## Support
 
-For issues or questions:
-- Check logs: `docker-compose logs api`
-- Review metrics: `http://localhost:8080/metrics`
-- Database state: `psql -U kainuguru -d kainuguru_db`
+For details see:
+- `/docs/SHOPPING_LIST_MIGRATION_SPEC_V2.md`
+- `/docs/api.md`
