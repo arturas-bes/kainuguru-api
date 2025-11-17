@@ -242,7 +242,7 @@
 
 **Purpose**: GraphQL error mapping, logging, and metrics
 
-- [ ] T060 [P] Create internal/graphql/errors/wizard_errors.go with typed errors (ValidationError, StaleDataError, NotFoundError, ExpiredSessionError) mapping to GraphQL codes
+- [X] T060 [P] Create internal/graphql/errors/wizard_errors.go with typed errors (ValidationError, StaleDataError, NotFoundError, ExpiredSessionError) mapping to GraphQL codes
 - [ ] T061 [P] Add error wrapping in all wizard service methods using pkg/errors (or fmt.Errorf with %w)
 - [ ] T062 [P] Map service errors to GraphQL errors in all resolvers (e.g., ErrSessionExpired → ExpiredSessionError)
 - [ ] T063 Add structured logging to wizard service methods: session_id, list_id, user_id, item_count, store_count, decision_action fields
@@ -272,10 +272,10 @@
 - [X] T069 [P] Add rate limiting to startWizard mutation (max 5 sessions per user per hour) to prevent abuse
 - [X] T070 Update internal/graphql/schema/shopping_list.graphqls to extend ShoppingList type with expiredItemCount and hasActiveWizardSession fields
 - [X] T071 [P] Create quickstart example in specs/001-shopping-list-migration/quickstart.md showing cURL/GraphQL calls for full wizard flow
-- [ ] T072 Add comment documentation to all public wizard service methods (godoc format)
+- [X] T072 Add comment documentation to all public wizard service methods (godoc format)
 - [ ] T073 Run gqlgen generate final time to regenerate resolvers with all changes
-- [ ] T074 Run go fmt ./... and go vet ./... on all wizard code
-- [ ] T075 Verify all wizard files follow internal/ package structure conventions
+- [X] T074 Run go fmt ./... and go vet ./... on all wizard code
+- [X] T075 Verify all wizard files follow internal/ package structure conventions
 
 **Checkpoint**: Wizard fully integrated, documented, and polished
 
