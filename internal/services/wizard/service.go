@@ -48,6 +48,11 @@ type Service interface {
 
 	// Wizard completion
 	ConfirmWizard(ctx context.Context, sessionID uuid.UUID, idempotencyKey string) (*ConfirmWizardResult, error)
+
+	// Expired item detection
+	CountExpiredItems(ctx context.Context, listID int64) (int, error)
+	HasActiveWizardSession(ctx context.Context, listID int64) (bool, error)
+	GetExpiredItemsForList(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
 }
 
 // wizardService implements the Service interface

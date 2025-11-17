@@ -124,9 +124,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context) (*model.AuthPayload
 // ShoppingLists resolver moved to shopping_list.go (Phase 2.2)
 
 // PriceAlerts resolves the priceAlerts field on User
-func (r *userResolver) PriceAlerts(ctx context.Context, obj *models.User) ([]*models.PriceAlert, error) {
+func (r *userResolver) PriceAlerts(ctx context.Context, obj *models.User) ([]*model.PriceAlert, error) {
 	// TODO: Implement in Phase 3.2 when price alert service is available
-	return []*models.PriceAlert{}, nil
+	return []*model.PriceAlert{}, nil
 }
 
 // Helper functions

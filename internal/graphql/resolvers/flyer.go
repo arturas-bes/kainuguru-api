@@ -31,8 +31,8 @@ func (r *flyerResolver) ValidTo(ctx context.Context, obj *models.Flyer) (string,
 	return obj.ValidTo.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
-func (r *flyerResolver) Status(ctx context.Context, obj *models.Flyer) (models.FlyerStatus, error) {
-	return models.FlyerStatus(obj.Status), nil
+func (r *flyerResolver) Status(ctx context.Context, obj *models.Flyer) (model.FlyerStatus, error) {
+	return model.FlyerStatus(obj.Status), nil
 }
 
 func (r *flyerResolver) ArchivedAt(ctx context.Context, obj *models.Flyer) (*string, error) {
