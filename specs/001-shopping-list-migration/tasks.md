@@ -205,10 +205,10 @@
 
 ### Implementation Tasks
 
-- [ ] T045 [P] [US6] Add session TTL extension in wizard_cache.go ExtendSessionTTL(sessionID) (reset Redis key to 1800s on any update)
-- [ ] T046 [P] [US6] Add staleness detection in wizardSession query resolver and confirmWizard (store datasetVersion in session, compare flyer_products.updated_at max on session load and confirm, return STALE_DATA error if changed since session start)
-- [ ] T047 [US6] Implement revalidation in confirmWizard before applying (re-fetch all selected flyerProductIDs, verify valid_to still future, prices unchanged)
-- [ ] T048 [US6] Add session cleanup worker internal/workers/cleanup_expired_sessions.go (runs hourly, deletes Redis keys wizard:session:* where expires_at < NOW())
+- [X] T045 [P] [US6] Add session TTL extension in wizard_cache.go ExtendSessionTTL(sessionID) (reset Redis key to 1800s on any update)
+- [X] T046 [P] [US6] Add staleness detection in wizardSession query resolver and confirmWizard (store datasetVersion in session, compare flyer_products.updated_at max on session load and confirm, return STALE_DATA error if changed since session start)
+- [X] T047 [US6] Implement revalidation in confirmWizard before applying (re-fetch all selected flyerProductIDs, verify valid_to still future, prices unchanged)
+- [X] T048 [US6] Add session cleanup worker internal/workers/cleanup_expired_sessions.go (runs hourly, deletes Redis keys wizard:session:* where expires_at < NOW())
 
 **Checkpoint**: Sessions persist and resume reliably with staleness protection
 
