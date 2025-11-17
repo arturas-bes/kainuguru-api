@@ -341,6 +341,12 @@ func (s *wizardService) CancelWizard(ctx context.Context, sessionID uuid.UUID) e
 // Returns ErrSessionExpired if session TTL has expired.
 // Returns ErrInvalidDecision if suggestionID is missing for REPLACE decision.
 func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) (*models.WizardSession, error) {
+	// T065: Track method latency
+	decideStart := time.Now()
+	defer func() {
+		monitoring.WizardLatencyMs.WithLabelValues("decide_item").Observe(float64(time.Since(decideStart).Milliseconds()))
+	}()
+
 	s.logger.Info("DecideItem called",
 		"session_id", req.SessionID,
 		"item_id", req.ItemID,
@@ -470,12 +476,6 @@ func (s *wizardService) ApplyBulkDecisions(ctx context.Context, req *ApplyBulkDe
 	bulkStart := time.Now()
 	defer func() {
 		monitoring.WizardLatencyMs.WithLabelValues("apply_bulk_decisions").Observe(float64(time.Since(bulkStart).Milliseconds()))
-	}()
-
-	// T043: Check idempotency key first
-	startTime := time.Now()
-	defer func() {
-		monitoring.WizardLatencyMs.WithLabelValues("apply_bulk_decisions").Observe(float64(time.Since(startTime).Milliseconds()))
 	}()
 
 	// T043: Check idempotency key first
