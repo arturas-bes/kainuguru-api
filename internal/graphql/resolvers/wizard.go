@@ -221,17 +221,51 @@ func (r *mutationResolver) RecordDecision(ctx context.Context, input model.Recor
 	return gqlSession, nil
 }
 
-// BulkAcceptSuggestions accepts all suggestions in bulk
+// BulkAcceptSuggestions accepts all top suggestions in bulk with automatic store limitation
 func (r *mutationResolver) BulkAcceptSuggestions(ctx context.Context, input model.BulkAcceptInput) (*model.WizardSession, error) {
 	// Require authentication
-	_, ok := middleware.GetUserFromContext(ctx)
+	userID, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	// TODO: Implement in Phase 7 (US5 - Bulk Decisions)
-	_ = input
-	return nil, fmt.Errorf("not implemented yet")
+	// Parse session ID
+	sessionUUID, err := parseUUID(input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session ID: %w", err)
+	}
+
+	// Load session first to verify ownership
+	session, err := r.wizardService.GetSession(ctx, sessionUUID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Verify user owns the session
+	if session.UserID != int64(userID.ID()) {
+		return nil, fmt.Errorf("access denied: session does not belong to current user")
+	}
+
+	// Generate idempotency key
+	idempotencyKey := fmt.Sprintf("wizard:bulk:%s", sessionUUID.String())
+
+	// Build service request
+	req := &wizard.ApplyBulkDecisionsRequest{
+		SessionID:      sessionUUID,
+		Decisions:      []wizard.BulkDecision{}, // Empty = accept all top suggestions
+		IdempotencyKey: idempotencyKey,
+	}
+
+	// Call service to apply bulk decisions (includes store validation per T042)
+	updatedSession, err := r.wizardService.ApplyBulkDecisions(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply bulk decisions: %w", err)
+	}
+
+	// Map to GraphQL model
+	gqlSession := mapWizardSessionToGraphQL(updatedSession)
+
+	return gqlSession, nil
 }
 
 // CompleteWizard completes the wizard and applies changes

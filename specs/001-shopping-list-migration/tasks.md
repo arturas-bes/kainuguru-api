@@ -135,11 +135,11 @@
 
 ### Implementation Tasks
 
-- [ ] T030 [P] [US3] Add maxStores validation in store_selection.go SelectOptimalStores() (reject if result would exceed config.MaxStores)
-- [ ] T031 [P] [US3] Add coverage calculation in store_selection.go (count items per store, pick top 2 by coverage)
-- [ ] T032 [US3] Add savings calculation in store_selection.go (compare prices, compute €savings for 2nd store justification)
-- [ ] T033 [US3] Add unit tests in tests/unit/store_selection_test.go verifying maxStores constraint never violated
-- [ ] T034 [US3] Add Prometheus histogram wizard_selected_store_count in metrics.go (track store count distribution)
+- [X] T030 [P] [US3] Add maxStores validation in store_selection.go SelectOptimalStores() (reject if result would exceed config.MaxStores)
+- [X] T031 [P] [US3] Add coverage calculation in store_selection.go (count items per store, pick top 2 by coverage)
+- [X] T032 [US3] Add savings calculation in store_selection.go (compare prices, compute €savings for 2nd store justification)
+- [X] T033 [US3] Add unit tests in tests/unit/store_selection_test.go verifying maxStores constraint never violated
+- [X] T034 [US3] Add Prometheus histogram wizard_selected_store_count in metrics.go (track store count distribution)
 
 **Checkpoint**: Store selection respects 2-store limit and optimizes coverage
 
@@ -182,10 +182,10 @@
 
 ### Implementation Tasks
 
-- [ ] T041 [P] [US5] Implement applyBulkDecisions mutation resolver in wizard.resolvers.go (iterate Suggestions, select top for each item, validate maxStores, update Decisions, save session)
-- [ ] T042 [US5] Add bulk store validation in applyBulkDecisions (if >2 stores, re-run SelectOptimalStores to pick best 2, update decisions accordingly)
-- [ ] T043 [US5] Add idempotency key handling in applyBulkDecisions (same pattern as decideItem)
-- [ ] T044 [US5] Add unit tests in tests/unit/wizard_service_test.go for bulk decision logic (verify store cap enforcement)
+- [X] T041 [P] [US5] Implement applyBulkDecisions mutation resolver in wizard.resolvers.go (iterate Suggestions, select top for each item, validate maxStores, update Decisions, save session)
+- [X] T042 [US5] Add bulk store validation in applyBulkDecisions (if >2 stores, re-run SelectOptimalStores to pick best 2, update decisions accordingly)
+- [X] T043 [US5] Add idempotency key handling in applyBulkDecisions (same pattern as decideItem)
+- [X] T044 [US5] Add unit tests in tests/unit/wizard_service_test.go for bulk decision logic (verify store cap enforcement)
 
 **Checkpoint**: Bulk operations work with automatic store limitation
 
@@ -243,11 +243,11 @@
 **Purpose**: GraphQL error mapping, logging, and metrics
 
 - [X] T060 [P] Create internal/graphql/errors/wizard_errors.go with typed errors (ValidationError, StaleDataError, NotFoundError, ExpiredSessionError) mapping to GraphQL codes
-- [ ] T061 [P] Add error wrapping in all wizard service methods using pkg/errors (or fmt.Errorf with %w)
-- [ ] T062 [P] Map service errors to GraphQL errors in all resolvers (e.g., ErrSessionExpired → ExpiredSessionError)
-- [ ] T063 Add structured logging to wizard service methods: session_id, list_id, user_id, item_count, store_count, decision_action fields
-- [ ] T064 [P] Add all Prometheus metrics to internal/monitoring/metrics.go: wizard_items_flagged_total, wizard_suggestions_returned_total, wizard_acceptance_rate (histogram), wizard_selected_store_count (histogram), wizard_latency_ms (histogram)
-- [ ] T065 Add metrics instrumentation to service methods (defer recordDuration, increment counters at decision points)
+- [X] T061 [P] Add error wrapping in all wizard service methods using pkg/errors (or fmt.Errorf with %w)
+- [X] T062 [P] Map service errors to GraphQL errors in all resolvers (e.g., ErrSessionExpired → ExpiredSessionError)
+- [X] T063 Add structured logging to wizard service methods: session_id, list_id, user_id, item_count, store_count, decision_action fields
+- [X] T064 [P] Add all Prometheus metrics to internal/monitoring/metrics.go: wizard_items_flagged_total, wizard_suggestions_returned_total, wizard_acceptance_rate (histogram), wizard_selected_store_count (histogram), wizard_latency_ms (histogram)
+- [X] T065 Add metrics instrumentation to service methods (defer recordDuration, increment counters at decision points)
 
 **Checkpoint**: Errors are typed and observable, metrics captured for all wizard operations
 

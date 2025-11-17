@@ -87,20 +87,27 @@ func NewService(
 
 // StartWizard initiates a new wizard session for migrating expired flyer products.
 // It performs the following steps:
-//   1. Validates shopping list exists and user has permission
-//   2. Checks rate limiting (max 5 sessions per user per hour)
-//   3. Verifies list is not already locked by another wizard session
-//   4. Detects expired items (flyer products with valid_to < NOW)
-//   5. Generates ranked suggestions using two-pass brand-aware search
-//   6. Selects optimal stores (max 2) using greedy algorithm
-//   7. Locks the shopping list (sets is_locked=true)
-//   8. Saves session to Redis with 30-minute TTL
+//  1. Validates shopping list exists and user has permission
+//  2. Checks rate limiting (max 5 sessions per user per hour)
+//  3. Verifies list is not already locked by another wizard session
+//  4. Detects expired items (flyer products with valid_to < NOW)
+//  5. Generates ranked suggestions using two-pass brand-aware search
+//  6. Selects optimal stores (max 2) using greedy algorithm
+//  7. Locks the shopping list (sets is_locked=true)
+//  8. Saves session to Redis with 30-minute TTL
 //
 // Returns ErrRateLimitExceeded if user has started 5+ sessions in the last hour.
 // Returns ErrListLocked if shopping list is already being migrated.
 // Returns ErrNoExpiredItems if no expired items found.
 func (s *wizardService) StartWizard(ctx context.Context, req *StartWizardRequest) (*models.WizardSession, error) {
-	s.logger.Info("StartWizard called",
+	// T065: Track method latency
+	startTime := time.Now()
+	defer func() {
+		monitoring.WizardLatencyMs.WithLabelValues("start_wizard").Observe(float64(time.Since(startTime).Milliseconds()))
+	}()
+
+	// T063: Structured logging with all relevant context
+	s.logger.Info("starting wizard session",
 		"shopping_list_id", req.ShoppingListID,
 		"user_id", req.UserID)
 
@@ -284,9 +291,9 @@ func (s *wizardService) GetSession(ctx context.Context, sessionID uuid.UUID) (*m
 
 // CancelWizard cancels an active wizard session without applying any changes.
 // It performs the following cleanup:
-//   1. Updates session status to CANCELLED
-//   2. Unlocks the shopping list (sets is_locked=false)
-//   3. Deletes session from Redis
+//  1. Updates session status to CANCELLED
+//  2. Unlocks the shopping list (sets is_locked=false)
+//  3. Deletes session from Redis
 //
 // Returns ErrSessionNotFound if session does not exist.
 // This operation is idempotent - multiple cancellations of the same session succeed.
@@ -442,12 +449,194 @@ func (s *wizardService) DecideItem(ctx context.Context, req *DecideItemRequest) 
 	return session, nil
 }
 
-// ApplyBulkDecisions records decisions for multiple items
+// ApplyBulkDecisions applies all top suggestions as REPLACE decisions with automatic
+// store limitation to max 2 stores. This enables users to accept all suggestions at once
+// for faster processing.
+//
+// Steps:
+//  1. Check idempotency key to prevent duplicate requests
+//  2. Load session from Redis and validate it's not expired
+//  3. Iterate all expired items and select top suggestion for each
+//  4. Validate selected suggestions don't exceed maxStores=2 constraint
+//  5. If >2 stores, re-run SelectOptimalStores to pick best 2 stores
+//  6. Update decisions map with REPLACE actions
+//  7. Save updated session to Redis
+//  8. Store idempotency result for 24h
+//
+// Returns ErrSessionExpired if session has expired.
+// Returns ErrListLocked if another session has locked the list.
 func (s *wizardService) ApplyBulkDecisions(ctx context.Context, req *ApplyBulkDecisionsRequest) (*models.WizardSession, error) {
-	// TODO: Implement in Phase 6 (T036-T040)
-	s.logger.Info("ApplyBulkDecisions called", "session_id", req.SessionID, "decisions_count", len(req.Decisions))
-	return nil, nil
+	// T065: Track method latency
+	bulkStart := time.Now()
+	defer func() {
+		monitoring.WizardLatencyMs.WithLabelValues("apply_bulk_decisions").Observe(float64(time.Since(bulkStart).Milliseconds()))
+	}()
+
+	// T043: Check idempotency key first
+	startTime := time.Now()
+	defer func() {
+		monitoring.WizardLatencyMs.WithLabelValues("apply_bulk_decisions").Observe(float64(time.Since(startTime).Milliseconds()))
+	}()
+
+	// T043: Check idempotency key first
+	if req.IdempotencyKey != "" {
+		cachedSessionID, err := s.wizardCache.GetIdempotencyKey(ctx, req.IdempotencyKey)
+		if err == nil && cachedSessionID != uuid.Nil {
+			// Request already processed, return cached result
+			cachedSession, err := s.wizardCache.GetSession(ctx, cachedSessionID)
+			if err == nil && cachedSession != nil {
+				s.logger.Info("returning cached bulk decision result",
+					"session_id", cachedSessionID,
+					"idempotency_key", req.IdempotencyKey)
+				return cachedSession, nil
+			}
+		}
+	}
+
+	// 1. Load session from Redis
+	session, err := s.wizardCache.GetSession(ctx, req.SessionID)
+	if err != nil {
+		s.logger.Error("failed to load wizard session",
+			"session_id", req.SessionID,
+			"error", err)
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	// 2. Check if session is expired
+	if session.IsExpired() {
+		s.logger.Warn("attempted to apply bulk decisions to expired session",
+			"session_id", req.SessionID,
+			"expires_at", session.ExpiresAt)
+		_ = s.wizardCache.DeleteSession(ctx, req.SessionID)
+		return nil, fmt.Errorf("session has expired")
+	}
+
+	// 3. T041: Build decisions for all items by selecting top suggestion
+	decisionsToApply := make(map[int64]models.Decision)
+	storeUsage := make(map[int]int) // Track how many items per store
+
+	// Build map of suggestions by item ID for fast lookup
+	suggestionsByItem := make(map[int64][]models.Suggestion)
+	for _, item := range session.ExpiredItems {
+		suggestionsByItem[item.ItemID] = item.Suggestions
+	}
+
+	// Iterate each item and pick top suggestion (first in list = highest ranked)
+	for _, item := range session.ExpiredItems {
+		// Skip if no suggestions available
+		if len(item.Suggestions) == 0 {
+			s.logger.Warn("item has no suggestions, skipping",
+				"item_id", item.ItemID,
+				"product_name", item.ProductName)
+			continue
+		}
+
+		// Pick top suggestion (index 0 = highest score)
+		topSuggestion := item.Suggestions[0]
+		suggestionID := topSuggestion.FlyerProductID
+
+		// Track store usage
+		storeUsage[topSuggestion.StoreID]++
+
+		// Create decision
+		decisionsToApply[item.ItemID] = models.Decision{
+			ItemID:       item.ItemID,
+			Action:       models.DecisionActionReplace,
+			SuggestionID: &suggestionID,
+			Timestamp:    time.Now(),
+		}
+	}
+
+	// 4. T042: Validate maxStores constraint
+	if len(storeUsage) > s.maxStoresPerWizard {
+		s.logger.Info("bulk decisions exceed maxStores, re-optimizing store selection",
+			"stores_selected", len(storeUsage),
+			"max_stores", s.maxStoresPerWizard,
+			"session_id", req.SessionID)
+
+		// T042: Re-run SelectOptimalStores to pick best 2 stores by coverage
+		// Build suggestions map for SelectOptimalStores (item_id -> list of suggestions)
+		suggestionMap := make(map[int][]*models.Suggestion)
+		for _, item := range session.ExpiredItems {
+			sugList := make([]*models.Suggestion, len(item.Suggestions))
+			for i := range item.Suggestions {
+				sugList[i] = &item.Suggestions[i]
+			}
+			suggestionMap[int(item.ItemID)] = sugList
+		}
+
+		// Run greedy algorithm
+		storeResult := SelectOptimalStores(suggestionMap, s.maxStoresPerWizard)
+
+		// Clear previous decisions and rebuild with selected stores only
+		decisionsToApply = make(map[int64]models.Decision)
+
+		for _, item := range session.ExpiredItems {
+			// Find top suggestion from one of the selected stores
+			var selectedSuggestion *models.Suggestion
+			for i := range item.Suggestions {
+				sug := &item.Suggestions[i]
+				for _, storeID := range storeResult.SelectedStores {
+					if sug.StoreID == storeID {
+						selectedSuggestion = sug
+						break
+					}
+				}
+				if selectedSuggestion != nil {
+					break
+				}
+			}
+
+			// If no suggestion from selected stores, skip this item
+			if selectedSuggestion == nil {
+				s.logger.Warn("no suggestion available from selected stores for item",
+					"item_id", item.ItemID,
+					"selected_stores", storeResult.SelectedStores)
+				continue
+			}
+
+			suggestionID := selectedSuggestion.FlyerProductID
+			decisionsToApply[item.ItemID] = models.Decision{
+				ItemID:       item.ItemID,
+				Action:       models.DecisionActionReplace,
+				SuggestionID: &suggestionID,
+				Timestamp:    time.Now(),
+			}
+		}
+	}
+
+	// 5. Apply decisions to session
+	for itemID, decision := range decisionsToApply {
+		session.Decisions[itemID] = decision
+	}
+	session.LastUpdatedAt = time.Now()
+
+	// 6. Track metrics
+	monitoring.WizardAcceptanceRate.WithLabelValues(string(models.DecisionActionReplace)).Add(float64(len(decisionsToApply)))
+
+	// 7. Save updated session to Redis
+	if err := s.wizardCache.SaveSession(ctx, session); err != nil {
+		s.logger.Error("failed to save wizard session after bulk decisions",
+			"session_id", req.SessionID,
+			"error", err)
+		return nil, fmt.Errorf("failed to save bulk decisions: %w", err)
+	}
+
+	// 8. T043: Store idempotency result if key provided
+	if req.IdempotencyKey != "" {
+		if err := s.wizardCache.SaveIdempotencyKey(ctx, req.IdempotencyKey, session.ID); err != nil {
+			s.logger.Warn("failed to store idempotency result for bulk decisions",
+				"idempotency_key", req.IdempotencyKey,
+				"error", err)
+		}
+	}
+
+	s.logger.Info("bulk decisions applied successfully",
+		"session_id", req.SessionID,
+		"items_updated", len(decisionsToApply),
+		"total_decisions", len(session.Decisions))
+
+	return session, nil
 }
 
 // ConfirmWizard completes the wizard and applies all changes atomically
-// ApplyBulkDecisions applies multiple decisions at once to a wizard session

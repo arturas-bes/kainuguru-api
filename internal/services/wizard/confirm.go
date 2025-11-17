@@ -16,25 +16,32 @@ import (
 // This is the culminating action that persists wizard changes to the database.
 //
 // Process:
-//   1. Checks idempotency key (24-hour cache) to prevent duplicate confirmations
-//   2. Loads session from Redis and validates status is ACTIVE
-//   3. Revalidates all selected products (verifies not expired, prices unchanged)
-//   4. Starts database transaction for ACID guarantees
-//   5. For REPLACE decisions: creates OfferSnapshot, updates item to new product
-//   6. For REMOVE decisions: deletes shopping list item
-//   7. For SKIP decisions: no changes (item remains expired)
-//   8. Commits transaction atomically
-//   9. Updates session status to COMPLETED
-//   10. Unlocks shopping list (sets is_locked=false)
-//   11. Deletes session from Redis
-//   12. Stores idempotency key with 24-hour TTL
+//  1. Checks idempotency key (24-hour cache) to prevent duplicate confirmations
+//  2. Loads session from Redis and validates status is ACTIVE
+//  3. Revalidates all selected products (verifies not expired, prices unchanged)
+//  4. Starts database transaction for ACID guarantees
+//  5. For REPLACE decisions: creates OfferSnapshot, updates item to new product
+//  6. For REMOVE decisions: deletes shopping list item
+//  7. For SKIP decisions: no changes (item remains expired)
+//  8. Commits transaction atomically
+//  9. Updates session status to COMPLETED
+//  10. Unlocks shopping list (sets is_locked=false)
+//  11. Deletes session from Redis
+//  12. Stores idempotency key with 24-hour TTL
 //
 // Returns ErrSessionNotFound if session does not exist.
 // Returns ErrRevalidationFailed if products are stale/expired/price changed.
 // On revalidation failure, session remains ACTIVE for user to review.
 // On transaction failure, rolls back all changes and keeps session ACTIVE.
 func (s *wizardService) ConfirmWizard(ctx context.Context, sessionID uuid.UUID, idempotencyKey string) (*ConfirmWizardResult, error) {
-	s.logger.Info("ConfirmWizard called", "session_id", sessionID)
+	// T065: Track method latency
+	confirmStart := time.Now()
+	defer func() {
+		monitoring.WizardLatencyMs.WithLabelValues("confirm_wizard").Observe(float64(time.Since(confirmStart).Milliseconds()))
+	}()
+
+	// T063: Structured logging
+	s.logger.Info("confirming wizard session", "session_id", sessionID)
 
 	// T057: Check idempotency cache first
 	if idempotencyKey != "" {
