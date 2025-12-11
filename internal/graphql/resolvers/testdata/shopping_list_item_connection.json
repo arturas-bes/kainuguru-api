@@ -19,6 +19,7 @@
         "linked_product_id": null,
         "store_id": null,
         "flyer_id": null,
+        "origin": "",
         "estimated_price": 3.49,
         "actual_price": null,
         "price_source": null,

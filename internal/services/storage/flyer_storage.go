@@ -70,8 +70,12 @@ func (s *fileSystemStorage) SaveFlyerPage(ctx context.Context, flyer *models.Fly
 		Int("page", pageNumber).
 		Msg("Saved flyer page")
 
-	// Return the relative path (not full URL)
-	return fmt.Sprintf("%s/%s", relativePath, fileName), nil
+	// Return the full CDN URL if publicURL is configured, otherwise relative path
+	relPath := fmt.Sprintf("%s/%s", relativePath, fileName)
+	if s.publicURL != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimSuffix(s.publicURL, "/"), relPath), nil
+	}
+	return relPath, nil
 }
 
 // GetFlyerPageURL returns the public URL for a flyer page

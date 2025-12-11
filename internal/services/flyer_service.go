@@ -87,6 +87,10 @@ func (fs *flyerService) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
+func (fs *flyerService) GetBySourceURL(ctx context.Context, sourceURL string) (*models.Flyer, error) {
+	return fs.repo.GetBySourceURL(ctx, sourceURL)
+}
+
 func (fs *flyerService) GetCurrentFlyers(ctx context.Context, storeIDs []int) ([]*models.Flyer, error) {
 	isValid := true
 	filters := FlyerFilters{

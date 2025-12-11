@@ -101,6 +101,21 @@ func (r *flyerRepository) Delete(ctx context.Context, id int) error {
 	return err
 }
 
+func (r *flyerRepository) GetBySourceURL(ctx context.Context, sourceURL string) (*models.Flyer, error) {
+	f := &models.Flyer{}
+	err := r.db.NewSelect().
+		Model(f).
+		Where("f.source_url = ?", sourceURL).
+		Scan(ctx)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 func (r *flyerRepository) GetProcessable(ctx context.Context) ([]*models.Flyer, error) {
 	var flyers []*models.Flyer
 	now := time.Now()

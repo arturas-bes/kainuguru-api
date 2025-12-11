@@ -33,6 +33,11 @@ func ValidateSearchRequest(req *SearchRequest) error {
 		return apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid store IDs")
 	}
 
+	// Validate flyer IDs
+	if err := validateFlyerIDs(req.FlyerIDs); err != nil {
+		return apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid flyer IDs")
+	}
+
 	// Validate category
 	if err := validateCategory(req.Category); err != nil {
 		return apperrors.Wrap(err, apperrors.ErrorTypeValidation, "invalid category")
@@ -198,6 +203,20 @@ func validateStoreIDs(storeIDs []int) error {
 	for _, id := range storeIDs {
 		if id <= 0 {
 			return apperrors.Validation("store ID must be greater than 0")
+		}
+	}
+
+	return nil
+}
+
+func validateFlyerIDs(flyerIDs []int) error {
+	if len(flyerIDs) > 50 {
+		return apperrors.Validation("cannot specify more than 50 flyer IDs")
+	}
+
+	for _, id := range flyerIDs {
+		if id <= 0 {
+			return apperrors.Validation("flyer ID must be greater than 0")
 		}
 	}
 

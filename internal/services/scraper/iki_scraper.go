@@ -110,7 +110,7 @@ func (s *IKIScraper) ScrapeCurrentFlyers(ctx context.Context) ([]FlyerInfo, erro
 	}
 
 	// Set default values and store info
-	mainFlyer.StoreID = s.store.ID
+	mainFlyer.StoreCode = s.store.Code
 	if mainFlyer.Title == "" {
 		mainFlyer.Title = "IKI savaitės leidinys"
 	}
@@ -131,7 +131,7 @@ func (s *IKIScraper) ScrapeCurrentFlyers(ctx context.Context) ([]FlyerInfo, erro
 // parseIKIFlyer extracts flyer information from a single element
 func (s *IKIScraper) parseIKIFlyer(selection *goquery.Selection) FlyerInfo {
 	flyer := FlyerInfo{
-		StoreID: s.store.ID,
+		StoreCode: s.store.Code,
 	}
 
 	// Extract title
@@ -162,7 +162,7 @@ func (s *IKIScraper) parseIKIFlyer(selection *goquery.Selection) FlyerInfo {
 // parseIKIFlyerFromPDF extracts flyer information from PDF link
 func (s *IKIScraper) parseIKIFlyerFromPDF(selection *goquery.Selection, href string) FlyerInfo {
 	flyer := FlyerInfo{
-		StoreID: s.store.ID,
+		StoreCode: s.store.Code,
 	}
 
 	// Make URL absolute if needed
@@ -214,9 +214,9 @@ func (s *IKIScraper) parseMainIKIFlyer(doc *goquery.Document, bodyHTML string) [
 		}
 
 		flyer := FlyerInfo{
-			StoreID:  s.store.ID,
-			Title:    "IKI savaitės leidinys",
-			FlyerURL: pdfURL,
+			StoreCode: s.store.Code,
+			Title:     "IKI savaitės leidinys",
+			FlyerURL:  pdfURL,
 		}
 
 		// Extract dates from the date block near the PDF
@@ -475,7 +475,7 @@ func (s *IKIScraper) tryAPIMethod(ctx context.Context) ([]FlyerInfo, error) {
 	var flyers []FlyerInfo
 	for _, f := range apiResp.Flyers {
 		flyer := FlyerInfo{
-			StoreID:   s.store.ID,
+			StoreCode: s.store.Code,
 			Title:     f.Title,
 			ValidFrom: f.StartDate,
 			ValidTo:   f.EndDate,

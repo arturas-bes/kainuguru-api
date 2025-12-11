@@ -85,6 +85,22 @@ func setupShoppingListRepoTestDB(t *testing.T) (*bun.DB, shoppinglist.Repository
 
 	ctx := context.Background()
 	schema := `
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL DEFAULT '',
+    email_verified BOOLEAN NOT NULL DEFAULT 0,
+    full_name TEXT,
+    preferred_language TEXT DEFAULT 'lt',
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    oauth_provider TEXT,
+    oauth_id TEXT,
+    avatar_url TEXT,
+    metadata TEXT DEFAULT '{}',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME
+);
 CREATE TABLE shopping_lists (
 	id INTEGER PRIMARY KEY,
 	user_id TEXT NOT NULL,
@@ -93,6 +109,7 @@ CREATE TABLE shopping_lists (
 	is_default BOOLEAN NOT NULL DEFAULT 0,
 	is_archived BOOLEAN NOT NULL DEFAULT 0,
 	is_public BOOLEAN NOT NULL DEFAULT 0,
+	is_locked BOOLEAN NOT NULL DEFAULT 0,
 	share_code TEXT,
 	item_count INTEGER NOT NULL DEFAULT 0,
 	completed_item_count INTEGER NOT NULL DEFAULT 0,
@@ -114,6 +131,10 @@ CREATE TABLE shopping_lists (
 
 func insertTestShoppingList(t *testing.T, db *bun.DB, list *models.ShoppingList) {
 	t.Helper()
+
+	// Insert user first
+	insertTestUserRow(t, db, list.UserID)
+
 	if list.CreatedAt.IsZero() {
 		list.CreatedAt = time.Now()
 	}

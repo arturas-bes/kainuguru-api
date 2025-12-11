@@ -534,6 +534,7 @@ type flyerRepoStub struct {
 	createFunc              func(ctx context.Context, flyer *models.Flyer) error
 	updateFunc              func(ctx context.Context, flyer *models.Flyer) error
 	deleteFunc              func(ctx context.Context, id int) error
+	getBySourceURLFunc      func(ctx context.Context, sourceURL string) (*models.Flyer, error)
 	getProcessableFunc      func(ctx context.Context) ([]*models.Flyer, error)
 	getForProcessingFunc    func(ctx context.Context, limit int) ([]*models.Flyer, error)
 	withPagesFunc           func(ctx context.Context, flyerID int) (*models.Flyer, error)
@@ -597,6 +598,13 @@ func (f *flyerRepoStub) Delete(ctx context.Context, id int) error {
 		return f.deleteFunc(ctx, id)
 	}
 	return errors.New("not implemented")
+}
+
+func (f *flyerRepoStub) GetBySourceURL(ctx context.Context, sourceURL string) (*models.Flyer, error) {
+	if f.getBySourceURLFunc != nil {
+		return f.getBySourceURLFunc(ctx, sourceURL)
+	}
+	return nil, nil
 }
 
 func (f *flyerRepoStub) GetProcessable(ctx context.Context) ([]*models.Flyer, error) {

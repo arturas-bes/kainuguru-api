@@ -165,6 +165,26 @@ func (s *service) getPagesToProcess(ctx context.Context, flyerID int, opts servi
 			continue
 		}
 
+		// Skip "warning" pages that already have products (unless force-reprocess)
+		// Warning pages have some extraction issues but may have partial data
+		if page.ExtractionStatus == "warning" && !opts.ForceReprocess {
+			// Check if page already has products in the database
+			products, err := s.productService.GetProductsByFlyerPageIDs(ctx, []int{page.ID})
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Int("page_id", page.ID).
+					Msg("Failed to check products for warning page")
+			}
+			if len(products) > 0 {
+				log.Debug().
+					Int("page_id", page.ID).
+					Int("product_count", len(products)).
+					Msg("Skipping warning page with existing products")
+				continue
+			}
+		}
+
 		// Skip if currently processing
 		if page.ExtractionStatus == "processing" {
 			continue
@@ -246,6 +266,15 @@ func (s *service) processPage(ctx context.Context, flyer *models.Flyer, page *mo
 	storeCode := ""
 	if flyer.Store != nil {
 		storeCode = flyer.Store.Code
+	}
+
+	// Validate image URL exists
+	if page.ImageURL == nil || *page.ImageURL == "" {
+		page.ExtractionStatus = "failed"
+		errMsg := "missing image URL"
+		page.ExtractionError = &errMsg
+		s.pageService.Update(ctx, page)
+		return nil, fmt.Errorf("page %d has no image URL", page.ID)
 	}
 
 	// Convert local image URL to base64 (OpenAI cannot access localhost URLs)
@@ -447,7 +476,8 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 				product.OriginalPrice = &origPrice
 
 				// Calculate discount if not already provided
-				if origPrice > 0 && product.CurrentPrice > 0 {
+				// Support free items (CurrentPrice = 0) as 100% discount
+				if origPrice > 0 && product.CurrentPrice >= 0 && product.CurrentPrice < origPrice {
 					discount := ((origPrice - product.CurrentPrice) / origPrice) * 100
 					product.DiscountPercent = &discount
 					product.IsOnSale = true
@@ -487,6 +517,11 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 			product.BoundingBox = promo.BoundingBox
 		}
 
+		// Set page position if available
+		if promo.PagePosition != nil && promo.PagePosition.Zone != "" {
+			product.PagePosition = promo.PagePosition
+		}
+
 		products = append(products, product)
 	}
 
@@ -516,7 +551,8 @@ func (s *service) convertToProducts(result *ai.ExtractionResult, flyer *models.F
 			if extracted.OriginalPrice != "" {
 				if origPrice, err := parsePrice(extracted.OriginalPrice); err == nil {
 					product.OriginalPrice = &origPrice
-					if origPrice > 0 {
+					// Support free items (CurrentPrice = 0) as 100% discount
+					if origPrice > 0 && product.CurrentPrice >= 0 && product.CurrentPrice < origPrice {
 						discount := ((origPrice - product.CurrentPrice) / origPrice) * 100
 						product.DiscountPercent = &discount
 						product.IsOnSale = true
@@ -618,14 +654,21 @@ func (s *service) matchProductsToMasters(ctx context.Context, products []*models
 // convertImageToBase64 converts a local image path to base64 data URI
 func (s *service) convertImageToBase64(imageURL string) (string, error) {
 	// imageURL is stored as relative path like: flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-8.jpg
-	// Or as full URL like: http://localhost:8080/flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-8.jpg
+	// Or as full URL like: http://localhost:9742/flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-8.jpg
 
-	// Remove the base URL part if present
-	relativePath := strings.TrimPrefix(imageURL, "http://localhost:8080/")
+	// Remove the base URL part if present (CDN on port 9742, or legacy 8080)
+	relativePath := imageURL
+	relativePath = strings.TrimPrefix(relativePath, "http://localhost:9742/")
+	relativePath = strings.TrimPrefix(relativePath, "https://localhost:9742/")
+	relativePath = strings.TrimPrefix(relativePath, "http://localhost:8080/")
 	relativePath = strings.TrimPrefix(relativePath, "https://localhost:8080/")
 
-	// Build absolute path - kainuguru-public is sibling to kainuguru-api
-	basePath := filepath.Join("..", "kainuguru-public")
+	// Get storage base path from environment (Docker: /kainuguru-public, Local: ../kainuguru-public)
+	basePath := os.Getenv("STORAGE_BASE_PATH")
+	if basePath == "" {
+		// Fallback for local development - kainuguru-public is sibling to kainuguru-api
+		basePath = filepath.Join("..", "kainuguru-public")
+	}
 	imagePath := filepath.Join(basePath, relativePath)
 
 	// Read image file

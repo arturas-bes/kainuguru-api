@@ -9,6 +9,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/productmaster"
 	"github.com/kainuguru/kainuguru-api/internal/repositories/base"
+	"github.com/lib/pq"
 	"github.com/uptrace/bun"
 )
 
@@ -234,13 +235,29 @@ func (r *productMasterRepository) GetProduct(ctx context.Context, productID int)
 
 func (r *productMasterRepository) CreateMasterWithMatch(ctx context.Context, product *models.Product, master *models.ProductMaster) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.NewInsert().
-			Model(master).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("failed to create master: %w", err)
+		// Use ON CONFLICT to handle race condition when multiple products
+		// try to create the same master concurrently
+		// The unique constraint is: (normalized_name, brand, standard_unit) WHERE status = 'active'
+		// Note: Using raw SQL because bun's alias handling conflicts with ON CONFLICT DO UPDATE
+		now := time.Now()
+		err := tx.NewRaw(`
+			INSERT INTO product_masters (name, normalized_name, brand, description, category, subcategory, standard_unit, standard_size, tags, barcode, status, match_count, confidence_score, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (normalized_name, brand, standard_unit) WHERE status = 'active'
+			DO UPDATE SET match_count = product_masters.match_count + 1, updated_at = ?
+			RETURNING id, match_count`,
+			master.Name, master.NormalizedName, master.Brand, master.Description,
+			master.Category, master.Subcategory, master.StandardUnit, master.StandardSize,
+			pq.Array(master.Tags), master.Barcode, master.Status, master.MatchCount,
+			master.ConfidenceScore, now, now, now).Scan(ctx, &master.ID, &master.MatchCount)
+		if err != nil {
+			return fmt.Errorf("failed to create or update master: %w", err)
 		}
+		master.CreatedAt = now
+		master.UpdatedAt = now
 
-		if _, err := tx.NewInsert().
+		// Create match record - also handle potential duplicates
+		_, err = tx.NewInsert().
 			Model(&models.ProductMasterMatch{
 				ProductID:       int64(product.ID),
 				ProductMasterID: master.ID,
@@ -248,9 +265,12 @@ func (r *productMasterRepository) CreateMasterWithMatch(ctx context.Context, pro
 				MatchType:       "new_master",
 				ReviewStatus:    "pending",
 			}).
-			Exec(ctx); err != nil {
+			On("CONFLICT (product_id, product_master_id) DO NOTHING").
+			Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("failed to create match record: %w", err)
 		}
+
 		return nil
 	})
 }

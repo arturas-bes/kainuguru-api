@@ -284,6 +284,7 @@ func (r *queryResolver) SearchProducts(ctx context.Context, input model.SearchIn
 	searchReq := &search.SearchRequest{
 		Query:       input.Q,
 		StoreIDs:    input.StoreIDs,
+		FlyerIDs:    input.FlyerIDs,
 		MinPrice:    input.MinPrice,
 		MaxPrice:    input.MaxPrice,
 		OnSaleOnly:  onSaleOnly,
@@ -307,13 +308,18 @@ func (r *queryResolver) SearchProducts(ctx context.Context, input model.SearchIn
 	// Convert search results to ProductSearchResult
 	products := make([]*model.ProductSearchResult, len(response.Products))
 	for i, result := range response.Products {
-		matchType := "exact" // Could be derived from search result
+		// Use the ACTUAL values from the search service
+		var similarity *float64
+		if result.Similarity > 0 {
+			similarity = &result.Similarity
+		}
+
 		products[i] = &model.ProductSearchResult{
 			Product:     result.Product,
 			SearchScore: result.SearchScore,
-			MatchType:   matchType,
-			Similarity:  nil,        // Could be calculated if needed
-			Highlights:  []string{}, // Could be populated if needed
+			MatchType:   result.MatchType,  // Use actual match type from search service
+			Similarity:  similarity,        // Use actual similarity score
+			Highlights:  result.Highlights, // Use actual highlights
 		}
 	}
 

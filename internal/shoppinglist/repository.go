@@ -19,6 +19,7 @@ type Repository interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID, filters *Filters) ([]*models.ShoppingList, error)
 	CountByUserID(ctx context.Context, userID uuid.UUID, filters *Filters) (int, error)
 	GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error)
+	ExistsByUserAndName(ctx context.Context, userID uuid.UUID, name string) (bool, error)
 
 	GetUserDefaultList(ctx context.Context, userID uuid.UUID) (*models.ShoppingList, error)
 	UnsetDefaultLists(ctx context.Context, userID uuid.UUID, excludeID *int64) error

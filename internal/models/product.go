@@ -31,9 +31,9 @@ type Product struct {
 	// Pricing information
 	CurrentPrice    float64  `bun:"current_price,notnull" json:"current_price"`
 	OriginalPrice   *float64 `bun:"original_price" json:"original_price,omitempty"`
-	DiscountPercent *float64 `bun:"discount_percent" json:"discount_percent,omitempty"`
-	SpecialDiscount *string  `bun:"special_discount" json:"special_discount,omitempty"` // e.g., "1+1", "3 už 2"
-	Currency        string   `bun:"-" json:"currency"`                                  // Not stored in DB, always EUR
+	DiscountPercent *float64 `bun:"discount_percentage" json:"discount_percent,omitempty"` // DB column is discount_percentage
+	SpecialDiscount *string  `bun:"special_discount" json:"special_discount,omitempty"`    // e.g., "1+1", "3 už 2"
+	Currency        string   `bun:"-" json:"currency"`                                     // Not stored in DB, always EUR
 
 	// Product specifications
 	UnitSize    *string `bun:"unit_size" json:"unit_size,omitempty"`

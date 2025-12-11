@@ -51,14 +51,14 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 		SELECT
 			product_id, name, brand, category, current_price,
 			store_id, flyer_id, name_similarity, brand_similarity, combined_similarity
-		FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
-	s.logger.Info("executing fuzzy search", "query", req.Query, "limit", req.Limit, "offset", req.Offset, "tags", req.Tags)
+	s.logger.Info("executing fuzzy search", "query", req.Query, "limit", req.Limit, "offset", req.Offset, "tags", req.Tags, "flyer_ids", req.FlyerIDs)
 
 	rows, err := s.db.DB.QueryContext(ctx, query,
 		req.Query,
-		0.3, // similarity_threshold
+		0.15, // similarity_threshold - lowered to 0.15 to catch typos (combined_similarity uses weighted formula)
 		req.Limit,
 		req.Offset,
 		pq.Array(req.StoreIDs),
@@ -67,6 +67,7 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 		req.MaxPrice,
 		req.OnSaleOnly,
 		pq.Array(req.Tags),
+		pq.Array(req.FlyerIDs),
 	)
 	if err != nil {
 		s.logger.Error("fuzzy search failed", "error", err, "query", req.Query)
@@ -76,7 +77,9 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 
 	var productIDs []int
 	var scoresMap = make(map[int]float64)
+	rowCount := 0
 	for rows.Next() {
+		rowCount++
 		var (
 			productID                                    int64
 			storeID, flyerID                             int
@@ -97,6 +100,8 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 		scoresMap[int(productID)] = combinedSim
 	}
 
+	s.logger.Info("fuzzy search DB scan complete", "row_count", rowCount, "product_ids", productIDs, "scores_map_size", len(scoresMap))
+
 	// Load full products with relations
 	var products []*models.Product
 	if len(productIDs) > 0 {
@@ -113,25 +118,35 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 			return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to load products with relations")
 		}
 		s.logger.Info("loaded products", "count", len(products))
+		for _, p := range products {
+			s.logger.Info("loaded product detail", "id", p.ID, "name", p.Name, "store_id", p.StoreID, "flyer_id", p.FlyerID)
+		}
 
 		// Set currency for all products (not stored in DB)
 		for _, p := range products {
 			p.Currency = "EUR"
 		}
+	} else {
+		s.logger.Warn("no product IDs to load")
 	}
 
 	// Build results with loaded products
 	var results []ProductSearchResult
 	for _, product := range products {
 		if score, ok := scoresMap[product.ID]; ok {
+			s.logger.Info("adding product to results", "product_id", product.ID, "name", product.Name, "score", score)
 			results = append(results, ProductSearchResult{
 				Product:     product,
 				SearchScore: score,
 				MatchType:   "fuzzy",
 				Similarity:  score,
 			})
+		} else {
+			s.logger.Warn("product not in scores map", "product_id", product.ID, "name", product.Name)
 		}
 	}
+
+	s.logger.Info("fuzzy search results built", "result_count", len(results))
 
 	if err := rows.Err(); err != nil {
 		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "error iterating fuzzy search results")
@@ -140,10 +155,10 @@ func (s *searchService) FuzzySearchProducts(ctx context.Context, req *SearchRequ
 	// Get total count for pagination
 	var totalCount int
 	countQuery := `
-		SELECT COUNT(*) FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		SELECT COUNT(*) FROM fuzzy_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
-	err = s.db.DB.QueryRowContext(ctx, countQuery, req.Query, 0.3, 1000000, 0,
-		pq.Array(req.StoreIDs), req.Category, req.MinPrice, req.MaxPrice, req.OnSaleOnly, pq.Array(req.Tags)).Scan(&totalCount)
+	err = s.db.DB.QueryRowContext(ctx, countQuery, req.Query, 0.15, 1000000, 0,
+		pq.Array(req.StoreIDs), req.Category, req.MinPrice, req.MaxPrice, req.OnSaleOnly, pq.Array(req.Tags), pq.Array(req.FlyerIDs)).Scan(&totalCount)
 	if err != nil {
 		s.logger.Warn("failed to get total count", "error", err)
 		totalCount = len(results)
@@ -180,7 +195,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 		SELECT
 			product_id, name, brand, current_price,
 			store_id, flyer_id, search_score, match_type
-		FROM hybrid_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		FROM hybrid_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	rows, err := s.db.DB.QueryContext(ctx, query,
@@ -194,6 +209,7 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 		req.Category,
 		req.OnSaleOnly,
 		pq.Array(req.Tags),
+		pq.Array(req.FlyerIDs),
 	)
 	if err != nil {
 		s.logger.Error("hybrid search failed", "error", err, "query", req.Query)
@@ -265,10 +281,10 @@ func (s *searchService) HybridSearchProducts(ctx context.Context, req *SearchReq
 	// Get total count
 	var totalCount int
 	countQuery := `
-		SELECT COUNT(*) FROM hybrid_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		SELECT COUNT(*) FROM hybrid_search_products($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	err = s.db.QueryRowContext(ctx, countQuery, req.Query, 1000000, 0,
-		pq.Array(req.StoreIDs), req.MinPrice, req.MaxPrice, req.PreferFuzzy, req.Category, req.OnSaleOnly, pq.Array(req.Tags)).Scan(&totalCount)
+		pq.Array(req.StoreIDs), req.MinPrice, req.MaxPrice, req.PreferFuzzy, req.Category, req.OnSaleOnly, pq.Array(req.Tags), pq.Array(req.FlyerIDs)).Scan(&totalCount)
 	if err != nil {
 		s.logger.Warn("failed to get total count", "error", err)
 		totalCount = len(results)

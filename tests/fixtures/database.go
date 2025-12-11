@@ -279,16 +279,16 @@ func (fm *FixtureManager) LoadProducts(ctx context.Context) error {
 		query := `
 			INSERT INTO products (
 				name, normalized_name, brand, description,
-				current_price, original_price, discount_percent,
+				current_price, original_price, discount_percentage,
 				category, store_id, flyer_id,
 				valid_from, valid_to,
-				is_available, is_on_sale, created_at
+				is_available, created_at
 			) VALUES (
 				?, ?, '', ?,
 				?, NULL, 0,
 				'Groceries', ?, ?,
 				?, ?,
-				true, false, ?
+				true, ?
 			) ON CONFLICT DO NOTHING
 		`
 		normalizedName := fixtureNormalizedProductName(normalizer, p.Name)

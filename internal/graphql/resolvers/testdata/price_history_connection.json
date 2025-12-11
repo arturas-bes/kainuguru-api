@@ -2,21 +2,29 @@
   "edges": [
     {
       "node": {
-        "id": 1,
-        "product_master_id": 10,
-        "store_id": 3,
+        "id": "1",
+        "productMasterID": 10,
+        "storeID": 3,
         "price": 2.49,
         "currency": "EUR",
-        "is_on_sale": true,
-        "recorded_at": "2024-06-01T00:00:00Z",
-        "valid_from": "2024-06-01T00:00:00Z",
-        "valid_to": "2024-06-03T00:00:00Z",
+        "isOnSale": true,
+        "recordedAt": "2024-06-01T00:00:00Z",
+        "validFrom": "2024-06-01T00:00:00Z",
+        "validTo": "2024-06-03T00:00:00Z",
         "source": "",
-        "extraction_method": "",
+        "extractionMethod": "",
         "confidence": 0,
-        "is_available": false,
-        "is_active": false,
-        "created_at": "0001-01-01T00:00:00Z"
+        "isAvailable": false,
+        "isActive": false,
+        "isCurrentlyValid": false,
+        "isCurrentlySale": false,
+        "discountAmount": 0,
+        "discountPercent": 0,
+        "isExpired": false,
+        "validityDuration": "",
+        "createdAt": "",
+        "productMaster": null,
+        "store": null
       },
       "cursor": "b2Zmc2V0OjQ="
     }

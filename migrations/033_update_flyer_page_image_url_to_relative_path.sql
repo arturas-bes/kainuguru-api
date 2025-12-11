@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 -- Migration: Update flyer_pages.image_url to store relative paths instead of full URLs
 -- Date: 2025-11-09
 -- Description: Strip the base URL from image_url to store only the relative path
@@ -26,3 +28,9 @@ WHERE image_url IS NOT NULL
 
 -- Add comment to table
 COMMENT ON COLUMN flyer_pages.image_url IS 'Relative path to flyer page image (e.g., flyers/iki/2025-11-03-iki-iki-kaininis-leidinys-nr-45/page-1.jpg). Base URL is configured via FLYER_BASE_URL env variable.';
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+-- No easy way to revert without knowing the original base URL for each record
+-- +goose StatementEnd

@@ -10,6 +10,7 @@ import (
 type SearchRequest struct {
 	Query       string   `json:"query" validate:"required,min=1,max=255"`
 	StoreIDs    []int    `json:"store_ids,omitempty"`
+	FlyerIDs    []int    `json:"flyer_ids,omitempty"`
 	MinPrice    *float64 `json:"min_price,omitempty" validate:"omitempty,gte=0"`
 	MaxPrice    *float64 `json:"max_price,omitempty" validate:"omitempty,gte=0"`
 	OnSaleOnly  bool     `json:"on_sale_only"`

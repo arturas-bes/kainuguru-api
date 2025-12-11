@@ -16,7 +16,7 @@ type Store struct {
 
 // FlyerInfo represents basic flyer information from scraping
 type FlyerInfo struct {
-	StoreID   int       `json:"store_id"`
+	StoreCode string    `json:"store_code"`
 	Title     string    `json:"title"`
 	ValidFrom time.Time `json:"valid_from"`
 	ValidTo   time.Time `json:"valid_to"`

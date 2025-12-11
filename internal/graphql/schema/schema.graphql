@@ -768,6 +768,7 @@ input PriceAlertFilters {
 input SearchInput {
   q: String!
   storeIDs: [Int!]
+  flyerIDs: [Int!]
   minPrice: Float
   maxPrice: Float
   onSaleOnly: Boolean = false

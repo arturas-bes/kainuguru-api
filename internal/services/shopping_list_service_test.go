@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/shoppinglist"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShoppingListService_CreateSetsDefaultForFirstList(t *testing.T) {
@@ -47,13 +48,10 @@ func TestShoppingListService_CreateSetsDefaultForFirstList(t *testing.T) {
 		Name:   "Weekly",
 	}
 
-	if err := service.Create(context.Background(), list); err != nil {
-		t.Fatalf("Create returned error: %v", err)
-	}
+	err := service.Create(context.Background(), list)
+	assert.NoError(t, err)
+	assert.True(t, list.IsDefault)
 
-	if !list.IsDefault {
-		t.Fatalf("expected first list to be default")
-	}
 	if list.CreatedAt.IsZero() || list.UpdatedAt.IsZero() || list.LastAccessedAt.IsZero() {
 		t.Fatalf("expected timestamps to be initialized")
 	}
@@ -639,6 +637,7 @@ type fakeShoppingListRepository struct {
 	getUserCategoriesFn   func(ctx context.Context, userID uuid.UUID, listID int64) ([]*models.ShoppingListCategory, error)
 	clearCompletedItemsFn func(ctx context.Context, listID int64) (int, error)
 	getExpiredItemsFn     func(ctx context.Context, listID int64) ([]*models.ShoppingListItem, error)
+	existsByUserAndNameFn func(ctx context.Context, userID uuid.UUID, name string) (bool, error)
 }
 
 func (f *fakeShoppingListRepository) Create(ctx context.Context, list *models.ShoppingList) error {
@@ -691,10 +690,17 @@ func (f *fakeShoppingListRepository) CountByUserID(ctx context.Context, userID u
 }
 
 func (f *fakeShoppingListRepository) GetByShareCode(ctx context.Context, shareCode string) (*models.ShoppingList, error) {
-	if f.getByShareCodeFn == nil {
-		panic("getByShareCodeFn not set")
+	if f.getByShareCodeFn != nil {
+		return f.getByShareCodeFn(ctx, shareCode)
 	}
-	return f.getByShareCodeFn(ctx, shareCode)
+	return nil, nil
+}
+
+func (f *fakeShoppingListRepository) ExistsByUserAndName(ctx context.Context, userID uuid.UUID, name string) (bool, error) {
+	if f.existsByUserAndNameFn != nil {
+		return f.existsByUserAndNameFn(ctx, userID, name)
+	}
+	return false, nil
 }
 
 func (f *fakeShoppingListRepository) GetUserDefaultList(ctx context.Context, userID uuid.UUID) (*models.ShoppingList, error) {

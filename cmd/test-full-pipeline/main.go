@@ -95,7 +95,7 @@ func main() {
 
 	// Step 2: Get store from database
 	fmt.Println("🗄️  STEP 2: Getting store from database...")
-	store, err := storeService.GetByID(ctx, flyerInfo.StoreID)
+	store, err := storeService.GetByCode(ctx, flyerInfo.StoreCode)
 	if err != nil {
 		log.Fatalf("Failed to get store: %v", err)
 	}
