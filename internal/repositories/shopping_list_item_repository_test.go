@@ -101,7 +101,20 @@ func setupShoppingListItemRepoTestDB(t *testing.T) (*bun.DB, shoppinglistitem.Re
 
 	schema := `
 CREATE TABLE users (
-    id TEXT PRIMARY KEY
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL DEFAULT '',
+    email_verified BOOLEAN NOT NULL DEFAULT 0,
+    full_name TEXT,
+    preferred_language TEXT DEFAULT 'lt',
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    oauth_provider TEXT,
+    oauth_id TEXT,
+    avatar_url TEXT,
+    metadata TEXT DEFAULT '{}',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME
 );
 CREATE TABLE product_masters (
     id INTEGER PRIMARY KEY
@@ -133,6 +146,7 @@ CREATE TABLE shopping_list_items (
     linked_product_id INTEGER,
     store_id INTEGER,
     flyer_id INTEGER,
+    origin TEXT NOT NULL DEFAULT 'free_text',
     estimated_price REAL,
     actual_price REAL,
     price_source TEXT,
@@ -180,7 +194,7 @@ func insertTestShoppingListItem(t *testing.T, db *bun.DB, item *models.ShoppingL
 }
 
 func insertTestUserRow(t *testing.T, db *bun.DB, id uuid.UUID) {
-	_, err := db.ExecContext(context.Background(), "INSERT OR IGNORE INTO users (id) VALUES (?)", id.String())
+	_, err := db.ExecContext(context.Background(), "INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)", id.String(), id.String()+"@test.com")
 	if err != nil {
 		t.Fatalf("failed to insert user row: %v", err)
 	}

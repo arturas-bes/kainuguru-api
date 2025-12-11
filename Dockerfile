@@ -1,8 +1,8 @@
 # Development stage
 FROM golang:1.24-alpine AS development
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+# Install build dependencies and PDF processing tools
+RUN apk add --no-cache git ca-certificates tzdata poppler-utils imagemagick
 
 # Set working directory
 WORKDIR /app

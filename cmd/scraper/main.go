@@ -21,6 +21,7 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/models"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/scraper"
+	"github.com/kainuguru/kainuguru-api/internal/services/storage"
 	"github.com/kainuguru/kainuguru-api/pkg/pdf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -172,7 +173,7 @@ func processScraper(ctx context.Context, s scraper.Scraper, factory *services.Se
 
 	// 2. Process each flyer
 	for _, flyerInfo := range flyerInfos {
-		if err := processFlyerInfo(ctx, flyerInfo, factory, pdfProcessor); err != nil {
+		if err := processFlyerInfo(ctx, flyerInfo, s, factory, pdfProcessor); err != nil {
 			log.Error().
 				Err(err).
 				Str("store", storeInfo.Name).
@@ -185,35 +186,26 @@ func processScraper(ctx context.Context, s scraper.Scraper, factory *services.Se
 	return nil
 }
 
-func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory *services.ServiceFactory, pdfProcessor *pdf.Processor) error {
+func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, s scraper.Scraper, factory *services.ServiceFactory, pdfProcessor *pdf.Processor) error {
 	flyerService := factory.FlyerService()
 	flyerPageService := factory.FlyerPageService()
 	storeService := factory.StoreService()
 	storageService := factory.FlyerStorageService()
 
-	// 1. Get store from database
-	store, err := storeService.GetByID(ctx, flyerInfo.StoreID)
+	// 1. Get store from database by code
+	store, err := storeService.GetByCode(ctx, flyerInfo.StoreCode)
 	if err != nil {
-		return fmt.Errorf("failed to get store: %w", err)
+		return fmt.Errorf("failed to get store by code %q: %w", flyerInfo.StoreCode, err)
 	}
 
-	// 2. Check if flyer already exists (by date range)
-	filters := services.FlyerFilters{
-		StoreIDs:  []int{store.ID},
-		ValidFrom: &flyerInfo.ValidFrom,
-		Limit:     1,
-	}
-
-	existingFlyers, err := flyerService.GetAll(ctx, filters)
-	if err != nil {
-		return fmt.Errorf("failed to check existing flyers: %w", err)
-	}
-
-	if len(existingFlyers) > 0 {
+	// 2. Check if this exact flyer already exists (by source URL)
+	existingFlyer, err := flyerService.GetBySourceURL(ctx, flyerInfo.FlyerURL)
+	if err == nil && existingFlyer != nil {
 		log.Info().
-			Int("flyerId", existingFlyers[0].ID).
+			Int("flyerId", existingFlyer.ID).
 			Str("store", store.Code).
-			Msg("Flyer already exists, skipping")
+			Str("url", flyerInfo.FlyerURL).
+			Msg("Flyer already exists (same source URL), skipping")
 		return nil
 	}
 
@@ -239,7 +231,115 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 		Str("title", title).
 		Msg("Created flyer record")
 
-	// 4. Download PDF
+	// 4. Try to get page images directly via scraper (works for iPaper-based stores like Maxima)
+	pageInfos, err := s.ScrapeFlyer(ctx, flyerInfo)
+	if err == nil && len(pageInfos) > 0 {
+		// Check if the first page is a PDF (IKI returns PDF URL, not images)
+		// If so, fall back to PDF processing
+		if len(pageInfos) == 1 && pageInfos[0].FileType == "pdf" {
+			log.Debug().
+				Int("flyerId", flyer.ID).
+				Msg("ScrapeFlyer returned PDF, falling back to PDF processing")
+		} else {
+			// Store provides direct image URLs (e.g., Maxima via iPaper)
+			return processDirectImagePages(ctx, flyer, pageInfos, flyerService, flyerPageService, storageService)
+		}
+	}
+
+	// 5. Fall back to PDF download and conversion (e.g., IKI)
+	return processPDFFlyer(ctx, flyer, flyerInfo, flyerService, flyerPageService, storageService, pdfProcessor)
+}
+
+// processDirectImagePages handles stores that provide direct image URLs (like Maxima via iPaper)
+func processDirectImagePages(ctx context.Context, flyer *models.Flyer, pageInfos []scraper.PageInfo, flyerService services.FlyerService, flyerPageService services.FlyerPageService, storageService storage.FlyerStorageService) error {
+	log.Info().
+		Int("flyerId", flyer.ID).
+		Int("pages", len(pageInfos)).
+		Msg("Processing direct image pages")
+
+	var flyerPages []*models.FlyerPage
+
+	for _, pageInfo := range pageInfos {
+		// Download image from CDN URL
+		imageData, err := downloadFile(ctx, pageInfo.ImageURL)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Int("page", pageInfo.PageNumber).
+				Str("url", pageInfo.ImageURL).
+				Msg("Failed to download page image")
+			continue
+		}
+
+		log.Debug().
+			Int("flyerId", flyer.ID).
+			Int("page", pageInfo.PageNumber).
+			Int("bytes", len(imageData)).
+			Msg("Downloaded page image")
+
+		// Save to storage and get public URL
+		publicURL, err := storageService.SaveFlyerPage(ctx, flyer, pageInfo.PageNumber, bytes.NewReader(imageData))
+		if err != nil {
+			log.Error().
+				Err(err).
+				Int("page", pageInfo.PageNumber).
+				Msg("Failed to save page to storage")
+			continue
+		}
+
+		// Create flyer page record
+		flyerPage := &models.FlyerPage{
+			FlyerID:          flyer.ID,
+			PageNumber:       pageInfo.PageNumber,
+			ImageURL:         &publicURL,
+			ExtractionStatus: string(models.FlyerPageStatusPending),
+		}
+
+		flyerPages = append(flyerPages, flyerPage)
+
+		log.Debug().
+			Int("flyerId", flyer.ID).
+			Int("page", pageInfo.PageNumber).
+			Str("url", publicURL).
+			Msg("Saved flyer page")
+	}
+
+	// Update page count
+	pageCount := len(flyerPages)
+	flyer.PageCount = &pageCount
+	flyerService.Update(ctx, flyer)
+
+	// Batch create flyer pages
+	if len(flyerPages) > 0 {
+		if err := flyerPageService.CreateBatch(ctx, flyerPages); err != nil {
+			flyerService.FailProcessing(ctx, flyer.ID)
+			return fmt.Errorf("failed to create flyer pages: %w", err)
+		}
+
+		log.Info().
+			Int("flyerId", flyer.ID).
+			Int("pages", len(flyerPages)).
+			Msg("Created flyer page records")
+	}
+
+	// Mark flyer as completed
+	if err := flyerService.CompleteProcessing(ctx, flyer.ID, len(flyerPages)); err != nil {
+		log.Error().Err(err).Msg("Failed to mark flyer as completed")
+	}
+
+	log.Info().
+		Int("flyerId", flyer.ID).
+		Str("store", flyer.Store.Code).
+		Int("pages", len(flyerPages)).
+		Str("folder", flyer.GetFolderName()).
+		Msg("✅ Flyer processed successfully (direct images)")
+
+	return nil
+}
+
+// processPDFFlyer handles stores that provide PDF URLs (like IKI)
+func processPDFFlyer(ctx context.Context, flyer *models.Flyer, flyerInfo scraper.FlyerInfo, flyerService services.FlyerService, flyerPageService services.FlyerPageService, storageService storage.FlyerStorageService, pdfProcessor *pdf.Processor) error {
+	// Download PDF
 	pdfData, err := downloadFile(ctx, flyerInfo.FlyerURL)
 	if err != nil {
 		flyerService.FailProcessing(ctx, flyer.ID)
@@ -251,7 +351,7 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 		Int("bytes", len(pdfData)).
 		Msg("Downloaded PDF")
 
-	// 5. Save PDF to temp file
+	// Save PDF to temp file
 	tempDir := "/tmp/kainuguru/pdf"
 	os.MkdirAll(tempDir, 0755) // Ensure temp dir exists
 
@@ -267,7 +367,7 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 	}
 	defer os.Remove(tempPDFPath)
 
-	// 6. Convert PDF to images
+	// Convert PDF to images
 	result, err := pdfProcessor.ProcessPDF(ctx, tempPDFPath)
 	if err != nil || !result.Success {
 		flyerService.FailProcessing(ctx, flyer.ID)
@@ -279,12 +379,12 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 		Int("pages", result.PageCount).
 		Msg("Converted PDF to images")
 
-	// 7. Update flyer page count
+	// Update flyer page count
 	pageCount := result.PageCount
 	flyer.PageCount = &pageCount
 	flyerService.Update(ctx, flyer)
 
-	// 8. Save each page image to storage
+	// Save each page image to storage
 	var flyerPages []*models.FlyerPage
 
 	for i, imagePath := range result.OutputFiles {
@@ -344,16 +444,16 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 	}
 
 	// 10. Enforce storage limit (keep only 2 flyers per store)
-	if err := storageService.EnforceStorageLimit(ctx, store.Code); err != nil {
+	if err := storageService.EnforceStorageLimit(ctx, flyer.Store.Code); err != nil {
 		log.Warn().
 			Err(err).
-			Str("store", store.Code).
+			Str("store", flyer.Store.Code).
 			Msg("Failed to enforce storage limit (non-critical)")
 	}
 
 	// 11. Mark old flyers from this store as archived (manual update for now)
 	// Note: This will be handled better when we implement the archive service properly
-	oldFlyers, _ := flyerService.GetFlyersByStore(ctx, store.ID, services.FlyerFilters{
+	oldFlyers, _ := flyerService.GetFlyersByStore(ctx, flyer.StoreID, services.FlyerFilters{
 		IsArchived: &[]bool{false}[0],
 	})
 	for _, oldFlyer := range oldFlyers {
@@ -369,10 +469,10 @@ func processFlyerInfo(ctx context.Context, flyerInfo scraper.FlyerInfo, factory 
 
 	log.Info().
 		Int("flyerId", flyer.ID).
-		Str("store", store.Code).
+		Str("store", flyer.Store.Code).
 		Int("pages", len(flyerPages)).
 		Str("folder", flyer.GetFolderName()).
-		Msg("✅ Flyer processed successfully")
+		Msg("✅ Flyer processed successfully (PDF)")
 
 	return nil
 }

@@ -3,13 +3,17 @@
     {
       "node": {
         "id": 11,
-        "flyer_id": 100,
-        "page_number": 1,
-        "extraction_status": "",
-        "extraction_attempts": 0,
-        "needs_manual_review": false,
-        "created_at": "2024-03-01T00:00:00Z",
-        "updated_at": "2024-03-02T00:00:00Z"
+        "flyerID": 100,
+        "pageNumber": 1,
+        "status": "PENDING",
+        "productsExtracted": 0,
+        "extractionErrors": 0,
+        "hasImage": false,
+        "extractionEfficiency": 0,
+        "createdAt": "2024-03-01T00:00:00Z",
+        "updatedAt": "2024-03-02T00:00:00Z",
+        "flyer": null,
+        "products": null
       },
       "cursor": "b2Zmc2V0OjA="
     }

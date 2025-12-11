@@ -10,7 +10,6 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/cache"
-	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/generated"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
@@ -67,22 +66,8 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 	gqlHandler := handler.NewDefaultServer(schema)
 
 	return func(c *fiber.Ctx) error {
+		// Get the context with dataloaders already set by middleware
 		ctx := deriveGraphQLContext(c)
-
-		// Create DataLoaders for this request (prevents N+1 queries)
-		loaders := dataloaders.NewLoaders(
-			config.StoreService,
-			config.FlyerService,
-			config.FlyerPageService,
-			config.ShoppingListService,
-			config.ProductService,
-			config.ProductMasterService,
-			config.AuthService,
-		)
-
-		// Add DataLoaders to the request context
-		ctx = dataloaders.AddToContext(ctx, loaders)
-		c.SetUserContext(ctx)
 
 		// Convert Fiber request to GraphQL request body
 		req := &graphQLRequest{}

@@ -43,14 +43,20 @@ install:
 
 seed-data:
 	@echo "📦 Loading test fixtures into database..."
-	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_complete_fixtures.go
+	@echo "Running migrations first..."
+	@docker-compose exec -T api go run cmd/migrator/main.go -action=up || true
+	@echo "Loading fixtures..."
+	@docker exec -e DATABASE_URL="postgres://kainuguru:kainuguru_password@db:5432/kainuguru_db?sslmode=disable" kainuguru-api-api-1 go run tests/scripts/load_complete/load_complete_fixtures.go
 	@echo "✅ Test fixtures loaded successfully!"
 
 db-reset:
 	@echo "🔄 Resetting database and reloading fixtures..."
-	@docker-compose restart db
-	@sleep 10
+	@echo "Stopping containers and removing volumes..."
+	@docker-compose down --volumes
+	@echo "Starting containers..."
+	@docker-compose up -d
 	@echo "Waiting for database to be ready..."
+	@sleep 15
 	@make seed-data
 	@echo "✅ Database reset completed!"
 

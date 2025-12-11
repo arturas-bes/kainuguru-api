@@ -21,22 +21,24 @@ ADD COLUMN IF NOT EXISTS last_seen_date TIMESTAMP WITH TIME ZONE,
 ADD COLUMN IF NOT EXISTS match_count INTEGER DEFAULT 0;
 
 -- Create product_master_matches table for audit trail
-CREATE TABLE IF NOT EXISTS product_master_matches (
-    id BIGSERIAL PRIMARY KEY,
-    product_id BIGINT NOT NULL,
-    master_id BIGINT NOT NULL REFERENCES product_masters(id),
-    confidence_score DECIMAL(3,2) NOT NULL,
-    match_method VARCHAR(50) NOT NULL,
-    matched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    matched_by VARCHAR(100),
-    is_verified BOOLEAN DEFAULT FALSE
-);
+-- MOVED TO 031_create_product_master_matches.sql
+-- CREATE TABLE IF NOT EXISTS product_master_matches (
+--     id BIGSERIAL PRIMARY KEY,
+--     product_id BIGINT NOT NULL,
+--     master_id BIGINT NOT NULL REFERENCES product_masters(id),
+--     confidence_score DECIMAL(3,2) NOT NULL,
+--     match_method VARCHAR(50) NOT NULL,
+--     matched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--     matched_by VARCHAR(100),
+--     is_verified BOOLEAN DEFAULT FALSE
+-- );
 
 -- Add indexes for product_master_matches
-CREATE INDEX IF NOT EXISTS idx_pmm_product ON product_master_matches(product_id);
-CREATE INDEX IF NOT EXISTS idx_pmm_master ON product_master_matches(master_id);
-CREATE INDEX IF NOT EXISTS idx_pmm_matched_at ON product_master_matches(matched_at);
-CREATE INDEX IF NOT EXISTS idx_pmm_method ON product_master_matches(match_method);
+-- MOVED TO 031_create_product_master_matches.sql
+-- CREATE INDEX IF NOT EXISTS idx_pmm_product ON product_master_matches(product_id);
+-- CREATE INDEX IF NOT EXISTS idx_pmm_master ON product_master_matches(master_id);
+-- CREATE INDEX IF NOT EXISTS idx_pmm_matched_at ON product_master_matches(matched_at);
+-- CREATE INDEX IF NOT EXISTS idx_pmm_method ON product_master_matches(match_method);
 
 -- Add index for products.product_master_id if not exists
 CREATE INDEX IF NOT EXISTS idx_products_product_master_id ON products(product_master_id);

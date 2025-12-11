@@ -1,9 +1,11 @@
+-- +goose Up
+-- +goose StatementBegin
 -- Migration: Create product_master_matches table
 -- This table stores matching attempts between products and product masters for audit/review purposes
 
 CREATE TABLE IF NOT EXISTS product_master_matches (
     id BIGSERIAL PRIMARY KEY,
-    product_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL, -- No FK due to composite PK on products table
     product_master_id BIGINT NOT NULL REFERENCES product_masters(id) ON DELETE CASCADE,
     confidence DECIMAL(5, 4) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
     match_type VARCHAR(50) NOT NULL, -- 'exact', 'fuzzy', 'brand', 'category', 'manual'
@@ -38,3 +40,9 @@ COMMENT ON COLUMN product_master_matches.match_type IS 'Type of matching algorit
 COMMENT ON COLUMN product_master_matches.match_score IS 'Additional scoring metric for fuzzy/similarity matching';
 COMMENT ON COLUMN product_master_matches.matched_fields IS 'JSON object indicating which fields contributed to the match';
 COMMENT ON COLUMN product_master_matches.review_status IS 'Status of manual review: pending, approved, or rejected';
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS product_master_matches;
+-- +goose StatementEnd

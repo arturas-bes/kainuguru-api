@@ -16,10 +16,40 @@ func NormalizeProductText(text string) string {
 	return text
 }
 
+// sanitizeForTsvector removes special characters that cause tsvector parsing errors
+// These characters are special in PostgreSQL tsvector syntax: : & | ! ( ) * '
+func sanitizeForTsvector(text string) string {
+	// Remove tsvector special characters
+	replacer := strings.NewReplacer(
+		":", "", // word position indicator
+		"&", "", // AND operator
+		"|", "", // OR operator
+		"!", "", // NOT operator (negation)
+		"(", "", // grouping
+		")", "", // grouping
+		"*", "", // prefix search
+		"'", "", // phrase quoting
+	)
+	return replacer.Replace(text)
+}
+
 // GenerateSearchVector generates a search vector for full-text search
 func GenerateSearchVector(normalizedName string) string {
-	words := strings.Fields(normalizedName)
-	return strings.Join(words, " & ")
+	// Sanitize to remove tsvector special characters
+	sanitized := sanitizeForTsvector(normalizedName)
+	words := strings.Fields(sanitized)
+	// Filter out empty words after sanitization
+	var validWords []string
+	for _, w := range words {
+		w = strings.TrimSpace(w)
+		if w != "" {
+			validWords = append(validWords, w)
+		}
+	}
+	if len(validWords) == 0 {
+		return ""
+	}
+	return strings.Join(validWords, " & ")
 }
 
 // ValidateProduct validates a product model

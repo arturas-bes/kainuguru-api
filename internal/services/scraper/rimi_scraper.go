@@ -90,7 +90,7 @@ func (s *RimiScraper) ScrapeCurrentFlyers(ctx context.Context) ([]FlyerInfo, err
 // parseRimiFlyer extracts flyer information from a single element
 func (s *RimiScraper) parseRimiFlyer(selection *goquery.Selection) FlyerInfo {
 	flyer := FlyerInfo{
-		StoreID: s.store.ID,
+		StoreCode: s.store.Code,
 	}
 
 	// Extract title - Rimi specific selectors
@@ -293,7 +293,7 @@ func (s *RimiScraper) parseGenericRimiFlyers(doc *goquery.Document) []FlyerInfo 
 	// Mock current flyer for development
 	now := time.Now()
 	flyer := FlyerInfo{
-		StoreID:   s.store.ID,
+		StoreCode: s.store.Code,
 		Title:     "Rimi savaitės akcijos",
 		ValidFrom: now.AddDate(0, 0, -int(now.Weekday())),
 		ValidTo:   now.AddDate(0, 0, 7-int(now.Weekday())),

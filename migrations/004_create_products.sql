@@ -15,9 +15,9 @@ CREATE TABLE products (
     brand VARCHAR(100),
     description TEXT,
 
-    -- Pricing
-    price_current DECIMAL(10,2),
-    price_original DECIMAL(10,2),
+    -- Pricing (renamed to match Go model)
+    current_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+    original_price DECIMAL(10,2),
     discount_percentage DECIMAL(5,2),
 
     -- Units and quantity
@@ -35,6 +35,9 @@ CREATE TABLE products (
     -- Dates for partitioning
     valid_from DATE NOT NULL,
     valid_to DATE NOT NULL,
+
+    -- Status
+    is_available BOOLEAN DEFAULT TRUE,
 
     -- Search vectors
     search_vector tsvector,

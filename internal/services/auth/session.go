@@ -35,7 +35,14 @@ func (s *sessionService) CreateSession(ctx context.Context, input *models.Sessio
 		return nil, err
 	}
 
+	// Use provided ID or generate a new one
+	sessionID := input.ID
+	if sessionID == uuid.Nil {
+		sessionID = uuid.New()
+	}
+
 	session := &models.UserSession{
+		ID:               sessionID,
 		UserID:           input.UserID,
 		TokenHash:        input.TokenHash,
 		ExpiresAt:        input.ExpiresAt,

@@ -2,7 +2,9 @@ package scraper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -10,6 +12,21 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+// iPaperConfig holds configuration extracted from iPaper viewer page
+type iPaperConfig struct {
+	PaperID   int      `json:"paperId"`
+	PaperGUID string   `json:"-"` // Extracted from aws.url
+	Name      string   `json:"name"`
+	Pages     []int    `json:"pages"`
+	AWSPolicy string   `json:"-"` // AWS signed URL params
+	ImageDims struct {
+		NormalWidth  int `json:"normalWidth"`
+		NormalHeight int `json:"normalHeight"`
+		ZoomWidth    int `json:"zoomWidth"`
+		ZoomHeight   int `json:"zoomHeight"`
+	} `json:"image"`
+}
 
 // MaximaScraper implements scraping for Maxima grocery store
 type MaximaScraper struct {
@@ -42,8 +59,8 @@ func (s *MaximaScraper) GetStoreInfo() Store {
 
 // ScrapeCurrentFlyers retrieves current weekly flyers from Maxima
 func (s *MaximaScraper) ScrapeCurrentFlyers(ctx context.Context) ([]FlyerInfo, error) {
-	// Maxima flyers are typically found at /akcijos or /leidiniai
-	flyersURL := s.store.BaseURL + "/akcijos"
+	// Maxima flyers are found at /leidiniai
+	flyersURL := s.store.BaseURL + "/leidiniai"
 
 	req, err := http.NewRequestWithContext(ctx, "GET", flyersURL, nil)
 	if err != nil {
@@ -89,7 +106,7 @@ func (s *MaximaScraper) ScrapeCurrentFlyers(ctx context.Context) ([]FlyerInfo, e
 // parseMaximaFlyer extracts flyer information from a single element
 func (s *MaximaScraper) parseMaximaFlyer(selection *goquery.Selection) FlyerInfo {
 	flyer := FlyerInfo{
-		StoreID: s.store.ID,
+		StoreCode: s.store.Code,
 	}
 
 	// Extract title - Maxima specific selectors
@@ -267,36 +284,98 @@ func (s *MaximaScraper) estimatePageCount(selection *goquery.Selection) int {
 	return 8
 }
 
-// parseGenericMaximaFlyers fallback parsing method
+// parseGenericMaximaFlyers fallback parsing method - finds flyers from /leidiniai page
 func (s *MaximaScraper) parseGenericMaximaFlyers(doc *goquery.Document) []FlyerInfo {
 	var flyers []FlyerInfo
 
-	// Mock current flyer for development
-	now := time.Now()
-	flyer := FlyerInfo{
-		StoreID:   s.store.ID,
-		Title:     "Maxima savaitės pasiūlymai",
-		ValidFrom: now.AddDate(0, 0, -int(now.Weekday())),
-		ValidTo:   now.AddDate(0, 0, 7-int(now.Weekday())),
-		FlyerURL:  s.store.BaseURL + "/akcijos",
-		PageCount: 12,
-	}
+	// Find flyer links on the /leidiniai page
+	// Links are typically like /leidiniai/2025kk50
+	doc.Find("a[href*='/leidiniai/']").Each(func(i int, sel *goquery.Selection) {
+		href, exists := sel.Attr("href")
+		if !exists {
+			return
+		}
 
-	flyers = append(flyers, flyer)
+		// Skip navigation links and duplicates
+		if href == "/leidiniai" || href == "/leidiniai/" {
+			return
+		}
 
+		// Only process main weekly flyer (kk = kaininis katalogas)
+		if !strings.Contains(href, "kk") {
+			return
+		}
+
+		// Build full URL
+		flyerURL := s.resolveMaximaURL(href)
+
+		// Check if we already have this flyer
+		for _, existing := range flyers {
+			if existing.FlyerURL == flyerURL {
+				return
+			}
+		}
+
+		// Extract title from link text or nearby elements
+		title := strings.TrimSpace(sel.Text())
+		if title == "" {
+			title = "Maxima kaininis leidinys"
+		}
+
+		now := time.Now()
+		flyer := FlyerInfo{
+			StoreCode: s.store.Code,
+			Title:     title,
+			ValidFrom: now.AddDate(0, 0, -int(now.Weekday())),
+			ValidTo:   now.AddDate(0, 0, 7-int(now.Weekday())),
+			FlyerURL:  flyerURL,
+			PageCount: 28, // Typical Maxima flyer size
+		}
+
+		flyers = append(flyers, flyer)
+	})
+
+	// If no flyers found, return empty - don't use mock data
 	return flyers
 }
 
-// ScrapeFlyer downloads and processes a specific Maxima flyer
+// ScrapeFlyer downloads and processes a specific Maxima flyer from iPaper
 func (s *MaximaScraper) ScrapeFlyer(ctx context.Context, flyerInfo FlyerInfo) ([]PageInfo, error) {
-	// Simulate flyer pages for development
-	var pages []PageInfo
+	// Maxima uses iPaper for flyers - we need to:
+	// 1. Get the iPaper viewer URL from the Maxima flyer page
+	// 2. Extract paper configuration (GUID, AWS signed URLs, page count)
+	// 3. Build page image URLs using the iPaper CDN pattern
 
-	for i := 1; i <= flyerInfo.PageCount; i++ {
+	// First, get the iPaper viewer URL
+	iPaperURL, err := s.getIPaperViewerURL(ctx, flyerInfo.FlyerURL)
+	if err != nil {
+		return nil, NewScraperError("maxima", "get_ipaper_url", err.Error(), true)
+	}
+
+	// Extract iPaper configuration from the viewer page
+	iPaperCfg, err := s.extractIPaperConfig(ctx, iPaperURL)
+	if err != nil {
+		return nil, NewScraperError("maxima", "extract_ipaper_config", err.Error(), true)
+	}
+
+	// Build page URLs from iPaper CDN
+	var pages []PageInfo
+	for _, pageNum := range iPaperCfg.Pages {
+		// iPaper CDN URL pattern: /iPaper/Papers/{GUID}/Pages/{pageNum}/Normal.jpg?{awsPolicy}
+		imageURL := fmt.Sprintf(
+			"https://cdn.ipaper.io/iPaper/Papers/%s/Pages/%d/Normal.jpg?%s",
+			iPaperCfg.PaperGUID,
+			pageNum,
+			iPaperCfg.AWSPolicy,
+		)
+
 		page := PageInfo{
 			FlyerID:    0, // Will be set when flyer is saved to DB
-			PageNumber: i,
-			ImageURL:   fmt.Sprintf("https://cdn.maxima.lt/flyers/current/page_%d.jpg", i),
+			PageNumber: pageNum,
+			ImageURL:   imageURL,
+			FileType:   "jpg",
+			Width:      iPaperCfg.ImageDims.NormalWidth,
+			Height:     iPaperCfg.ImageDims.NormalHeight,
 		}
 		pages = append(pages, page)
 	}
@@ -305,6 +384,219 @@ func (s *MaximaScraper) ScrapeFlyer(ctx context.Context, flyerInfo FlyerInfo) ([
 	time.Sleep(s.config.RateLimit)
 
 	return pages, nil
+}
+
+// getIPaperViewerURL extracts the iPaper viewer URL from Maxima's flyer page
+func (s *MaximaScraper) getIPaperViewerURL(ctx context.Context, flyerURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", flyerURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", s.config.UserAgent)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("parse html: %w", err)
+	}
+
+	// Look for iPaper iframe or viewer URL
+	// Common patterns:
+	// - iframe src="https://viewer.ipaper.io/..."
+	// - data-url="https://viewer.ipaper.io/..."
+	// - JavaScript redirect to viewer.ipaper.io
+
+	var iPaperURL string
+
+	// Check for iframe
+	doc.Find("iframe[src*='ipaper.io']").Each(func(i int, sel *goquery.Selection) {
+		if src, exists := sel.Attr("src"); exists {
+			iPaperURL = src
+		}
+	})
+
+	if iPaperURL != "" {
+		return iPaperURL, nil
+	}
+
+	// Check for data attributes
+	doc.Find("[data-url*='ipaper.io']").Each(func(i int, sel *goquery.Selection) {
+		if url, exists := sel.Attr("data-url"); exists {
+			iPaperURL = url
+		}
+	})
+
+	if iPaperURL != "" {
+		return iPaperURL, nil
+	}
+
+	// Check for links to ipaper
+	doc.Find("a[href*='viewer.ipaper.io']").Each(func(i int, sel *goquery.Selection) {
+		if href, exists := sel.Attr("href"); exists {
+			iPaperURL = href
+		}
+	})
+
+	if iPaperURL != "" {
+		return iPaperURL, nil
+	}
+
+	// Check page source for viewer.ipaper.io URL pattern
+	html, _ := doc.Html()
+	re := regexp.MustCompile(`https://viewer\.ipaper\.io/[^"'\s]+`)
+	if matches := re.FindString(html); matches != "" {
+		return matches, nil
+	}
+
+	// Construct iPaper URL from Maxima URL pattern
+	// e.g., https://www.maxima.lt/leidiniai/2025kk50 -> https://viewer.ipaper.io/maxima/kk-savaite/2025kk50
+	if strings.Contains(flyerURL, "/leidiniai/") {
+		parts := strings.Split(flyerURL, "/leidiniai/")
+		if len(parts) == 2 && parts[1] != "" {
+			flyerID := strings.TrimSuffix(parts[1], "/")
+			// Convert Maxima flyer ID to iPaper path
+			iPaperURL = fmt.Sprintf("https://viewer.ipaper.io/maxima/kk-savaite/%s", flyerID)
+			return iPaperURL, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find iPaper viewer URL")
+}
+
+// extractIPaperConfig fetches and parses the iPaper viewer configuration
+func (s *MaximaScraper) extractIPaperConfig(ctx context.Context, iPaperURL string) (*iPaperConfig, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", iPaperURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", s.config.UserAgent)
+	req.Header.Set("Accept-Language", "lt-LT,lt;q=0.9,en;q=0.8")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
+	htmlContent := string(body)
+
+	// Extract window.staticSettings JSON from the page
+	// The JSON is large, so we need to find it by matching braces
+	startMarker := "window.staticSettings"
+	startIdx := strings.Index(htmlContent, startMarker)
+	if startIdx == -1 {
+		return nil, fmt.Errorf("could not find staticSettings in page")
+	}
+
+	// Find the JSON start (first '{' after the marker)
+	jsonStart := strings.Index(htmlContent[startIdx:], "{")
+	if jsonStart == -1 {
+		return nil, fmt.Errorf("could not find JSON start in staticSettings")
+	}
+	jsonStart += startIdx
+
+	// Find matching closing brace by counting braces
+	depth := 0
+	jsonEnd := -1
+	for i := jsonStart; i < len(htmlContent); i++ {
+		if htmlContent[i] == '{' {
+			depth++
+		} else if htmlContent[i] == '}' {
+			depth--
+			if depth == 0 {
+				jsonEnd = i + 1
+				break
+			}
+		}
+	}
+
+	if jsonEnd == -1 {
+		return nil, fmt.Errorf("could not find JSON end in staticSettings")
+	}
+
+	jsonStr := htmlContent[jsonStart:jsonEnd]
+
+	// Parse the main config
+	var rawConfig map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &rawConfig); err != nil {
+		return nil, fmt.Errorf("parse staticSettings JSON: %w", err)
+	}
+
+	config := &iPaperConfig{}
+
+	// Extract paperId
+	if paperIDRaw, ok := rawConfig["paperId"]; ok {
+		json.Unmarshal(paperIDRaw, &config.PaperID)
+	}
+
+	// Extract name
+	if nameRaw, ok := rawConfig["name"]; ok {
+		json.Unmarshal(nameRaw, &config.Name)
+	}
+
+	// Extract pages array
+	if pagesRaw, ok := rawConfig["pages"]; ok {
+		json.Unmarshal(pagesRaw, &config.Pages)
+	}
+
+	// Extract image dimensions
+	if imageRaw, ok := rawConfig["image"]; ok {
+		json.Unmarshal(imageRaw, &config.ImageDims)
+	}
+
+	// Extract AWS configuration (contains GUID and signed URL params)
+	if awsRaw, ok := rawConfig["aws"]; ok {
+		var awsConfig map[string]interface{}
+		if err := json.Unmarshal(awsRaw, &awsConfig); err == nil {
+			// Extract paper GUID from aws.url
+			// e.g., "url":"https://cdn.ipaper.io/iPaper/Papers/7e831eab-58b9-45b7-8ee3-cddcc6420015/"
+			if urlVal, ok := awsConfig["url"].(string); ok {
+				guidRe := regexp.MustCompile(`/Papers/([0-9a-f-]+)/`)
+				if guidMatch := guidRe.FindStringSubmatch(urlVal); len(guidMatch) > 1 {
+					config.PaperGUID = guidMatch[1]
+				}
+			}
+
+			// Extract AWS policy string
+			// e.g., "policy":"Policy=...&Signature=...&Key-Pair-Id=..."
+			if policyVal, ok := awsConfig["policy"].(string); ok {
+				config.AWSPolicy = policyVal
+			}
+		}
+	}
+
+	// Validate extracted config
+	if config.PaperGUID == "" {
+		return nil, fmt.Errorf("could not extract paper GUID from iPaper config")
+	}
+	if config.AWSPolicy == "" {
+		return nil, fmt.Errorf("could not extract AWS policy from iPaper config")
+	}
+	if len(config.Pages) == 0 {
+		return nil, fmt.Errorf("could not extract pages from iPaper config")
+	}
+
+	return config, nil
 }
 
 // DownloadPage downloads a specific flyer page image from Maxima

@@ -96,6 +96,15 @@ func (s *shoppingListService) Create(ctx context.Context, list *models.ShoppingL
 	list.UpdatedAt = now
 	list.LastAccessedAt = now
 
+	// Check if a list with the same name already exists
+	exists, err := s.repo.ExistsByUserAndName(ctx, list.UserID, list.Name)
+	if err != nil {
+		return apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to check existing lists")
+	}
+	if exists {
+		return apperrors.Validation(fmt.Sprintf("You already have a shopping list named \"%s\". Please choose a different name.", list.Name))
+	}
+
 	// If this is the user's first list, make it default
 	count, err := s.repo.CountByUserID(ctx, list.UserID, nil)
 	if err != nil {

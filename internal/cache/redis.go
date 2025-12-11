@@ -60,6 +60,11 @@ func (r *RedisClient) Close() error {
 	return nil
 }
 
+// Client returns the underlying redis.Client for services that need direct access
+func (r *RedisClient) Client() *redis.Client {
+	return r.client
+}
+
 func (r *RedisClient) Health(ctx context.Context) error {
 	return r.client.Ping(ctx).Err()
 }

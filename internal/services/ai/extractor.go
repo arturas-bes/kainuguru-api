@@ -77,6 +77,7 @@ type Promotion struct {
 	LoyaltyRequired  bool                       `json:"loyalty_required"`
 	BundleDetails    string                     `json:"bundle_details,omitempty"`
 	BoundingBox      *models.ProductBoundingBox `json:"bounding_box,omitempty"`
+	PagePosition     *models.ProductPosition    `json:"page_position,omitempty"`
 	Confidence       float64                    `json:"confidence,omitempty"`
 }
 

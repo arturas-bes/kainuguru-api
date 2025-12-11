@@ -10,6 +10,7 @@
         "is_archived": false,
         "is_public": false,
         "share_code": null,
+        "is_locked": false,
         "item_count": 0,
         "completed_item_count": 0,
         "estimated_total_price": null,

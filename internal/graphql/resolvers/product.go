@@ -150,13 +150,24 @@ func (r *productResolver) UpdatedAt(ctx context.Context, obj *models.Product) (s
 }
 
 func (r *productResolver) BoundingBox(ctx context.Context, obj *models.Product) (*model.ProductBoundingBox, error) {
-	// BoundingBox is extracted from flyer images - not yet implemented
-	// Return nil for now (Phase 3.3 - Image Processing)
-	return nil, nil
+	if obj.BoundingBox == nil {
+		return nil, nil
+	}
+	return &model.ProductBoundingBox{
+		X:      obj.BoundingBox.X,
+		Y:      obj.BoundingBox.Y,
+		Width:  obj.BoundingBox.Width,
+		Height: obj.BoundingBox.Height,
+	}, nil
 }
 
 func (r *productResolver) PagePosition(ctx context.Context, obj *models.Product) (*model.ProductPosition, error) {
-	// PagePosition is the location of product on flyer page - not yet fully implemented
-	// Return nil for now (Phase 3.3 - Image Processing)
-	return nil, nil
+	if obj.PagePosition == nil {
+		return nil, nil
+	}
+	return &model.ProductPosition{
+		Row:    obj.PagePosition.Row,
+		Column: obj.PagePosition.Column,
+		Zone:   obj.PagePosition.Zone,
+	}, nil
 }

@@ -19,6 +19,7 @@ type Repository interface {
 	Delete(ctx context.Context, id int) error
 
 	// Specialized queries
+	GetBySourceURL(ctx context.Context, sourceURL string) (*models.Flyer, error)
 	GetProcessable(ctx context.Context) ([]*models.Flyer, error)
 	GetFlyersForProcessing(ctx context.Context, limit int) ([]*models.Flyer, error)
 	GetWithPages(ctx context.Context, flyerID int) (*models.Flyer, error)

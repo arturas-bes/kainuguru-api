@@ -222,6 +222,7 @@ func (us *UserSession) GetLocationDescription() string {
 
 // SessionCreateInput represents input for creating a new session
 type SessionCreateInput struct {
+	ID               uuid.UUID     `json:"-"` // Set internally, not from input
 	UserID           uuid.UUID     `json:"userId" validate:"required"`
 	TokenHash        string        `json:"-"` // Set internally, not from input
 	ExpiresAt        time.Time     `json:"expiresAt" validate:"required"`

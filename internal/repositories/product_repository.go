@@ -45,7 +45,8 @@ func (r *productRepository) GetProductsByFlyerIDs(ctx context.Context, flyerIDs 
 	var products []*models.Product
 	err := attachProductRelations(r.db.NewSelect().Model(&products)).
 		Where("p.flyer_id IN (?)", bun.In(flyerIDs)).
-		Order("p.flyer_id ASC, p.id ASC").
+		Order("p.flyer_id ASC").
+		Order("p.id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -60,7 +61,8 @@ func (r *productRepository) GetProductsByFlyerPageIDs(ctx context.Context, flyer
 	var products []*models.Product
 	err := attachProductRelations(r.db.NewSelect().Model(&products)).
 		Where("p.flyer_page_id IN (?)", bun.In(flyerPageIDs)).
-		Order("p.flyer_page_id ASC, p.id ASC").
+		Order("p.flyer_page_id ASC").
+		Order("p.id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, err

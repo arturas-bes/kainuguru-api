@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -13,9 +15,12 @@ import (
 	"github.com/kainuguru/kainuguru-api/internal/cache"
 	"github.com/kainuguru/kainuguru-api/internal/config"
 	"github.com/kainuguru/kainuguru-api/internal/database"
+	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/handlers"
 	"github.com/kainuguru/kainuguru-api/internal/middleware"
+	"github.com/kainuguru/kainuguru-api/internal/repositories"
 	"github.com/kainuguru/kainuguru-api/internal/services"
+	"github.com/kainuguru/kainuguru-api/internal/services/wizard"
 )
 
 type Server struct {
@@ -127,9 +132,33 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient, c
 	// Health check endpoint
 	app.Get("/health", handlers.Health(db, redis))
 
+	// Static file server for flyer images
+	// Serves files from /kainuguru-public at /static URL path
+	// e.g., /static/flyers/maxima/2025-12-07.../page-1.jpg
+	app.Static("/static", cfg.Storage.BasePath, fiber.Static{
+		Compress:      true,
+		ByteRange:     true,
+		Browse:        false,
+		CacheDuration: 24 * time.Hour,
+	})
+
 	// Initialize service factory
 	serviceFactory := services.NewServiceFactoryWithConfig(db.DB, cfg)
 	authService := serviceFactory.AuthService()
+
+	// Initialize wizard service with cache and dependencies
+	wizardCache := cache.NewWizardCache(redis)
+	wizardService := wizard.NewService(
+		db.DB,
+		slog.Default(),
+		wizardCache,
+		serviceFactory.SearchService(),
+		repositories.NewShoppingListRepository(db.DB),
+		nil, // TODO: Fix wizard.NewService signature - it incorrectly expects *OfferSnapshotRepository instead of OfferSnapshotRepository
+	)
+
+	// Initialize rate limiter
+	rateLimiter := cache.NewRateLimiter(redis.Client())
 
 	// Configure GraphQL handler with all services
 	graphqlConfig := handlers.GraphQLConfig{
@@ -144,16 +173,45 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient, c
 		ShoppingListService:     serviceFactory.ShoppingListService(),
 		ShoppingListItemService: serviceFactory.ShoppingListItemService(),
 		PriceHistoryService:     serviceFactory.PriceHistoryService(),
+		WizardService:           wizardService,
+		RateLimiter:             rateLimiter,
 		DB:                      db.DB,
+	}
+
+	// Determine which auth middleware to use based on configuration
+	var authMiddlewareHandler fiber.Handler
+	if cfg.Auth.Clerk.Enabled {
+		// Use Clerk authentication
+		clerkService := middleware.NewClerkService(db.DB, cfg.Auth.Clerk)
+		authMiddlewareHandler = middleware.NewClerkMiddleware(middleware.ClerkMiddlewareConfig{
+			Required:     false,
+			Config:       cfg.Auth.Clerk,
+			ClerkService: clerkService,
+		})
+		log.Info().Msg("Using Clerk authentication")
+	} else {
+		// Use traditional JWT authentication
+		authMiddlewareHandler = middleware.NewAuthMiddleware(middleware.AuthMiddlewareConfig{
+			Required:       false,
+			JWTService:     authService.JWT(),
+			SessionService: authService.Sessions(),
+		})
+		log.Info().Msg("Using JWT authentication")
 	}
 
 	// GraphQL endpoint with full service integration
 	app.All("/graphql",
-		middleware.NewAuthMiddleware(middleware.AuthMiddlewareConfig{
-			Required:       false,
-			JWTService:     authService.JWT(),
-			SessionService: authService.Sessions(),
-		}),
+		// DataLoader middleware - MUST come first to be in context for field resolvers
+		dataloaders.Middleware(
+			serviceFactory.StoreService(),
+			serviceFactory.FlyerService(),
+			serviceFactory.FlyerPageService(),
+			serviceFactory.ShoppingListService(),
+			serviceFactory.ProductService(),
+			serviceFactory.ProductMasterService(),
+			authService,
+		),
+		authMiddlewareHandler,
 		handlers.GraphQLHandler(graphqlConfig),
 	)
 

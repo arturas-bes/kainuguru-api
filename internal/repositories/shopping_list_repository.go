@@ -34,14 +34,33 @@ func (r *shoppingListRepository) Create(ctx context.Context, list *models.Shoppi
 
 // GetByID retrieves a shopping list by ID
 func (r *shoppingListRepository) GetByID(ctx context.Context, id int64) (*models.ShoppingList, error) {
-	list, err := r.base.GetByID(ctx, id)
+	var list models.ShoppingList
+	err := r.db.NewSelect().
+		Model(&list).
+		Where("sl.id = ?", id).
+		Relation("User").
+		Scan(ctx)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return list, nil
+	return &list, nil
+}
+
+// ExistsByUserAndName checks if a shopping list with the given name exists for the user
+func (r *shoppingListRepository) ExistsByUserAndName(ctx context.Context, userID uuid.UUID, name string) (bool, error) {
+	exists, err := r.db.NewSelect().
+		Model((*models.ShoppingList)(nil)).
+		Where("user_id = ?", userID).
+		Where("name = ?", name).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence: %w", err)
+	}
+	return exists, nil
 }
 
 // GetByIDs retrieves multiple shopping lists by IDs
@@ -50,13 +69,25 @@ func (r *shoppingListRepository) GetByIDs(ctx context.Context, ids []int64) ([]*
 		return []*models.ShoppingList{}, nil
 	}
 
-	return r.base.GetByIDs(ctx, ids)
+	var lists []*models.ShoppingList
+	err := r.db.NewSelect().
+		Model(&lists).
+		Where("id IN (?)", bun.In(ids)).
+		Relation("User"). // Added Relation("User")
+		Scan(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+	return lists, nil
 }
 
 // GetByUserID retrieves shopping lists for a user with optional filters
 func (r *shoppingListRepository) GetByUserID(ctx context.Context, userID uuid.UUID, filters *shoppinglist.Filters) ([]*models.ShoppingList, error) {
-	query := r.db.NewSelect().Model((*models.ShoppingList)(nil)).
-		Where("user_id = ?", userID)
+	query := r.db.NewSelect().
+		Model((*models.ShoppingList)(nil)).
+		Where("user_id = ?", userID).
+		Relation("User") // Added Relation("User")
 
 	query = applyShoppingListFilters(query, filters)
 	query = applyShoppingListOrdering(query, filters)
@@ -340,11 +371,12 @@ func applyShoppingListFilters(query *bun.SelectQuery, filters *shoppinglist.Filt
 
 func applyShoppingListOrdering(query *bun.SelectQuery, filters *shoppinglist.Filters) *bun.SelectQuery {
 	if filters == nil {
-		return query.Order("is_default DESC, updated_at DESC")
+		return query.Order("sl.is_default DESC, sl.updated_at DESC")
 	}
-	orderBy := "updated_at"
+	orderBy := "sl.updated_at"
 	if filters.OrderBy != "" {
-		orderBy = filters.OrderBy
+		// Qualify column name with table alias to avoid ambiguity with joined tables
+		orderBy = fmt.Sprintf("sl.%s", filters.OrderBy)
 	}
 	orderDir := "DESC"
 	if filters.OrderDir != "" {

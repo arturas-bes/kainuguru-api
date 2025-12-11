@@ -134,14 +134,14 @@ BEGIN
     -- Calculate statistics from linked products
     SELECT
         COUNT(*) as match_count,
-        AVG(price_current) as avg_price,
-        MIN(price_current) as min_price,
-        MAX(price_current) as max_price,
+        AVG(current_price) as avg_price,
+        MIN(current_price) as min_price,
+        MAX(current_price) as max_price,
         MAX(valid_to) as last_seen
     INTO stats_record
     FROM products
     WHERE product_master_id = master_id
-    AND price_current IS NOT NULL
+    AND current_price IS NOT NULL
     AND valid_to >= CURRENT_DATE - INTERVAL '30 days'; -- Only recent data
 
     -- Update the product master

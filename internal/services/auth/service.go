@@ -88,37 +88,33 @@ func (a *authServiceImpl) Register(ctx context.Context, input *models.UserInput)
 		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create user")
 	}
 
-	// Create session
+	// Generate session ID first (needed for JWT generation)
+	sessionID := uuid.New()
+
+	// Generate tokens with the session ID
+	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, sessionID)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
+	}
+
+	// Get token hashes
+	accessTokenHash := a.jwtService.GetTokenHash(tokenPair.AccessToken)
+	refreshTokenHash := a.jwtService.GetTokenHash(tokenPair.RefreshToken)
+	refreshExpiresAt := time.Now().Add(a.config.RefreshTokenExpiry)
+
+	// Create session with token hashes already set
 	sessionInput := &models.SessionCreateInput{
-		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(a.config.SessionExpiry),
+		ID:               sessionID,
+		UserID:           user.ID,
+		TokenHash:        accessTokenHash,
+		RefreshTokenHash: &refreshTokenHash,
+		ExpiresAt:        time.Now().Add(a.config.SessionExpiry),
+		RefreshExpiresAt: &refreshExpiresAt,
 	}
 
 	session, err := a.sessionService.CreateSession(ctx, sessionInput)
 	if err != nil {
 		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create session")
-	}
-
-	// Generate tokens
-	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, session.ID)
-	if err != nil {
-		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
-	}
-
-	// Update session with token hashes
-	accessTokenHash := a.jwtService.GetTokenHash(tokenPair.AccessToken)
-	refreshTokenHash := a.jwtService.GetTokenHash(tokenPair.RefreshToken)
-
-	session.TokenHash = accessTokenHash
-	session.RefreshTokenHash = &refreshTokenHash
-
-	_, err = a.db.NewUpdate().
-		Model(session).
-		Column("token_hash", "refresh_token_hash").
-		WherePK().
-		Exec(ctx)
-	if err != nil {
-		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to update session with token hashes")
 	}
 
 	// Send welcome email if email service is available
@@ -192,10 +188,28 @@ func (a *authServiceImpl) Login(ctx context.Context, email, password string, met
 		return nil, apperrors.Authentication("email not verified")
 	}
 
-	// Create session
+	// Generate session ID first (needed for JWT generation)
+	sessionID := uuid.New()
+
+	// Generate tokens with the session ID
+	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, sessionID)
+	if err != nil {
+		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
+	}
+
+	// Get token hashes
+	accessTokenHash := a.jwtService.GetTokenHash(tokenPair.AccessToken)
+	refreshTokenHash := a.jwtService.GetTokenHash(tokenPair.RefreshToken)
+	refreshExpiresAt := time.Now().Add(a.config.RefreshTokenExpiry)
+
+	// Create session with token hashes already set
 	sessionInput := &models.SessionCreateInput{
-		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(a.config.SessionExpiry),
+		ID:               sessionID,
+		UserID:           user.ID,
+		TokenHash:        accessTokenHash,
+		RefreshTokenHash: &refreshTokenHash,
+		ExpiresAt:        time.Now().Add(a.config.SessionExpiry),
+		RefreshExpiresAt: &refreshExpiresAt,
 	}
 
 	// Add metadata if provided
@@ -212,12 +226,6 @@ func (a *authServiceImpl) Login(ctx context.Context, email, password string, met
 	session, err := a.sessionService.CreateSession(ctx, sessionInput)
 	if err != nil {
 		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to create session")
-	}
-
-	// Generate tokens
-	tokenPair, err := a.jwtService.GenerateTokenPair(user.ID, session.ID)
-	if err != nil {
-		return nil, apperrors.Wrap(err, apperrors.ErrorTypeInternal, "failed to generate tokens")
 	}
 
 	// Update last login

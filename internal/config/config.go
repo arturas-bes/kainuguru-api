@@ -94,6 +94,15 @@ type AuthConfig struct {
 	JWTExpiresIn   time.Duration `mapstructure:"jwt_expires_in"`
 	BCryptCost     int           `mapstructure:"bcrypt_cost"`
 	SessionTimeout time.Duration `mapstructure:"session_timeout"`
+
+	// Clerk authentication (replaces JWT-based auth when enabled)
+	Clerk ClerkConfig `mapstructure:"clerk"`
+}
+
+type ClerkConfig struct {
+	Enabled        bool   `mapstructure:"enabled"`         // Enable Clerk authentication
+	SecretKey      string `mapstructure:"secret_key"`      // CLERK_SECRET_KEY from Clerk dashboard
+	PublishableKey string `mapstructure:"publishable_key"` // CLERK_PUBLISHABLE_KEY for frontend
 }
 
 type AppConfig struct {
@@ -261,6 +270,11 @@ func bindEnvironmentVariables(v *viper.Viper) {
 	v.BindEnv("auth.jwt_secret", "JWT_SECRET")
 	v.BindEnv("auth.session_secret", "SESSION_SECRET")
 
+	// Clerk authentication
+	v.BindEnv("auth.clerk.enabled", "CLERK_ENABLED")
+	v.BindEnv("auth.clerk.secret_key", "CLERK_SECRET_KEY")
+	v.BindEnv("auth.clerk.publishable_key", "CLERK_PUBLISHABLE_KEY")
+
 	// App configuration
 	v.BindEnv("app.environment", "APP_ENV")
 	v.BindEnv("app.debug", "APP_DEBUG")
@@ -328,6 +342,9 @@ func setDefaults(v *viper.Viper) {
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
+
+	// Clerk defaults (disabled by default to preserve backward compatibility)
+	v.SetDefault("auth.clerk.enabled", false)
 
 	// App defaults
 	v.SetDefault("app.environment", "development")

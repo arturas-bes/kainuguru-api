@@ -17,8 +17,8 @@ WHERE is_available = true;
 
 -- Composite index for products on sale
 CREATE INDEX IF NOT EXISTS idx_products_flyer_sale
-ON products(flyer_id, is_on_sale, valid_from, valid_to)
-WHERE is_available = true;
+ON products(flyer_id, valid_from, valid_to)
+WHERE discount_percentage IS NOT NULL AND discount_percentage > 0 AND is_available = true;
 
 -- Index for product master relationships
 CREATE INDEX IF NOT EXISTS idx_products_product_master

@@ -55,6 +55,7 @@ type FlyerService interface {
 	GetFlyersByStoreIDs(ctx context.Context, storeIDs []int) ([]*models.Flyer, error)
 
 	// Flyer-specific operations
+	GetBySourceURL(ctx context.Context, sourceURL string) (*models.Flyer, error)
 	GetCurrentFlyers(ctx context.Context, storeIDs []int) ([]*models.Flyer, error)
 	GetValidFlyers(ctx context.Context, storeIDs []int) ([]*models.Flyer, error)
 	GetFlyersByStore(ctx context.Context, storeID int, filters FlyerFilters) ([]*models.Flyer, error)

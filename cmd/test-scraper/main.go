@@ -49,7 +49,7 @@ func main() {
 		fmt.Printf("     Valid From: %s\n", flyer.ValidFrom.Format("2006-01-02"))
 		fmt.Printf("     Valid To: %s\n", flyer.ValidTo.Format("2006-01-02"))
 		fmt.Printf("     URL: %s\n", flyer.FlyerURL)
-		fmt.Printf("     Store ID: %d\n", flyer.StoreID)
+		fmt.Printf("     Store Code: %s\n", flyer.StoreCode)
 		fmt.Println()
 
 		// Test validating the flyer

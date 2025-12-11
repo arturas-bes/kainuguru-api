@@ -124,13 +124,13 @@ func (r *mutationResolver) CreateShoppingList(ctx context.Context, input model.C
 		return nil, fmt.Errorf("failed to create shopping list: %w", err)
 	}
 
-	// Reload the list to get relations (User)
-	list, err := r.shoppingListService.GetByID(ctx, list.ID)
+	// Reload the list with User relation to satisfy GraphQL schema
+	reloaded, err := r.shoppingListService.GetByID(ctx, list.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload shopping list: %w", err)
 	}
 
-	return list, nil
+	return reloaded, nil
 }
 
 // UpdateShoppingList updates an existing shopping list
@@ -235,6 +235,11 @@ func (r *mutationResolver) SetDefaultShoppingList(ctx context.Context, id int) (
 
 // User resolves the user field on ShoppingList
 func (r *shoppingListResolver) User(ctx context.Context, obj *models.ShoppingList) (*models.User, error) {
+	// If User is already loaded (e.g. via Relation("User")), return it
+	if obj.User != nil {
+		return obj.User, nil
+	}
+
 	loaders := dataloaders.FromContext(ctx)
 	user, err := loaders.UserLoader.Load(ctx, obj.UserID.String())()
 	if err != nil {

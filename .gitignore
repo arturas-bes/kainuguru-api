@@ -133,3 +133,4 @@ sessions/
 *.temp
 test_output/*
 /vendor/
+tapir.json

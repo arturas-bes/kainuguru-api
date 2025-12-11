@@ -60,6 +60,7 @@ func (pb *PromptBuilder) Schema() string {
       "loyalty_required": "true|false",
       "bundle_details": "e.g., '1+1','2+1','3 už 2'|null",
       "bounding_box": {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0},
+      "page_position": {"row": 0, "column": 0, "zone": "main|header|footer|sidebar"},
       "confidence": 0.0
     }
   ],
@@ -130,6 +131,7 @@ For each module, return:
 - loyalty_required (true if loyalty heart/MEILĖ IKI visible)
 - special_tags (array: ["SUPER KAINA","TIK","MEILĖ IKI",etc.])
 - bounding_box (normalized 0..1)
+- page_position: {"row": 1-based row from top, "column": 1-based column from left, "zone": "main|header|footer|sidebar"}
 - confidence (0.0-1.0)
 
 Output strict JSON following the schema. No markdown. Do not drop small corner modules.

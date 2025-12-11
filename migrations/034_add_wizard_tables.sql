@@ -13,18 +13,20 @@ ALTER TABLE shopping_list_items
 ADD COLUMN IF NOT EXISTS origin VARCHAR(20) DEFAULT 'free_text' 
 CHECK (origin IN ('flyer', 'free_text'));
 
--- Backfill origin='flyer' for items with flyer_product_id
+-- Backfill origin='flyer' for items with linked_product_id
 UPDATE shopping_list_items 
 SET origin = 'flyer' 
-WHERE flyer_product_id IS NOT NULL AND origin = 'free_text';
+WHERE linked_product_id IS NOT NULL AND origin = 'free_text';
 
 -- Add is_locked field for list locking during wizard sessions (FR-016)
-ALTER TABLE shopping_lists
-ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
+-- MOVED TO 035_add_is_locked_to_shopping_lists.sql
+-- ALTER TABLE shopping_lists
+-- ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
 
 -- Index for checking locked lists
-CREATE INDEX IF NOT EXISTS idx_shopping_lists_locked 
-ON shopping_lists(id, is_locked) WHERE is_locked = TRUE;
+-- MOVED TO 035_add_is_locked_to_shopping_lists.sql
+-- CREATE INDEX IF NOT EXISTS idx_shopping_lists_locked 
+-- ON shopping_lists(id, is_locked) WHERE is_locked = TRUE;
 
 -- ============================================================================
 -- Offer Snapshots Table - Immutable historical records of wizard suggestions
@@ -36,7 +38,7 @@ CREATE TABLE IF NOT EXISTS offer_snapshots (
     shopping_list_item_id BIGINT NOT NULL REFERENCES shopping_list_items(id) ON DELETE CASCADE,
     
     -- Product references
-    flyer_product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+    flyer_product_id BIGINT, -- No FK due to partitioned products table
     product_master_id BIGINT REFERENCES product_masters(id) ON DELETE SET NULL,
     store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
     
@@ -82,7 +84,7 @@ COMMENT ON TABLE offer_snapshots IS 'Immutable historical records of product off
 COMMENT ON COLUMN offer_snapshots.estimated IS 'FALSE for wizard suggestions (always uses actual flyer prices per constitution), TRUE for category-level discounts';
 COMMENT ON COLUMN offer_snapshots.snapshot_reason IS 'Source context: wizard_migration (from wizard), price_history (tracking), manual_snapshot (user-triggered)';
 COMMENT ON COLUMN shopping_list_items.origin IS 'Item source: flyer (from flyer offer) or free_text (manually entered by user)';
-COMMENT ON COLUMN shopping_lists.is_locked IS 'List lock status during active wizard session (FR-016 compliance)';
+-- COMMENT ON COLUMN shopping_lists.is_locked IS 'List lock status during active wizard session (FR-016 compliance)';
 
 -- +goose StatementEnd
 
