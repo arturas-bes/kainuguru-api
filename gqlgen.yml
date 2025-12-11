@@ -23,12 +23,16 @@ skip_mod_tidy: true
 # Custom scalar mappings
 struct_tag: bun
 
+# Autobind to find custom scalar implementations
+autobind:
+  - github.com/kainuguru/kainuguru-api/internal/graphql/scalars
+
 # Skip generating these types since we have custom implementations
 models:
   # Custom scalars with marshaling functions
   DateTime:
     model:
-      - time.Time
+      - github.com/kainuguru/kainuguru-api/internal/graphql/scalars.DateTime
 
   # Authentication types
   User:

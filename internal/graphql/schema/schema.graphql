@@ -254,11 +254,16 @@ type ShoppingList {
   isArchived: Boolean!
   isPublic: Boolean!
   shareCode: String
+  isLocked: Boolean!  # Indicates if list is being migrated by wizard session (FR-016)
 
   # Statistics
   itemCount: Int!
   completedItemCount: Int!
   estimatedTotalPrice: Float
+
+  # Wizard integration (T070)
+  expiredItemCount: Int!  # Count of items with expired flyer products
+  hasActiveWizardSession: Boolean!  # True if user has an active wizard session for this list
 
   # Computed fields (Hyena pattern)
   completionPercentage: Float!

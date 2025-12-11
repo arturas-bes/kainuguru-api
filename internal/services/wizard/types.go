@@ -14,8 +14,9 @@ type StartWizardRequest struct {
 // DecideItemRequest represents a request to record a decision for a single item
 type DecideItemRequest struct {
 	SessionID      uuid.UUID
-	ItemID         int
-	SuggestionID   *int // nil = keep existing, non-nil = select suggestion
+	ItemID         int64
+	Decision       string // "REPLACE", "SKIP", "REMOVE"
+	SuggestionID   *int64 // Required if Decision=REPLACE
 	IdempotencyKey string
 }
 
@@ -40,13 +41,19 @@ type ConfirmWizardRequest struct {
 
 // ConfirmWizardResult represents the result of confirming a wizard session
 type ConfirmWizardResult struct {
-	ShoppingListID    int64
-	ItemsUpdated      int
-	ItemsDeleted      int
-	OfferSnapshotsIDs []int
-	Success           bool
-	Message           string
+	ItemsUpdated        int
+	ItemsDeleted        int
+	OfferSnapshotIDs    []int64
+	StoreCount          int
+	TotalEstimatedPrice float64
 }
+
+// Decision action constants
+const (
+	DecisionReplace = "REPLACE"
+	DecisionSkip    = "SKIP"
+	DecisionRemove  = "REMOVE"
+)
 
 // StoreSelectionInput represents user input for store selection
 type StoreSelectionInput struct {
