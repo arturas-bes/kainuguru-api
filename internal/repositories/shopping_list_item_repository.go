@@ -299,7 +299,7 @@ func (r *shoppingListItemRepository) GetWithProduct(ctx context.Context, itemID 
 	err := r.db.NewSelect().
 		Model(item).
 		Relation("LinkedProduct").
-		Where("shopping_list_item.id = ?", itemID).
+		Where("sli.id = ?", itemID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -314,7 +314,7 @@ func (r *shoppingListItemRepository) GetWithProductMaster(ctx context.Context, i
 	err := r.db.NewSelect().
 		Model(item).
 		Relation("ProductMaster").
-		Where("shopping_list_item.id = ?", itemID).
+		Where("sli.id = ?", itemID).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -502,8 +502,8 @@ func (r *shoppingListItemRepository) GetTagStats(ctx context.Context, listID int
 func (r *shoppingListItemRepository) CanUserAccessItem(ctx context.Context, itemID int64, userID uuid.UUID) (bool, error) {
 	count, err := r.db.NewSelect().
 		Model((*models.ShoppingListItem)(nil)).
-		Join("JOIN shopping_lists sl ON sl.id = shopping_list_item.shopping_list_id").
-		Where("shopping_list_item.id = ?", itemID).
+		Join("JOIN shopping_lists sl ON sl.id = sli.shopping_list_id").
+		Where("sli.id = ?", itemID).
 		Where("(sl.user_id = ? OR sl.is_public = true)", userID).
 		Count(ctx)
 
