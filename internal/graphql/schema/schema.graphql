@@ -234,6 +234,10 @@ type User {
   # Relations
   shoppingLists: [ShoppingList!]!
   priceAlerts: [PriceAlert!]!
+
+  # Store Preferences
+  preferredStores: [Store!]!
+  preferredStoreIDs: [Int!]!
 }
 
 type AuthPayload {
@@ -887,6 +891,11 @@ type Mutation {
   deletePriceAlert(id: ID!): Boolean!
   activatePriceAlert(id: ID!): PriceAlert!
   deactivatePriceAlert(id: ID!): PriceAlert!
+
+  # User Store Preferences
+  setPreferredStores(input: SetPreferredStoresInput!): User!
+  addPreferredStore(storeID: Int!): User!
+  removePreferredStore(storeID: Int!): User!
 }
 
 # Additional Input Types for Updates
@@ -916,4 +925,9 @@ input UpdatePriceAlertInput {
   notifyPush: Boolean
   notes: String
   expiresAt: String
+}
+
+# User Store Preferences Input
+input SetPreferredStoresInput {
+  storeIDs: [Int!]!
 }

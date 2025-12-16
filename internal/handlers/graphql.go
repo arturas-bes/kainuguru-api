@@ -7,9 +7,13 @@ import (
 	"io"
 	"net/http/httptest"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/cache"
+	"github.com/kainuguru/kainuguru-api/internal/graphql/dataloaders"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/generated"
 	"github.com/kainuguru/kainuguru-api/internal/graphql/resolvers"
 	"github.com/kainuguru/kainuguru-api/internal/services"
@@ -21,20 +25,21 @@ import (
 
 // GraphQLConfig holds configuration for GraphQL handler
 type GraphQLConfig struct {
-	StoreService            services.StoreService
-	FlyerService            services.FlyerService
-	FlyerPageService        services.FlyerPageService
-	ProductService          services.ProductService
-	ProductMasterService    services.ProductMasterService
-	ExtractionJobService    services.ExtractionJobService
-	SearchService           search.Service
-	AuthService             auth.AuthService
-	ShoppingListService     services.ShoppingListService
-	ShoppingListItemService services.ShoppingListItemService
-	PriceHistoryService     services.PriceHistoryService
-	WizardService           wizard.Service
-	RateLimiter             *cache.RateLimiter
-	DB                      *bun.DB
+	StoreService               services.StoreService
+	FlyerService               services.FlyerService
+	FlyerPageService           services.FlyerPageService
+	ProductService             services.ProductService
+	ProductMasterService       services.ProductMasterService
+	ExtractionJobService       services.ExtractionJobService
+	SearchService              search.Service
+	AuthService                auth.AuthService
+	ShoppingListService        services.ShoppingListService
+	ShoppingListItemService    services.ShoppingListItemService
+	PriceHistoryService        services.PriceHistoryService
+	WizardService              wizard.Service
+	UserStorePreferenceService services.UserStorePreferenceService
+	RateLimiter                *cache.RateLimiter
+	DB                         *bun.DB
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
@@ -53,6 +58,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ShoppingListItemService,
 		config.PriceHistoryService,
 		config.WizardService,
+		config.UserStorePreferenceService,
 		config.RateLimiter,
 		config.DB,
 	)
@@ -62,20 +68,44 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		Resolvers: serviceResolver,
 	})
 
-	// Create GraphQL HTTP handler
-	gqlHandler := handler.NewDefaultServer(schema)
+	// Create GraphQL server with proper configuration
+	srv := handler.NewDefaultServer(schema)
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.POST{})
+	srv.Use(extension.Introspection{})
+
+	// Add AroundOperations to inject dataloaders into context
+	// This ensures dataloaders are available in all field resolvers including
+	// those executed in goroutines by gqlgen's FieldSet.Dispatch
+	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
+		// Create fresh dataloaders for this operation
+		loaders := dataloaders.NewLoaders(
+			config.StoreService,
+			config.FlyerService,
+			config.FlyerPageService,
+			config.ShoppingListService,
+			config.ProductService,
+			config.ProductMasterService,
+			config.AuthService,
+		)
+		ctx = dataloaders.AddToContext(ctx, loaders)
+		return next(ctx)
+	})
 
 	return func(c *fiber.Ctx) error {
-		// Get the context with dataloaders already set by middleware
-		ctx := deriveGraphQLContext(c)
+		// Get context from Fiber (may have auth info from middleware)
+		ctx := c.UserContext()
+		if ctx == nil {
+			ctx = context.Background()
+		}
 
-		// Convert Fiber request to GraphQL request body
-		req := &graphQLRequest{}
-		if err := c.BodyParser(req); err != nil {
+		// Parse GraphQL request body
+		var req graphQLRequest
+		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid JSON"})
 		}
 
-		// Create HTTP request from Fiber context
+		// Create HTTP request for gqlgen server
 		body, _ := json.Marshal(req)
 		httpReq := httptest.NewRequest("POST", "/graphql", bytes.NewReader(body))
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -84,44 +114,23 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		// Create HTTP response recorder
 		w := httptest.NewRecorder()
 
-		// Execute GraphQL query through the HTTP handler
-		gqlHandler.ServeHTTP(w, httpReq)
+		// Execute GraphQL request
+		srv.ServeHTTP(w, httpReq)
 
-		// Convert HTTP response back to Fiber response
+		// Return response
 		responseBody, _ := io.ReadAll(w.Body)
 		var gqlResponse interface{}
 		json.Unmarshal(responseBody, &gqlResponse)
 
-		// Set the same status code
 		c.Status(w.Code)
-
-		// Copy headers
 		for key, values := range w.Header() {
 			for _, value := range values {
 				c.Set(key, value)
 			}
 		}
 
-		// Return the GraphQL response
 		return c.JSON(gqlResponse)
 	}
-}
-
-func deriveGraphQLContext(c *fiber.Ctx) context.Context {
-	if c == nil {
-		return context.Background()
-	}
-
-	userCtx := c.UserContext()
-	if userCtx != nil && userCtx != context.Background() {
-		return userCtx
-	}
-
-	if requestCtx := c.Context(); requestCtx != nil {
-		return requestCtx
-	}
-
-	return context.Background()
 }
 
 // graphQLRequest represents a GraphQL request body

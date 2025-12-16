@@ -123,6 +123,11 @@ func (f *ServiceFactory) PriceHistoryService() PriceHistoryService {
 	return NewPriceHistoryService(f.db)
 }
 
+// UserStorePreferenceService returns a user store preference service instance
+func (f *ServiceFactory) UserStorePreferenceService() UserStorePreferenceService {
+	return NewUserStorePreferenceService(f.db, f.StoreService())
+}
+
 // PriceComparisonService returns a price comparison service instance
 func (f *ServiceFactory) PriceComparisonService() recommendation.PriceComparisonService {
 	return recommendation.NewPriceComparisonService(f.db)

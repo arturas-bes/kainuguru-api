@@ -89,7 +89,19 @@ format:
 
 run:
 	@echo "🚀 Running API server locally..."
-	@go run cmd/api/main.go
+	@echo "🐳 Recreating Docker containers (db, redis, cdn)..."
+	@docker-compose down --remove-orphans 2>/dev/null || true
+	@docker-compose up -d db redis cdn
+	@echo "⏳ Waiting for database to be healthy..."
+	@until docker-compose exec -T db pg_isready -U kainuguru -d kainuguru_db >/dev/null 2>&1; do \
+		sleep 1; \
+	done
+	@echo "⏳ Waiting for Redis to be healthy..."
+	@until docker-compose exec -T redis redis-cli ping >/dev/null 2>&1; do \
+		sleep 1; \
+	done
+	@echo "✅ Dependencies ready! Starting API..."
+	@set -a && source .env && set +a && REDIS_HOST=localhost go run cmd/api/main.go
 
 test:
 	@echo "🧪 Running all tests..."

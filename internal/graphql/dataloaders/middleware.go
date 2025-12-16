@@ -1,6 +1,8 @@
 package dataloaders
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/kainuguru/kainuguru-api/internal/services"
 	"github.com/kainuguru/kainuguru-api/internal/services/auth"
@@ -28,8 +30,14 @@ func Middleware(
 			authService,
 		)
 
+		// Get existing context or create a new one
+		ctx := c.UserContext()
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
 		// Add loaders to context
-		ctx := AddToContext(c.UserContext(), loaders)
+		ctx = AddToContext(ctx, loaders)
 		c.SetUserContext(ctx)
 
 		return c.Next()
