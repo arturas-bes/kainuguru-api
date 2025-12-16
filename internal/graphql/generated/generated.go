@@ -217,6 +217,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		ActivatePriceAlert         func(childComplexity int, id string) int
+		AddPreferredStore          func(childComplexity int, storeID int) int
 		BulkAcceptSuggestions      func(childComplexity int, input model.BulkAcceptInput) int
 		CancelWizard               func(childComplexity int, sessionID string) int
 		CheckShoppingListItem      func(childComplexity int, id int) int
@@ -234,8 +235,10 @@ type ComplexityRoot struct {
 		RecordDecision             func(childComplexity int, input model.RecordDecisionInput) int
 		RefreshToken               func(childComplexity int) int
 		Register                   func(childComplexity int, input model.RegisterInput) int
+		RemovePreferredStore       func(childComplexity int, storeID int) int
 		ResumeWizard               func(childComplexity int, sessionID string) int
 		SetDefaultShoppingList     func(childComplexity int, id int) int
+		SetPreferredStores         func(childComplexity int, input model.SetPreferredStoresInput) int
 		StartWizard                func(childComplexity int, input model.StartWizardInput) int
 		UncheckShoppingListItem    func(childComplexity int, id int) int
 		UpdateMigrationPreferences func(childComplexity int, input model.UpdatePreferencesInput) int
@@ -762,6 +765,8 @@ type ComplexityRoot struct {
 		IsActive          func(childComplexity int) int
 		LastLoginAt       func(childComplexity int) int
 		PreferredLanguage func(childComplexity int) int
+		PreferredStoreIDs func(childComplexity int) int
+		PreferredStores   func(childComplexity int) int
 		PriceAlerts       func(childComplexity int) int
 		ShoppingLists     func(childComplexity int) int
 		UpdatedAt         func(childComplexity int) int
@@ -869,6 +874,9 @@ type MutationResolver interface {
 	DeletePriceAlert(ctx context.Context, id string) (bool, error)
 	ActivatePriceAlert(ctx context.Context, id string) (*model.PriceAlert, error)
 	DeactivatePriceAlert(ctx context.Context, id string) (*model.PriceAlert, error)
+	SetPreferredStores(ctx context.Context, input model.SetPreferredStoresInput) (*models.User, error)
+	AddPreferredStore(ctx context.Context, storeID int) (*models.User, error)
+	RemovePreferredStore(ctx context.Context, storeID int) (*models.User, error)
 	StartWizard(ctx context.Context, input model.StartWizardInput) (*model.WizardSession, error)
 	RecordDecision(ctx context.Context, input model.RecordDecisionInput) (*model.WizardSession, error)
 	BulkAcceptSuggestions(ctx context.Context, input model.BulkAcceptInput) (*model.WizardSession, error)
@@ -984,6 +992,8 @@ type UserResolver interface {
 	UpdatedAt(ctx context.Context, obj *models.User) (string, error)
 	ShoppingLists(ctx context.Context, obj *models.User) ([]*models.ShoppingList, error)
 	PriceAlerts(ctx context.Context, obj *models.User) ([]*model.PriceAlert, error)
+	PreferredStores(ctx context.Context, obj *models.User) ([]*models.Store, error)
+	PreferredStoreIDs(ctx context.Context, obj *models.User) ([]int, error)
 }
 
 type executableSchema struct {
@@ -1679,6 +1689,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.ActivatePriceAlert(childComplexity, args["id"].(string)), true
+	case "Mutation.addPreferredStore":
+		if e.complexity.Mutation.AddPreferredStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addPreferredStore_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddPreferredStore(childComplexity, args["storeID"].(int)), true
 	case "Mutation.bulkAcceptSuggestions":
 		if e.complexity.Mutation.BulkAcceptSuggestions == nil {
 			break
@@ -1856,6 +1877,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
+	case "Mutation.removePreferredStore":
+		if e.complexity.Mutation.RemovePreferredStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removePreferredStore_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RemovePreferredStore(childComplexity, args["storeID"].(int)), true
 	case "Mutation.resumeWizard":
 		if e.complexity.Mutation.ResumeWizard == nil {
 			break
@@ -1878,6 +1910,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SetDefaultShoppingList(childComplexity, args["id"].(int)), true
+	case "Mutation.setPreferredStores":
+		if e.complexity.Mutation.SetPreferredStores == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setPreferredStores_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetPreferredStores(childComplexity, args["input"].(model.SetPreferredStoresInput)), true
 	case "Mutation.startWizard":
 		if e.complexity.Mutation.StartWizard == nil {
 			break
@@ -4447,6 +4490,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.PreferredLanguage(childComplexity), true
+	case "User.preferredStoreIDs":
+		if e.complexity.User.PreferredStoreIDs == nil {
+			break
+		}
+
+		return e.complexity.User.PreferredStoreIDs(childComplexity), true
+	case "User.preferredStores":
+		if e.complexity.User.PreferredStores == nil {
+			break
+		}
+
+		return e.complexity.User.PreferredStores(childComplexity), true
 	case "User.priceAlerts":
 		if e.complexity.User.PriceAlerts == nil {
 			break
@@ -4750,6 +4805,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputRecordDecisionInput,
 		ec.unmarshalInputRegisterInput,
 		ec.unmarshalInputSearchInput,
+		ec.unmarshalInputSetPreferredStoresInput,
 		ec.unmarshalInputShoppingListFilters,
 		ec.unmarshalInputShoppingListItemFilters,
 		ec.unmarshalInputStartWizardInput,
@@ -5109,6 +5165,10 @@ type User {
   # Relations
   shoppingLists: [ShoppingList!]!
   priceAlerts: [PriceAlert!]!
+
+  # Store Preferences
+  preferredStores: [Store!]!
+  preferredStoreIDs: [Int!]!
 }
 
 type AuthPayload {
@@ -5762,6 +5822,11 @@ type Mutation {
   deletePriceAlert(id: ID!): Boolean!
   activatePriceAlert(id: ID!): PriceAlert!
   deactivatePriceAlert(id: ID!): PriceAlert!
+
+  # User Store Preferences
+  setPreferredStores(input: SetPreferredStoresInput!): User!
+  addPreferredStore(storeID: Int!): User!
+  removePreferredStore(storeID: Int!): User!
 }
 
 # Additional Input Types for Updates
@@ -5791,6 +5856,11 @@ input UpdatePriceAlertInput {
   notifyPush: Boolean
   notes: String
   expiresAt: String
+}
+
+# User Store Preferences Input
+input SetPreferredStoresInput {
+  storeIDs: [Int!]!
 }`, BuiltIn: false},
 	{Name: "../schema/wizard.graphql", Input: `# Shopping List Migration Wizard API Contract
 # Version: 1.0.0
@@ -6270,6 +6340,17 @@ func (ec *executionContext) field_Mutation_activatePriceAlert_args(ctx context.C
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_addPreferredStore_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "storeID", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["storeID"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_bulkAcceptSuggestions_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6435,6 +6516,17 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_removePreferredStore_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "storeID", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["storeID"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_resumeWizard_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6454,6 +6546,17 @@ func (ec *executionContext) field_Mutation_setDefaultShoppingList_args(ctx conte
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setPreferredStores_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNSetPreferredStoresInput2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐSetPreferredStoresInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -7190,6 +7293,10 @@ func (ec *executionContext) fieldContext_AuthPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -12006,6 +12113,213 @@ func (ec *executionContext) fieldContext_Mutation_deactivatePriceAlert(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setPreferredStores(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_setPreferredStores,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().SetPreferredStores(ctx, fc.Args["input"].(model.SetPreferredStoresInput))
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setPreferredStores(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_User_emailVerified(ctx, field)
+			case "fullName":
+				return ec.fieldContext_User_fullName(ctx, field)
+			case "preferredLanguage":
+				return ec.fieldContext_User_preferredLanguage(ctx, field)
+			case "isActive":
+				return ec.fieldContext_User_isActive(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_User_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "shoppingLists":
+				return ec.fieldContext_User_shoppingLists(ctx, field)
+			case "priceAlerts":
+				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setPreferredStores_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_addPreferredStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_addPreferredStore,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().AddPreferredStore(ctx, fc.Args["storeID"].(int))
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_addPreferredStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_User_emailVerified(ctx, field)
+			case "fullName":
+				return ec.fieldContext_User_fullName(ctx, field)
+			case "preferredLanguage":
+				return ec.fieldContext_User_preferredLanguage(ctx, field)
+			case "isActive":
+				return ec.fieldContext_User_isActive(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_User_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "shoppingLists":
+				return ec.fieldContext_User_shoppingLists(ctx, field)
+			case "priceAlerts":
+				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_addPreferredStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_removePreferredStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_removePreferredStore,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().RemovePreferredStore(ctx, fc.Args["storeID"].(int))
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_removePreferredStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_User_emailVerified(ctx, field)
+			case "fullName":
+				return ec.fieldContext_User_fullName(ctx, field)
+			case "preferredLanguage":
+				return ec.fieldContext_User_preferredLanguage(ctx, field)
+			case "isActive":
+				return ec.fieldContext_User_isActive(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_User_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "shoppingLists":
+				return ec.fieldContext_User_shoppingLists(ctx, field)
+			case "priceAlerts":
+				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_removePreferredStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_startWizard(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -14068,6 +14382,10 @@ func (ec *executionContext) fieldContext_PriceAlert_user(_ context.Context, fiel
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -20116,6 +20434,10 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -22580,6 +22902,10 @@ func (ec *executionContext) fieldContext_ShoppingList_user(_ context.Context, fi
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -23073,6 +23399,10 @@ func (ec *executionContext) fieldContext_ShoppingListCategory_user(_ context.Con
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -24311,6 +24641,10 @@ func (ec *executionContext) fieldContext_ShoppingListItem_user(_ context.Context
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -24364,6 +24698,10 @@ func (ec *executionContext) fieldContext_ShoppingListItem_checkedByUser(_ contex
 				return ec.fieldContext_User_shoppingLists(ctx, field)
 			case "priceAlerts":
 				return ec.fieldContext_User_priceAlerts(ctx, field)
+			case "preferredStores":
+				return ec.fieldContext_User_preferredStores(ctx, field)
+			case "preferredStoreIDs":
+				return ec.fieldContext_User_preferredStoreIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -27091,6 +27429,96 @@ func (ec *executionContext) fieldContext_User_priceAlerts(_ context.Context, fie
 				return ec.fieldContext_PriceAlert_store(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PriceAlert", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_preferredStores(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_preferredStores,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().PreferredStores(ctx, obj)
+		},
+		nil,
+		ec.marshalNStore2ᚕᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐStoreᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_preferredStores(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "code":
+				return ec.fieldContext_Store_code(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "logoURL":
+				return ec.fieldContext_Store_logoURL(ctx, field)
+			case "websiteURL":
+				return ec.fieldContext_Store_websiteURL(ctx, field)
+			case "flyerSourceURL":
+				return ec.fieldContext_Store_flyerSourceURL(ctx, field)
+			case "scraperConfig":
+				return ec.fieldContext_Store_scraperConfig(ctx, field)
+			case "scrapeSchedule":
+				return ec.fieldContext_Store_scrapeSchedule(ctx, field)
+			case "lastScrapedAt":
+				return ec.fieldContext_Store_lastScrapedAt(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Store_isActive(ctx, field)
+			case "locations":
+				return ec.fieldContext_Store_locations(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			case "flyers":
+				return ec.fieldContext_Store_flyers(ctx, field)
+			case "products":
+				return ec.fieldContext_Store_products(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_preferredStoreIDs(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_preferredStoreIDs,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().PreferredStoreIDs(ctx, obj)
+		},
+		nil,
+		ec.marshalNInt2ᚕintᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_preferredStoreIDs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -31049,6 +31477,33 @@ func (ec *executionContext) unmarshalInputSearchInput(ctx context.Context, obj a
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputSetPreferredStoresInput(ctx context.Context, obj any) (model.SetPreferredStoresInput, error) {
+	var it model.SetPreferredStoresInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"storeIDs"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "storeIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("storeIDs"))
+			data, err := ec.unmarshalNInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StoreIDs = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputShoppingListFilters(ctx context.Context, obj any) (model.ShoppingListFilters, error) {
 	var it model.ShoppingListFilters
 	asMap := map[string]any{}
@@ -33262,6 +33717,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "deactivatePriceAlert":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deactivatePriceAlert(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setPreferredStores":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setPreferredStores(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "addPreferredStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addPreferredStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removePreferredStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removePreferredStore(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -38093,7 +38569,7 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		Object: "Subscription",
 	})
 	if len(fields) != 1 {
-		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
 		return nil
 	}
 
@@ -38403,6 +38879,78 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._User_priceAlerts(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "preferredStores":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_preferredStores(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "preferredStoreIDs":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_preferredStoreIDs(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -39231,7 +39779,7 @@ func (ec *executionContext) marshalNAuthPayload2githubᚗcomᚋkainuguruᚋkainu
 func (ec *executionContext) marshalNAuthPayload2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v *model.AuthPayload) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39241,7 +39789,7 @@ func (ec *executionContext) marshalNAuthPayload2ᚖgithubᚗcomᚋkainuguruᚋka
 func (ec *executionContext) marshalNAvailabilityFacet2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐAvailabilityFacet(ctx context.Context, sel ast.SelectionSet, v *model.AvailabilityFacet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39258,7 +39806,7 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	res := graphql.MarshalBoolean(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -39267,7 +39815,7 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 func (ec *executionContext) marshalNBrandFacet2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐBrandFacet(ctx context.Context, sel ast.SelectionSet, v *model.BrandFacet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39277,7 +39825,7 @@ func (ec *executionContext) marshalNBrandFacet2ᚖgithubᚗcomᚋkainuguruᚋkai
 func (ec *executionContext) marshalNBrandPreference2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐBrandPreference(ctx context.Context, sel ast.SelectionSet, v *model.BrandPreference) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39297,7 +39845,7 @@ func (ec *executionContext) unmarshalNBulkAcceptInput2githubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNCategoryFacet2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐCategoryFacet(ctx context.Context, sel ast.SelectionSet, v *model.CategoryFacet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39356,7 +39904,7 @@ func (ec *executionContext) marshalNConfidenceRate2ᚕᚖgithubᚗcomᚋkainugur
 func (ec *executionContext) marshalNConfidenceRate2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐConfidenceRate(ctx context.Context, sel ast.SelectionSet, v *model.ConfidenceRate) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39388,7 +39936,7 @@ func (ec *executionContext) marshalNDateTime2timeᚐTime(ctx context.Context, se
 	res := scalars.MarshalDateTime(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -39451,7 +39999,7 @@ func (ec *executionContext) marshalNExpiredItem2ᚕᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNExpiredItem2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐExpiredItem(ctx context.Context, sel ast.SelectionSet, v *model.ExpiredItem) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39465,7 +40013,7 @@ func (ec *executionContext) marshalNExpiredItemNotification2githubᚗcomᚋkainu
 func (ec *executionContext) marshalNExpiredItemNotification2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐExpiredItemNotification(ctx context.Context, sel ast.SelectionSet, v *model.ExpiredItemNotification) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39479,7 +40027,7 @@ func (ec *executionContext) marshalNExpiredItemsCheck2githubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNExpiredItemsCheck2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐExpiredItemsCheck(ctx context.Context, sel ast.SelectionSet, v *model.ExpiredItemsCheck) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39533,7 +40081,7 @@ func (ec *executionContext) marshalNFacetOption2ᚕᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNFacetOption2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFacetOption(ctx context.Context, sel ast.SelectionSet, v *model.FacetOption) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39550,7 +40098,7 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 	res := graphql.MarshalFloatContext(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return graphql.WrapContextMarshaler(ctx, res)
@@ -39559,7 +40107,7 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 func (ec *executionContext) marshalNFlyer2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐFlyer(ctx context.Context, sel ast.SelectionSet, v *models.Flyer) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39573,7 +40121,7 @@ func (ec *executionContext) marshalNFlyerConnection2githubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNFlyerConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerConnection(ctx context.Context, sel ast.SelectionSet, v *model.FlyerConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39627,7 +40175,7 @@ func (ec *executionContext) marshalNFlyerEdge2ᚕᚖgithubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNFlyerEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerEdge(ctx context.Context, sel ast.SelectionSet, v *model.FlyerEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39637,7 +40185,7 @@ func (ec *executionContext) marshalNFlyerEdge2ᚖgithubᚗcomᚋkainuguruᚋkain
 func (ec *executionContext) marshalNFlyerPage2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerPage(ctx context.Context, sel ast.SelectionSet, v *model.FlyerPage) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39651,7 +40199,7 @@ func (ec *executionContext) marshalNFlyerPageConnection2githubᚗcomᚋkainuguru
 func (ec *executionContext) marshalNFlyerPageConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerPageConnection(ctx context.Context, sel ast.SelectionSet, v *model.FlyerPageConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39705,7 +40253,7 @@ func (ec *executionContext) marshalNFlyerPageEdge2ᚕᚖgithubᚗcomᚋkainuguru
 func (ec *executionContext) marshalNFlyerPageEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐFlyerPageEdge(ctx context.Context, sel ast.SelectionSet, v *model.FlyerPageEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39747,7 +40295,7 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	res := graphql.MarshalID(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -39763,7 +40311,7 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	res := graphql.MarshalInt(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -39779,10 +40327,40 @@ func (ec *executionContext) marshalNInt2int64(ctx context.Context, sel ast.Selec
 	res := graphql.MarshalInt64(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v any) ([]int, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]int, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
@@ -39803,7 +40381,7 @@ func (ec *executionContext) marshalNMigrationStatus2githubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNMigrationSummary2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐMigrationSummary(ctx context.Context, sel ast.SelectionSet, v *model.MigrationSummary) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39813,7 +40391,7 @@ func (ec *executionContext) marshalNMigrationSummary2ᚖgithubᚗcomᚋkainuguru
 func (ec *executionContext) marshalNOfferSnapshot2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐOfferSnapshot(ctx context.Context, sel ast.SelectionSet, v *model.OfferSnapshot) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39827,7 +40405,7 @@ func (ec *executionContext) marshalNOfferSnapshotConnection2githubᚗcomᚋkainu
 func (ec *executionContext) marshalNOfferSnapshotConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐOfferSnapshotConnection(ctx context.Context, sel ast.SelectionSet, v *model.OfferSnapshotConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39881,7 +40459,7 @@ func (ec *executionContext) marshalNOfferSnapshotEdge2ᚕᚖgithubᚗcomᚋkainu
 func (ec *executionContext) marshalNOfferSnapshotEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐOfferSnapshotEdge(ctx context.Context, sel ast.SelectionSet, v *model.OfferSnapshotEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39891,7 +40469,7 @@ func (ec *executionContext) marshalNOfferSnapshotEdge2ᚖgithubᚗcomᚋkainugur
 func (ec *executionContext) marshalNOriginalItem2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐOriginalItem(ctx context.Context, sel ast.SelectionSet, v *model.OriginalItem) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39901,7 +40479,7 @@ func (ec *executionContext) marshalNOriginalItem2ᚖgithubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39911,7 +40489,7 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋkainuguruᚋkainu
 func (ec *executionContext) marshalNPagination2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPagination(ctx context.Context, sel ast.SelectionSet, v *model.Pagination) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39969,7 +40547,7 @@ func (ec *executionContext) marshalNPriceAlert2ᚕᚖgithubᚗcomᚋkainuguruᚋ
 func (ec *executionContext) marshalNPriceAlert2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceAlert(ctx context.Context, sel ast.SelectionSet, v *model.PriceAlert) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -39983,7 +40561,7 @@ func (ec *executionContext) marshalNPriceAlertConnection2githubᚗcomᚋkainugur
 func (ec *executionContext) marshalNPriceAlertConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceAlertConnection(ctx context.Context, sel ast.SelectionSet, v *model.PriceAlertConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40037,7 +40615,7 @@ func (ec *executionContext) marshalNPriceAlertEdge2ᚕᚖgithubᚗcomᚋkainugur
 func (ec *executionContext) marshalNPriceAlertEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceAlertEdge(ctx context.Context, sel ast.SelectionSet, v *model.PriceAlertEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40091,7 +40669,7 @@ func (ec *executionContext) marshalNPriceHistory2ᚕᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNPriceHistory2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceHistory(ctx context.Context, sel ast.SelectionSet, v *model.PriceHistory) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40105,7 +40683,7 @@ func (ec *executionContext) marshalNPriceHistoryConnection2githubᚗcomᚋkainug
 func (ec *executionContext) marshalNPriceHistoryConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceHistoryConnection(ctx context.Context, sel ast.SelectionSet, v *model.PriceHistoryConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40159,7 +40737,7 @@ func (ec *executionContext) marshalNPriceHistoryEdge2ᚕᚖgithubᚗcomᚋkainug
 func (ec *executionContext) marshalNPriceHistoryEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceHistoryEdge(ctx context.Context, sel ast.SelectionSet, v *model.PriceHistoryEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40169,7 +40747,7 @@ func (ec *executionContext) marshalNPriceHistoryEdge2ᚖgithubᚗcomᚋkainuguru
 func (ec *executionContext) marshalNPriceRangeFacet2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐPriceRangeFacet(ctx context.Context, sel ast.SelectionSet, v *model.PriceRangeFacet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40179,7 +40757,7 @@ func (ec *executionContext) marshalNPriceRangeFacet2ᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNProduct2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐProduct(ctx context.Context, sel ast.SelectionSet, v *models.Product) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40193,7 +40771,7 @@ func (ec *executionContext) marshalNProductConnection2githubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNProductConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductConnection(ctx context.Context, sel ast.SelectionSet, v *model.ProductConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40247,7 +40825,7 @@ func (ec *executionContext) marshalNProductEdge2ᚕᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNProductEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductEdge(ctx context.Context, sel ast.SelectionSet, v *model.ProductEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40257,7 +40835,7 @@ func (ec *executionContext) marshalNProductEdge2ᚖgithubᚗcomᚋkainuguruᚋka
 func (ec *executionContext) marshalNProductMaster2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductMaster(ctx context.Context, sel ast.SelectionSet, v *model.ProductMaster) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40271,7 +40849,7 @@ func (ec *executionContext) marshalNProductMasterConnection2githubᚗcomᚋkainu
 func (ec *executionContext) marshalNProductMasterConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductMasterConnection(ctx context.Context, sel ast.SelectionSet, v *model.ProductMasterConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40325,7 +40903,7 @@ func (ec *executionContext) marshalNProductMasterEdge2ᚕᚖgithubᚗcomᚋkainu
 func (ec *executionContext) marshalNProductMasterEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductMasterEdge(ctx context.Context, sel ast.SelectionSet, v *model.ProductMasterEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40349,7 +40927,7 @@ func (ec *executionContext) marshalNProductPrice2githubᚗcomᚋkainuguruᚋkain
 func (ec *executionContext) marshalNProductPrice2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductPrice(ctx context.Context, sel ast.SelectionSet, v *model.ProductPrice) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40403,7 +40981,7 @@ func (ec *executionContext) marshalNProductSearchResult2ᚕᚖgithubᚗcomᚋkai
 func (ec *executionContext) marshalNProductSearchResult2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐProductSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.ProductSearchResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40423,7 +41001,7 @@ func (ec *executionContext) unmarshalNRegisterInput2githubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNScoreBreakdown2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐScoreBreakdown(ctx context.Context, sel ast.SelectionSet, v *model.ScoreBreakdown) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40433,7 +41011,7 @@ func (ec *executionContext) marshalNScoreBreakdown2ᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNSearchFacets2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐSearchFacets(ctx context.Context, sel ast.SelectionSet, v *model.SearchFacets) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40452,11 +41030,16 @@ func (ec *executionContext) marshalNSearchResult2githubᚗcomᚋkainuguruᚋkain
 func (ec *executionContext) marshalNSearchResult2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.SearchResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
 	return ec._SearchResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNSetPreferredStoresInput2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐSetPreferredStoresInput(ctx context.Context, v any) (model.SetPreferredStoresInput, error) {
+	res, err := ec.unmarshalInputSetPreferredStoresInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNShoppingList2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐShoppingList(ctx context.Context, sel ast.SelectionSet, v models.ShoppingList) graphql.Marshaler {
@@ -40510,7 +41093,7 @@ func (ec *executionContext) marshalNShoppingList2ᚕᚖgithubᚗcomᚋkainuguru�
 func (ec *executionContext) marshalNShoppingList2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐShoppingList(ctx context.Context, sel ast.SelectionSet, v *models.ShoppingList) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40564,7 +41147,7 @@ func (ec *executionContext) marshalNShoppingListCategory2ᚕᚖgithubᚗcomᚋka
 func (ec *executionContext) marshalNShoppingListCategory2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐShoppingListCategory(ctx context.Context, sel ast.SelectionSet, v *model.ShoppingListCategory) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40578,7 +41161,7 @@ func (ec *executionContext) marshalNShoppingListConnection2githubᚗcomᚋkainug
 func (ec *executionContext) marshalNShoppingListConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐShoppingListConnection(ctx context.Context, sel ast.SelectionSet, v *model.ShoppingListConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40632,7 +41215,7 @@ func (ec *executionContext) marshalNShoppingListEdge2ᚕᚖgithubᚗcomᚋkainug
 func (ec *executionContext) marshalNShoppingListEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐShoppingListEdge(ctx context.Context, sel ast.SelectionSet, v *model.ShoppingListEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40646,7 +41229,7 @@ func (ec *executionContext) marshalNShoppingListItem2githubᚗcomᚋkainuguruᚋ
 func (ec *executionContext) marshalNShoppingListItem2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐShoppingListItem(ctx context.Context, sel ast.SelectionSet, v *models.ShoppingListItem) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40660,7 +41243,7 @@ func (ec *executionContext) marshalNShoppingListItemConnection2githubᚗcomᚋka
 func (ec *executionContext) marshalNShoppingListItemConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐShoppingListItemConnection(ctx context.Context, sel ast.SelectionSet, v *model.ShoppingListItemConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40714,7 +41297,7 @@ func (ec *executionContext) marshalNShoppingListItemEdge2ᚕᚖgithubᚗcomᚋka
 func (ec *executionContext) marshalNShoppingListItemEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐShoppingListItemEdge(ctx context.Context, sel ast.SelectionSet, v *model.ShoppingListItemEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40773,7 +41356,7 @@ func (ec *executionContext) marshalNStore2ᚕᚖgithubᚗcomᚋkainuguruᚋkainu
 func (ec *executionContext) marshalNStore2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐStore(ctx context.Context, sel ast.SelectionSet, v *models.Store) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40787,7 +41370,7 @@ func (ec *executionContext) marshalNStoreConnection2githubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNStoreConnection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreConnection(ctx context.Context, sel ast.SelectionSet, v *model.StoreConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40841,7 +41424,7 @@ func (ec *executionContext) marshalNStoreEdge2ᚕᚖgithubᚗcomᚋkainuguruᚋk
 func (ec *executionContext) marshalNStoreEdge2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreEdge(ctx context.Context, sel ast.SelectionSet, v *model.StoreEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40851,7 +41434,7 @@ func (ec *executionContext) marshalNStoreEdge2ᚖgithubᚗcomᚋkainuguruᚋkain
 func (ec *executionContext) marshalNStoreFacet2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreFacet(ctx context.Context, sel ast.SelectionSet, v *model.StoreFacet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40905,7 +41488,7 @@ func (ec *executionContext) marshalNStoreLocation2ᚕᚖgithubᚗcomᚋkainuguru
 func (ec *executionContext) marshalNStoreLocation2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreLocation(ctx context.Context, sel ast.SelectionSet, v *model.StoreLocation) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -40959,7 +41542,7 @@ func (ec *executionContext) marshalNStoreSelection2ᚕᚖgithubᚗcomᚋkainugur
 func (ec *executionContext) marshalNStoreSelection2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreSelection(ctx context.Context, sel ast.SelectionSet, v *model.StoreSelection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41013,7 +41596,7 @@ func (ec *executionContext) marshalNStoreUsage2ᚕᚖgithubᚗcomᚋkainuguruᚋ
 func (ec *executionContext) marshalNStoreUsage2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐStoreUsage(ctx context.Context, sel ast.SelectionSet, v *model.StoreUsage) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41030,7 +41613,7 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	res := graphql.MarshalString(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -41113,7 +41696,7 @@ func (ec *executionContext) marshalNSuggestion2ᚕᚖgithubᚗcomᚋkainuguruᚋ
 func (ec *executionContext) marshalNSuggestion2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐSuggestion(ctx context.Context, sel ast.SelectionSet, v *model.Suggestion) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41140,10 +41723,14 @@ func (ec *executionContext) unmarshalNUpdateShoppingListItemInput2githubᚗcom�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNUser2githubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v models.User) graphql.Marshaler {
+	return ec._User(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v *models.User) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41157,7 +41744,7 @@ func (ec *executionContext) marshalNUserMigrationPreferences2githubᚗcomᚋkain
 func (ec *executionContext) marshalNUserMigrationPreferences2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐUserMigrationPreferences(ctx context.Context, sel ast.SelectionSet, v *model.UserMigrationPreferences) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41167,7 +41754,7 @@ func (ec *executionContext) marshalNUserMigrationPreferences2ᚖgithubᚗcomᚋk
 func (ec *executionContext) marshalNWizardError2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐWizardError(ctx context.Context, sel ast.SelectionSet, v *model.WizardError) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41177,7 +41764,7 @@ func (ec *executionContext) marshalNWizardError2ᚖgithubᚗcomᚋkainuguruᚋka
 func (ec *executionContext) marshalNWizardProgress2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐWizardProgress(ctx context.Context, sel ast.SelectionSet, v *model.WizardProgress) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41191,7 +41778,7 @@ func (ec *executionContext) marshalNWizardResult2githubᚗcomᚋkainuguruᚋkain
 func (ec *executionContext) marshalNWizardResult2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐWizardResult(ctx context.Context, sel ast.SelectionSet, v *model.WizardResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41205,7 +41792,7 @@ func (ec *executionContext) marshalNWizardSession2githubᚗcomᚋkainuguruᚋkai
 func (ec *executionContext) marshalNWizardSession2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐWizardSession(ctx context.Context, sel ast.SelectionSet, v *model.WizardSession) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41219,7 +41806,7 @@ func (ec *executionContext) marshalNWizardStatistics2githubᚗcomᚋkainuguruᚋ
 func (ec *executionContext) marshalNWizardStatistics2ᚖgithubᚗcomᚋkainuguruᚋkainuguruᚑapiᚋinternalᚋgraphqlᚋmodelᚐWizardStatistics(ctx context.Context, sel ast.SelectionSet, v *model.WizardStatistics) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41294,7 +41881,7 @@ func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Conte
 	res := graphql.MarshalString(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res
@@ -41466,7 +42053,7 @@ func (ec *executionContext) marshalN__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgen�
 func (ec *executionContext) marshalN__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx context.Context, sel ast.SelectionSet, v *introspection.Type) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
@@ -41483,7 +42070,7 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	res := graphql.MarshalString(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
 	return res

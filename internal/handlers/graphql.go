@@ -25,20 +25,21 @@ import (
 
 // GraphQLConfig holds configuration for GraphQL handler
 type GraphQLConfig struct {
-	StoreService            services.StoreService
-	FlyerService            services.FlyerService
-	FlyerPageService        services.FlyerPageService
-	ProductService          services.ProductService
-	ProductMasterService    services.ProductMasterService
-	ExtractionJobService    services.ExtractionJobService
-	SearchService           search.Service
-	AuthService             auth.AuthService
-	ShoppingListService     services.ShoppingListService
-	ShoppingListItemService services.ShoppingListItemService
-	PriceHistoryService     services.PriceHistoryService
-	WizardService           wizard.Service
-	RateLimiter             *cache.RateLimiter
-	DB                      *bun.DB
+	StoreService               services.StoreService
+	FlyerService               services.FlyerService
+	FlyerPageService           services.FlyerPageService
+	ProductService             services.ProductService
+	ProductMasterService       services.ProductMasterService
+	ExtractionJobService       services.ExtractionJobService
+	SearchService              search.Service
+	AuthService                auth.AuthService
+	ShoppingListService        services.ShoppingListService
+	ShoppingListItemService    services.ShoppingListItemService
+	PriceHistoryService        services.PriceHistoryService
+	WizardService              wizard.Service
+	UserStorePreferenceService services.UserStorePreferenceService
+	RateLimiter                *cache.RateLimiter
+	DB                         *bun.DB
 }
 
 // GraphQLHandler handles GraphQL requests with configured services
@@ -57,6 +58,7 @@ func GraphQLHandler(config GraphQLConfig) fiber.Handler {
 		config.ShoppingListItemService,
 		config.PriceHistoryService,
 		config.WizardService,
+		config.UserStorePreferenceService,
 		config.RateLimiter,
 		config.DB,
 	)

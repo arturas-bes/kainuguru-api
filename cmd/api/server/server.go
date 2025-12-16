@@ -162,20 +162,21 @@ func setupRoutes(app *fiber.App, db *database.BunDB, redis *cache.RedisClient, c
 
 	// Configure GraphQL handler with all services
 	graphqlConfig := handlers.GraphQLConfig{
-		StoreService:            serviceFactory.StoreService(),
-		FlyerService:            serviceFactory.FlyerService(),
-		FlyerPageService:        serviceFactory.FlyerPageService(),
-		ProductService:          serviceFactory.ProductService(),
-		ProductMasterService:    serviceFactory.ProductMasterService(),
-		ExtractionJobService:    serviceFactory.ExtractionJobService(),
-		SearchService:           serviceFactory.SearchService(),
-		AuthService:             authService,
-		ShoppingListService:     serviceFactory.ShoppingListService(),
-		ShoppingListItemService: serviceFactory.ShoppingListItemService(),
-		PriceHistoryService:     serviceFactory.PriceHistoryService(),
-		WizardService:           wizardService,
-		RateLimiter:             rateLimiter,
-		DB:                      db.DB,
+		StoreService:               serviceFactory.StoreService(),
+		FlyerService:               serviceFactory.FlyerService(),
+		FlyerPageService:           serviceFactory.FlyerPageService(),
+		ProductService:             serviceFactory.ProductService(),
+		ProductMasterService:       serviceFactory.ProductMasterService(),
+		ExtractionJobService:       serviceFactory.ExtractionJobService(),
+		SearchService:              serviceFactory.SearchService(),
+		AuthService:                authService,
+		ShoppingListService:        serviceFactory.ShoppingListService(),
+		ShoppingListItemService:    serviceFactory.ShoppingListItemService(),
+		PriceHistoryService:        serviceFactory.PriceHistoryService(),
+		WizardService:              wizardService,
+		UserStorePreferenceService: serviceFactory.UserStorePreferenceService(),
+		RateLimiter:                rateLimiter,
+		DB:                         db.DB,
 	}
 
 	// Determine which auth middleware to use based on configuration
